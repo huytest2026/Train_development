@@ -264,7 +264,7 @@ window.loadData = function() {
     const container = document.getElementById('topic-container');
     if (container) container.innerHTML = "Đang tải dữ liệu chủ đề...";
 
-    const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbyYaXrY5eE9g3jLq7tIFjSQSOd6WOEbmJ8Z4vgHrshoGN9h3RkwfZbrBUMkGAAfxgpJ/exec";
     const script = document.createElement('script');
     script.src = `${API_URL}?ma=${encodeURIComponent(maHS)}&callback=handleQuizData`;
     script.onerror = () => { 
