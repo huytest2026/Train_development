@@ -450,24 +450,27 @@ window.renderQuiz = function() {
     const container = document.getElementById('quiz');
     if (!container) return;
 
-    let renderedPassages = new Set();
     let contentHtml = '';
+    let currentChuDe = '';
 
     AppState.currentQuizData.forEach((item, index) => {
         let isEnglish = cleanKey(item.mon) === cleanKey('Tiếng Anh');
-        
-        // Nếu là bài đọc hiểu có đoạn văn và chưa được render, in đoạn văn ra ngay trước câu hỏi đầu tiên của chủ đề đó
-        if (isEnglish && item.passage && item.passage.trim() !== '' && !renderedPassages.has(item.chuDe)) {
-            renderedPassages.add(item.chuDe);
+        let itemChuDe = item.chuDe || '';
+
+        // Nếu chuyển sang chủ đề đọc hiểu (DH) mới, in đoạn văn ra ngay trước câu hỏi của đoạn văn đó
+        if (isEnglish && item.passage && item.passage.trim() !== '' && itemChuDe !== currentChuDe) {
+            currentChuDe = itemChuDe;
             contentHtml += `
                 <div class="passage-box">
-                    <div class="passage-tag">${escapeHTML(item.chuDe)}</div>
+                    <div class="passage-tag">${escapeHTML(itemChuDe)}</div>
                     <div>
                         <button class="speaker-btn" data-question="${escapeHTML(item.passage)}" onclick="window.handleSpeak(this)">🔊 Nghe đoạn văn</button>
                     </div>
                     <div style="white-space: pre-line; margin-top: 10px;">${escapeHTML(item.passage)}</div>
                 </div>
             `;
+        } else if (!itemChuDe.toUpperCase().startsWith('DH')) {
+            currentChuDe = '';
         }
 
         let loaiVal = (item.loai || '').toLowerCase();
