@@ -655,7 +655,7 @@ window.submitQuiz = function() {
 
     alert(`Bài làm kết thúc!\nĐúng: ${AppState.correctCount}/${total}\nĐiểm của bạn: ${score} điểm`);
 
-    const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbyYaXrY5eE9g3jLq7tIFjSQSOd6WOEbmJ8Z4vgHrshoGN9h3RkwfZbrBUMkGAAfxgpJ/exec";
     fetch(API_URL, {
         method: 'POST',
         mode: 'no-cors',
