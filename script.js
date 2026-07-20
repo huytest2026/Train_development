@@ -305,16 +305,14 @@ window.handleQuizData = function(data) {
             if (item.loai) lastLoai = item.loai;
             else if (lastLoai) item.loai = lastLoai;
 
-            // QUAN TRỌNG: Chỉ lưu và nhớ passage nếu thực sự thuộc môn Tiếng Anh và đúng dòng đọc hiểu
             if (item.passage) {
                 lastPassage = item.passage;
             } else if (cleanKey(item.mon) !== cleanKey('Tiếng Anh') || !String(item.chuDe || '').toUpperCase().startsWith('DH')) {
-                lastPassage = ''; // Xóa sạch passage nếu chuyển sang môn khác hoặc chủ đề khác không phải đọc hiểu
+                lastPassage = ''; 
             } else if (lastPassage) {
                 item.passage = lastPassage;
             }
 
-            // Chặn tuyệt đối passage lọt sang môn Toán
             if (cleanKey(item.mon) !== cleanKey('Tiếng Anh')) {
                 item.passage = '';
             }
@@ -452,36 +450,31 @@ window.renderQuiz = function() {
     const container = document.getElementById('quiz');
     if (!container) return;
 
-    let passageHtml = '';
-    // Lọc chỉ lấy passage thực sự có nội dung và bắt buộc phải là môn Tiếng Anh
-    let passageItems = AppState.currentQuizData.filter(i => cleanKey(i.mon) === cleanKey('Tiếng Anh') && i.passage && i.passage.trim() !== '');
-    if (passageItems.length > 0) {
-        let uniquePassages = {};
-        passageItems.forEach(item => {
-            if (!uniquePassages[item.chuDe]) {
-                uniquePassages[item.chuDe] = item.passage;
-            }
-        });
+    let renderedPassages = new Set();
+    let contentHtml = '';
 
-        for (let code in uniquePassages) {
-            passageHtml += `
+    AppState.currentQuizData.forEach((item, index) => {
+        let isEnglish = cleanKey(item.mon) === cleanKey('Tiếng Anh');
+        
+        // Nếu là bài đọc hiểu có đoạn văn và chưa được render, in đoạn văn ra ngay trước câu hỏi đầu tiên của chủ đề đó
+        if (isEnglish && item.passage && item.passage.trim() !== '' && !renderedPassages.has(item.chuDe)) {
+            renderedPassages.add(item.chuDe);
+            contentHtml += `
                 <div class="passage-box">
-                    <div class="passage-tag">${escapeHTML(code)}</div>
+                    <div class="passage-tag">${escapeHTML(item.chuDe)}</div>
                     <div>
-                        <button class="speaker-btn" data-question="${escapeHTML(uniquePassages[code])}" onclick="window.handleSpeak(this)">🔊 Nghe đoạn văn</button>
+                        <button class="speaker-btn" data-question="${escapeHTML(item.passage)}" onclick="window.handleSpeak(this)">🔊 Nghe đoạn văn</button>
                     </div>
-                    <div style="white-space: pre-line; margin-top: 10px;">${escapeHTML(uniquePassages[code])}</div>
+                    <div style="white-space: pre-line; margin-top: 10px;">${escapeHTML(item.passage)}</div>
                 </div>
             `;
         }
-    }
 
-    let questionsHtml = AppState.currentQuizData.map((item, index) => {
         let loaiVal = (item.loai || '').toLowerCase();
         let hasNoOptions = (!item.a || item.a.trim() === '') &&
-                           (!item.b || item.b.trim() === '') &&
-                           (!item.c || item.c.trim() === '') &&
-                           (!item.d || item.d.trim() === '');
+                            (!item.b || item.b.trim() === '') &&
+                            (!item.c || item.c.trim() === '') &&
+                            (!item.d || item.d.trim() === '');
         let isVoca = loaiVal.includes('voca') || loaiVal.includes('dien') || loaiVal.includes('từ') || hasNoOptions;
         
         let questionText = item.question;
@@ -490,7 +483,7 @@ window.renderQuiz = function() {
         let speakerBtn = '';
         let bodyHtml = '';
 
-        if (cleanKey(item.mon) === cleanKey('Tiếng Anh')) {
+        if (isEnglish) {
             let chuDeLower = String(item.chuDe || '').toLowerCase();
             let loaiLower = String(item.loai || '').toLowerCase();
             
@@ -547,15 +540,15 @@ window.renderQuiz = function() {
             }).join('');
         }
 
-        return `<div class="quiz-card" id="q-card-${index}">
+        contentHtml += `<div class="quiz-card" id="q-card-${index}">
             <p><b>Câu ${index + 1}:</b> ${escapeHTML(questionText)}</p>
             ${speakerBtn}
             ${bodyHtml}
             <div class="explanation-box" id="exp-${index}"><b>Giải thích:</b> ${escapeHTML(explanationText)}</div>
         </div>`;
-    }).join('');
+    });
 
-    container.innerHTML = passageHtml + questionsHtml;
+    container.innerHTML = contentHtml;
 };
 
 window.handleSpeak = function(btn) {
