@@ -213,14 +213,6 @@ function addMistakesToBank(newWrongItems) {
     updateMistakeButtonUI();
 }
 
-function removeMistakeFromBank(item) {
-    let mistakes = loadMistakeBank();
-    const uniqueId = cleanKey(item.mon) + "_" + cleanKey(item.question);
-    const filtered = mistakes.filter(m => (cleanKey(m.mon) + "_" + cleanKey(m.question)) !== uniqueId);
-    saveMistakeBank(filtered);
-    updateMistakeButtonUI();
-}
-
 function updateMistakeButtonUI() {
     const container = document.getElementById('mistake-container');
     if (!container) return;
@@ -718,7 +710,6 @@ window.checkAnswer = function(element, chosenKey, index) {
         AppState.correctCount++;
         element.style.backgroundColor = '#d4edda';
         element.style.borderColor = '#28a745';
-        removeMistakeFromBank(item); // Xóa khỏi ngân hàng câu sai khi làm đúng
     } else {
         AppState.wrongCount++;
         element.style.backgroundColor = '#f8d7da';
@@ -760,7 +751,6 @@ window.checkVocaAnswer = function(index) {
         AppState.correctCount++;
         inputElem.style.backgroundColor = '#d4edda';
         inputElem.style.borderColor = '#28a745';
-        removeMistakeFromBank(item); // Xóa khỏi ngân hàng câu sai khi làm đúng
     } else {
         AppState.wrongCount++;
         inputElem.style.backgroundColor = '#f8d7da';
@@ -802,7 +792,9 @@ window.submitQuiz = function() {
         body: JSON.stringify({ maHS: maHS, score: score, total: total, mon: mon, level: levelSelected })
     }).catch(err => console.error("Lỗi gửi kết quả:", err));
 
-    let retryBtnHtml = AppState.wrongQuestions.length > 0 ? `<button id="retry-wrong-btn" onclick="window.retryWrongAnswers()">Làm lại các câu sai trong bài (${AppState.wrongQuestions.length})</button>` : '';
+    let retryBtnHtml = (AppState.wrongQuestions && AppState.wrongQuestions.length > 0) 
+        ? `<button type="button" id="retry-wrong-btn" onclick="window.retryWrongAnswers()">Làm lại các câu sai trong bài (${AppState.wrongQuestions.length})</button>` 
+        : '';
 
     document.getElementById('quiz-screen').innerHTML = `
         <div class="container" style="text-align:center;">
@@ -810,13 +802,13 @@ window.submitQuiz = function() {
             <p>Số câu đúng: <b>${AppState.correctCount}/${total}</b></p>
             <p>Điểm số: <b style="color:blue; font-size: 1.5em;">${score} đ</b></p>
             ${retryBtnHtml}
-            <button onclick="location.reload()" style="margin-top: 15px; padding: 12px 20px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; width:100%; font-weight:bold;">Làm bài mới / Về trang chủ</button>
+            <button type="button" onclick="location.reload()" style="margin-top: 15px; padding: 12px 20px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; width:100%; font-weight:bold;">Làm bài mới / Về trang chủ</button>
         </div>
     `;
 };
 
 window.retryWrongAnswers = function() {
-    if (AppState.wrongQuestions.length === 0) return;
+    if (!AppState.wrongQuestions || AppState.wrongQuestions.length === 0) return;
     setupAndRunQuiz(AppState.wrongQuestions, false, AppState.wrongQuestions.length * 30);
 };
 
