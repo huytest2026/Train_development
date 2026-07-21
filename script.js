@@ -126,7 +126,8 @@ function normalizeItem(item) {
             explanation: findKey(['explanation', 'giaithich', 'giai_thich', 'diễn giải', 'dien giai', 'giải thích', 'giai thich']),
             loai: findKey(['loai', 'loại', 'type']),
             level: findKey(['level', 'cấp độ', 'cap do', 'muc do']),
-            passage: findKey(['passage', 'doanvan', 'đoạn văn', 'doan_van', 'đoạn_văn', 'noidungdoanvan', 'noidung', 'reading', 'content'])
+            passage: findKey(['passage', 'doanvan', 'đoạn văn', 'doan_van', 'đoạn_văn', 'noidungdoanvan', 'noidung', 'reading', 'content']),
+            made: findKey(['made', 'mã đề', 'ma_de'])
         };
     }
     
@@ -160,7 +161,8 @@ function normalizeItem(item) {
         explanation: getVal(8),
         loai: getVal(9),
         level: getVal(10),
-        passage: getVal(11)
+        passage: getVal(11),
+        made: getVal(13)
     };
 }
 
@@ -169,6 +171,20 @@ window.addEventListener('DOMContentLoaded', () => {
     const input = document.getElementById('student-code');
     if (input) input.value = savedMa;
     
+    let topicCard = document.querySelector('#topic-container') ? document.querySelector('#topic-container').parentNode : null;
+    if (topicCard && !document.getElementById('made-select-container')) {
+        const madeDiv = document.createElement('div');
+        madeDiv.id = 'made-select-container';
+        madeDiv.style.marginTop = '15px';
+        madeDiv.innerHTML = `
+            <label><b>Hoặc chọn Mã đề (MADE) để thi trực tiếp:</b></label>
+            <select id="made-select" onchange="window.handleMadeChange()">
+                <option value="">-- Chọn mã đề --</option>
+            </select>
+        `;
+        topicCard.insertBefore(madeDiv, topicCard.querySelector('#topic-container').nextSibling);
+    }
+
     window.loadData();
 });
 
@@ -179,8 +195,30 @@ window.handleSubjectChange = function() {
         levelContainer.style.display = (mon === 'Tiếng Anh') ? 'block' : 'none';
     }
     window.updateTopicList();
+    window.updateMadeOptions();
     window.updateLevelOptions();
     window.renderLeaderboard(mon);
+};
+
+window.updateMadeOptions = function() {
+    const monSelect = document.getElementById('subject-select').value.trim();
+    const madeSelect = document.getElementById('made-select');
+    if (!madeSelect) return;
+
+    const cleanMonSelect = cleanKey(monSelect);
+    const mades = [...new Set(AppState.allQuizData
+        .filter(i => (!monSelect || cleanKey(i.mon) === cleanMonSelect) && i.made && i.made !== '')
+        .map(i => i.made))];
+
+    madeSelect.innerHTML = `<option value="">-- Chọn mã đề --</option>` + mades.map(m => `<option value="${escapeHTML(m)}">${escapeHTML(m)}</option>`).join('');
+};
+
+window.handleMadeChange = function() {
+    const madeSelect = document.getElementById('made-select');
+    if (madeSelect && madeSelect.value) {
+        const checkboxes = document.querySelectorAll('input[name="topic"]');
+        checkboxes.forEach(cb => cb.checked = false);
+    }
 };
 
 window.updateLevelOptions = function() {
@@ -250,7 +288,7 @@ window.updateTopicList = function() {
     container.innerHTML = topics.map(topic => {
         const isAllowed = !hasSpecificPermissions || allowed.includes(topic);
         return `<label style="display:block; margin:5px 0; opacity:${isAllowed ? '1' : '0.5'}">
-            <input type="checkbox" name="topic" value="${escapeHTML(topic)}" ${isAllowed ? 'checked' : ''}> ${escapeHTML(topic)}
+            <input type="checkbox" name="topic" value="${escapeHTML(topic)}" ${isAllowed ? 'checked' : ''} onclick="document.getElementById('made-select').value=''"> ${escapeHTML(topic)}
         </label>`;
     }).join('');
 };
@@ -287,6 +325,7 @@ window.handleQuizData = function(data) {
     let lastLevel = '';
     let lastLoai = '';
     let lastPassage = '';
+    let lastMade = '';
 
     AppState.allQuizData = (data.questions || [])
         .map(rawItem => {
@@ -304,6 +343,9 @@ window.handleQuizData = function(data) {
 
             if (item.loai) lastLoai = item.loai;
             else if (lastLoai) item.loai = lastLoai;
+
+            if (item.made) lastMade = item.made;
+            else if (lastMade) item.made = lastMade;
 
             if (item.passage) {
                 lastPassage = item.passage;
@@ -344,6 +386,7 @@ window.handleQuizData = function(data) {
 
     window.renderLeaderboard();
     window.updateTopicList();
+    window.updateMadeOptions();
     window.updateLevelOptions();
 };
 
@@ -387,38 +430,52 @@ function getOriginalCorrectKey(item) {
 window.startQuiz = function() {
     const mon = document.getElementById('subject-select').value;
     const levelSelected = document.getElementById('level-select').value;
-    const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
-    if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
+    const selectedMade = document.getElementById('made-select') ? document.getElementById('made-select').value.trim() : '';
     
-    let readingTopics = selectedTopics.filter(t => t.toUpperCase().startsWith('DH'));
-    let normalTopics = selectedTopics.filter(t => !t.toUpperCase().startsWith('DH'));
+    let rawSelectedQuestions = [];
+    let isReadingComp = false;
 
-    let readingQuestions = AppState.allQuizData.filter(i => {
-        const isSameSubject = (cleanKey(i.mon) === cleanKey(mon));
-        const isTopicMatch = readingTopics.includes(i.chuDe);
-        return isSameSubject && isTopicMatch && i.question !== '';
-    });
-
-    let normalQuestions = [];
-    if (normalTopics.length > 0) {
-        let filteredNormal = AppState.allQuizData.filter(i => {
+    if (selectedMade !== '') {
+        rawSelectedQuestions = AppState.allQuizData.filter(i => {
             const isSameSubject = (cleanKey(i.mon) === cleanKey(mon));
-            const isTopicMatch = normalTopics.includes(i.chuDe);
-            const isLevelMatch = (cleanKey(mon) !== cleanKey('Tiếng Anh')) || (String(i.level).trim() === String(levelSelected).trim());
-            return isSameSubject && isTopicMatch && isLevelMatch && i.question !== '';
+            const isMadeMatch = String(i.made || '').trim().toLowerCase() === selectedMade.toLowerCase();
+            return isSameSubject && isMadeMatch && i.question !== '';
         });
-        normalQuestions = filteredNormal.sort(() => 0.5 - Math.random()).slice(0, 20);
+        isReadingComp = true; 
+    } else {
+        const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
+        if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề hoặc chọn Mã đề!");
+        
+        let readingTopics = selectedTopics.filter(t => t.toUpperCase().startsWith('DH'));
+        let normalTopics = selectedTopics.filter(t => !t.toUpperCase().startsWith('DH'));
+
+        let readingQuestions = AppState.allQuizData.filter(i => {
+            const isSameSubject = (cleanKey(i.mon) === cleanKey(mon));
+            const isTopicMatch = readingTopics.includes(i.chuDe);
+            return isSameSubject && isTopicMatch && i.question !== '';
+        });
+
+        let normalQuestions = [];
+        if (normalTopics.length > 0) {
+            let filteredNormal = AppState.allQuizData.filter(i => {
+                const isSameSubject = (cleanKey(i.mon) === cleanKey(mon));
+                const isTopicMatch = normalTopics.includes(i.chuDe);
+                const isLevelMatch = (cleanKey(mon) !== cleanKey('Tiếng Anh')) || (String(i.level).trim() === String(levelSelected).trim());
+                return isSameSubject && isTopicMatch && isLevelMatch && i.question !== '';
+            });
+            normalQuestions = filteredNormal.sort(() => 0.5 - Math.random()).slice(0, 20);
+        }
+
+        rawSelectedQuestions = [...readingQuestions, ...normalQuestions];
+        isReadingComp = readingTopics.length > 0;
     }
 
-    let rawSelectedQuestions = [...readingQuestions, ...normalQuestions];
     if (rawSelectedQuestions.length === 0) return alert("Không tìm thấy câu hỏi phù hợp cho lựa chọn này!");
-
-    let isReadingComp = readingTopics.length > 0;
     
     AppState.currentQuizData = rawSelectedQuestions.map(item => {
         let originalCorrectKey = getOriginalCorrectKey(item);
         let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k] !== '');
-        let isDH = item.chuDe && item.chuDe.toUpperCase().startsWith('DH');
+        let isDH = (item.chuDe && item.chuDe.toUpperCase().startsWith('DH')) || (item.made && item.made !== '');
         let shuffledKeys = isDH ? validKeys : [...validKeys].sort(() => 0.5 - Math.random());
 
         return {
@@ -438,7 +495,9 @@ window.startQuiz = function() {
     window.renderQuiz();
     
     let totalSeconds = 10 * 60;
-    if (isReadingComp) {
+    if (selectedMade !== '') {
+        totalSeconds = 45 * 60;
+    } else if (isReadingComp) {
         totalSeconds = 22 * 60; 
     } else if (cleanKey(mon) === cleanKey('Toán')) {
         totalSeconds = 15 * 60;
@@ -457,7 +516,6 @@ window.renderQuiz = function() {
         let isEnglish = cleanKey(item.mon) === cleanKey('Tiếng Anh');
         let itemChuDe = item.chuDe || '';
 
-        // Nếu chuyển sang chủ đề đọc hiểu (DH) mới, in đoạn văn ra ngay trước câu hỏi của đoạn văn đó
         if (isEnglish && item.passage && item.passage.trim() !== '' && itemChuDe !== currentChuDe) {
             currentChuDe = itemChuDe;
             contentHtml += `
@@ -469,7 +527,7 @@ window.renderQuiz = function() {
                     <div style="white-space: pre-line; margin-top: 10px;">${escapeHTML(item.passage)}</div>
                 </div>
             `;
-        } else if (!itemChuDe.toUpperCase().startsWith('DH')) {
+        } else if (!itemChuDe.toUpperCase().startsWith('DH') && !item.made) {
             currentChuDe = '';
         }
 
@@ -678,7 +736,7 @@ window.retryWrongAnswers = function() {
     AppState.currentQuizData = AppState.wrongQuestions.map(item => {
         let originalCorrectKey = getOriginalCorrectKey(item);
         let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k] !== '');
-        let isDH = item.chuDe && item.chuDe.toUpperCase().startsWith('DH');
+        let isDH = (item.chuDe && item.chuDe.toUpperCase().startsWith('DH')) || (item.made && item.made !== '');
         let shuffledKeys = isDH ? validKeys : [...validKeys].sort(() => 0.5 - Math.random());
         return {
             ...item,
