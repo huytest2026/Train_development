@@ -7,8 +7,7 @@ const AppState = {
     correctCount: 0,
     wrongCount: 0,
     wrongQuestions: [],
-    isReadingComp: false,
-    isMistakeMode: false
+    isReadingComp: false
 };
 
 (function injectStyles() {
@@ -77,20 +76,6 @@ const AppState = {
         }
 
         select option:disabled { color: #aaa; background: #f1f1f1; }
-        
-        .mistake-btn {
-            background: #ffc107;
-            color: #333;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 8px;
-            cursor: pointer;
-            width: 100%;
-            font-weight: bold;
-            margin-top: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .mistake-btn:hover { background: #e0a800; }
     `;
     document.head.appendChild(style);
 })();
@@ -161,7 +146,9 @@ function normalizeItem(item) {
         return '';
     };
 
-    // Đúng cấu trúc index thực tế của bạn: 13 là MADE
+    // Ánh xạ chuẩn xác theo các cột trong Google Sheets:
+    // 0: ID, 1: Môn, 2: Chủ đề, 3: Nội dung câu hỏi, 4: Đăng án A, 5: Đáp án B, 6: Đáp án C, 7: Đáp án D, 
+    // 8: Đáp án đúng, 9: Diễn giải, 10: loại, 11: Level, 12: passage, 13: MADE
     return {
         mon: getCol(1),
         chuDe: getCol(2),
@@ -179,68 +166,6 @@ function normalizeItem(item) {
     };
 }
 
-// --- CÁC HÀM XỬ LÝ NGÂN HÀNG CÂU SAI (MISTAKE BANK) ---
-function getMistakeBankKey() {
-    const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : 'guest';
-    return `mistake_bank_${maHS}`;
-}
-
-function loadMistakeBank() {
-    try {
-        const data = localStorage.getItem(getMistakeBankKey());
-        return data ? JSON.parse(data) : [];
-    } catch (e) {
-        return [];
-    }
-}
-
-function saveMistakeBank(mistakes) {
-    try {
-        localStorage.setItem(getMistakeBankKey(), JSON.stringify(mistakes));
-    } catch (e) {}
-}
-
-function addMistakesToBank(newWrongItems) {
-    let mistakes = loadMistakeBank();
-    newWrongItems.forEach(item => {
-        // Tạo ID duy nhất cho mỗi câu hỏi dựa vào môn và nội dung
-        const uniqueId = cleanKey(item.mon) + "_" + cleanKey(item.question);
-        const exists = mistakes.some(m => (cleanKey(m.mon) + "_" + cleanKey(m.question)) === uniqueId);
-        if (!exists) {
-            mistakes.push(item);
-        }
-    });
-    saveMistakeBank(mistakes);
-    updateMistakeButtonUI();
-}
-
-function removeMistakeFromBank(item) {
-    let mistakes = loadMistakeBank();
-    const uniqueId = cleanKey(item.mon) + "_" + cleanKey(item.question);
-    const filtered = mistakes.filter(m => (cleanKey(m.mon) + "_" + cleanKey(m.question)) !== uniqueId);
-    saveMistakeBank(filtered);
-    updateMistakeButtonUI();
-}
-
-function updateMistakeButtonUI() {
-    const container = document.getElementById('mistake-container');
-    if (!container) return;
-    const mistakes = loadMistakeBank();
-    const monSelect = document.getElementById('subject-select') ? document.getElementById('subject-select').value.trim() : '';
-    
-    // Lọc số câu sai theo môn đang chọn (nếu có)
-    const filteredMistakes = monSelect ? mistakes.filter(m => cleanKey(m.mon) === cleanKey(monSelect)) : mistakes;
-
-    if (filteredMistakes.length > 0) {
-        container.style.display = 'block';
-        container.innerHTML = `<button type="button" class="mistake-btn" onclick="window.startMistakeQuiz()">🎯 Ôn tập câu hay sai (${filteredMistakes.length} câu)</button>`;
-    } else {
-        container.style.display = 'none';
-        container.innerHTML = '';
-    }
-}
-// ----------------------------------------------------
-
 window.addEventListener('DOMContentLoaded', () => {
     const savedMa = localStorage.getItem('saved_maHS') || 'Huy';
     const input = document.getElementById('student-code');
@@ -248,7 +173,6 @@ window.addEventListener('DOMContentLoaded', () => {
     
     let topicCard = document.querySelector('#topic-container') ? document.querySelector('#topic-container').parentNode : null;
     if (topicCard && !document.getElementById('made-select-container')) {
-        // Tạo container cho chọn mã đề
         const madeDiv = document.createElement('div');
         madeDiv.id = 'made-select-container';
         madeDiv.style.marginTop = '15px';
@@ -259,12 +183,6 @@ window.addEventListener('DOMContentLoaded', () => {
             </select>
         `;
         topicCard.insertBefore(madeDiv, topicCard.querySelector('#topic-container').nextSibling);
-
-        // Tạo container cho Ngân hàng câu sai ngay bên dưới
-        const mistakeDiv = document.createElement('div');
-        mistakeDiv.id = 'mistake-container';
-        mistakeDiv.style.marginTop = '10px';
-        topicCard.insertBefore(mistakeDiv, madeDiv.nextSibling);
     }
 
     window.loadData();
@@ -280,7 +198,6 @@ window.handleSubjectChange = function() {
     window.updateMadeOptions();
     window.updateLevelOptions();
     window.renderLeaderboard(mon);
-    updateMistakeButtonUI();
 };
 
 window.updateMadeOptions = function() {
@@ -380,6 +297,7 @@ window.loadData = function() {
     const maHS = document.getElementById('student-code').value.trim();
     if (!maHS) return alert("Vui lòng nhập mã học sinh!");
     localStorage.setItem('saved_maHS', maHS);
+    localStorage.removeItem('cache_quiz_data_' + maHS);
 
     const container = document.getElementById('topic-container');
     if (container) container.innerHTML = "Đang tải dữ liệu chủ đề...";
@@ -470,7 +388,6 @@ window.handleQuizData = function(data) {
     window.updateTopicList();
     window.updateMadeOptions();
     window.updateLevelOptions();
-    updateMistakeButtonUI();
 };
 
 window.renderLeaderboard = function(subjectFilter = null) {
@@ -511,7 +428,6 @@ function getOriginalCorrectKey(item) {
 }
 
 window.startQuiz = function() {
-    AppState.isMistakeMode = false;
     const mon = document.getElementById('subject-select').value;
     const levelSelected = document.getElementById('level-select').value;
     const selectedMade = document.getElementById('made-select') ? document.getElementById('made-select').value.trim() : '';
@@ -549,25 +465,7 @@ window.startQuiz = function() {
 
     if (rawSelectedQuestions.length === 0) return alert("Không tìm thấy câu hỏi phù hợp cho lựa chọn này!");
     
-    setupAndRunQuiz(rawSelectedQuestions, isReadingComp, selectedMade !== '' ? 45 * 60 : 10 * 60);
-};
-
-window.startMistakeQuiz = function() {
-    AppState.isMistakeMode = true;
-    const mon = document.getElementById('subject-select').value.trim();
-    const mistakes = loadMistakeBank();
-    const filteredMistakes = mon ? mistakes.filter(m => cleanKey(m.mon) === cleanKey(mon)) : mistakes;
-
-    if (filteredMistakes.length === 0) {
-        alert("Không có câu hỏi sai nào trong ngân hàng của môn này!");
-        return;
-    }
-
-    setupAndRunQuiz(filteredMistakes, false, filteredMistakes.length * 30);
-};
-
-function setupAndRunQuiz(rawQuestions, isReadingComp, totalSeconds) {
-    AppState.currentQuizData = rawQuestions.map(item => {
+    AppState.currentQuizData = rawSelectedQuestions.map(item => {
         let originalCorrectKey = getOriginalCorrectKey(item);
         let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k] !== '');
         let isDH = (item.made && item.made !== '');
@@ -588,8 +486,15 @@ function setupAndRunQuiz(rawQuestions, isReadingComp, totalSeconds) {
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('quiz-screen').style.display = 'block';
     window.renderQuiz();
+    
+    let totalSeconds = 10 * 60; // Mặc định Anh văn
+    if (selectedMade !== '') {
+        totalSeconds = 45 * 60; // Mã đề: 45 phút
+    } else if (cleanKey(mon) === cleanKey('Toán')) {
+        totalSeconds = 15 * 60; // Toán luyện tập: 15 phút
+    }
     window.startTimerTotal(totalSeconds);
-}
+};
 
 window.renderQuiz = function() {
     const container = document.getElementById('quiz');
@@ -725,9 +630,6 @@ window.checkAnswer = function(element, chosenKey, index) {
         AppState.correctCount++;
         element.style.backgroundColor = '#d4edda';
         element.style.borderColor = '#28a745';
-        if (AppState.isMistakeMode) {
-            removeMistakeFromBank(item); // Trả lời đúng trong chế độ ôn câu sai -> xóa khỏi ngân hàng
-        }
     } else {
         AppState.wrongCount++;
         element.style.backgroundColor = '#f8d7da';
@@ -769,9 +671,6 @@ window.checkVocaAnswer = function(index) {
         AppState.correctCount++;
         inputElem.style.backgroundColor = '#d4edda';
         inputElem.style.borderColor = '#28a745';
-        if (AppState.isMistakeMode) {
-            removeMistakeFromBank(item);
-        }
     } else {
         AppState.wrongCount++;
         inputElem.style.backgroundColor = '#f8d7da';
@@ -793,11 +692,6 @@ window.checkVocaAnswer = function(index) {
 window.submitQuiz = function() {
     if (AppState.timerInterval) clearInterval(AppState.timerInterval);
     
-    // Nếu không phải đang ôn câu sai, tiến hành thêm các câu sai vào ngân hàng câu sai
-    if (!AppState.isMistakeMode && AppState.wrongQuestions.length > 0) {
-        addMistakesToBank(AppState.wrongQuestions);
-    }
-
     let total = AppState.currentQuizData.length;
     let score = Math.round((AppState.correctCount / total) * 10 * 10) / 10;
     let maHS = document.getElementById('student-code').value.trim();
@@ -814,7 +708,7 @@ window.submitQuiz = function() {
         body: JSON.stringify({ maHS: maHS, score: score, total: total, mon: mon, level: levelSelected })
     }).catch(err => console.error("Lỗi gửi kết quả:", err));
 
-    let retryBtnHtml = AppState.wrongQuestions.length > 0 ? `<button id="retry-wrong-btn" onclick="window.retryWrongAnswers()">Làm lại các câu sai trong bài (${AppState.wrongQuestions.length})</button>` : '';
+    let retryBtnHtml = AppState.wrongQuestions.length > 0 ? `<button id="retry-wrong-btn" onclick="window.retryWrongAnswers()">Làm lại các câu sai (${AppState.wrongQuestions.length})</button>` : '';
 
     document.getElementById('quiz-screen').innerHTML = `
         <div class="container" style="text-align:center;">
@@ -829,7 +723,33 @@ window.submitQuiz = function() {
 
 window.retryWrongAnswers = function() {
     if (AppState.wrongQuestions.length === 0) return;
-    setupAndRunQuiz(AppState.wrongQuestions, false, AppState.wrongQuestions.length * 30);
+    
+    AppState.currentQuizData = AppState.wrongQuestions.map(item => {
+        let originalCorrectKey = getOriginalCorrectKey(item);
+        let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k] !== '');
+        let isDH = (item.made && item.made !== '');
+        let shuffledKeys = isDH ? validKeys : [...validKeys].sort(() => 0.5 - Math.random());
+        return {
+            ...item,
+            _shuffledKeys: shuffledKeys,
+            _correctKey: originalCorrectKey
+        };
+    });
+
+    AppState.correctCount = 0;
+    AppState.wrongCount = 0;
+    AppState.wrongQuestions = [];
+    
+    document.getElementById('quiz-screen').innerHTML = `
+        <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 10px;">
+            <div>Thời gian: <span id="timer-display" style="color: red;">--:--</span></div>
+            <div>Đúng: <span id="count-correct" style="color: green;">0</span> | Sai: <span id="count-wrong" style="color: red;">0</span></div>
+        </div>
+        <div id="quiz"></div>
+        <button type="button" id="submit-btn" onclick="window.submitQuiz()" style="width: 100%; padding: 15px; background: #28a745; color: white; border: none; cursor: pointer; margin-top: 15px;">Nộp bài</button>
+    `;
+    window.renderQuiz();
+    window.startTimerTotal(AppState.currentQuizData.length * 30);
 };
 
 window.startTimerTotal = function(totalSeconds) {
