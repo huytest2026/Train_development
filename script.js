@@ -7,20 +7,18 @@ const AppState = {
     correctCount: 0,
     wrongCount: 0,
     wrongQuestions: [],
-    isReadingComp: false,
-    userAnswersRecord: [], // Lưu lịch sử đáp án của học sinh để xem lại chi tiết
-    isDarkMode: false
+    isReadingComp: false
 };
 
 (function injectStyles() {
     const style = document.createElement('style');
     style.innerHTML = `
-        .container { background: #bbe9f0; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 600px; margin: 20px auto; transition: background 0.3s, color 0.3s; }
-        .quiz-card { background: #ffffff; border: 2px solid #540606; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: background 0.3s, color 0.3s, border-color 0.3s; }
+        .container { background: #bbe9f0; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 600px; margin: 20px auto; }
+        .quiz-card { background: #ffffff; border: 2px solid #540606; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .option-box { background: #f8f9fa; border: 1px solid #540606; border-radius: 8px; padding: 12px 15px; margin: 8px 0; cursor: pointer; transition: all 0.2s ease; font-weight: 500; }
         .option-box:hover { background: #e9ecef; border-color: #adb5bd; }
         .explanation-box { margin-top: 15px; padding: 12px; background: #fff3cd; border-left: 5px solid #ffc107; border-radius: 4px; display: none; color: #856404; font-size: 0.95em; line-height: 1.4; }
-        .leaderboard-container { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #eee; transition: background 0.3s, color 0.3s; }
+        .leaderboard-container { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #eee; }
         .leaderboard-item { padding: 10px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
         .medal { font-size: 1.2em; margin-right: 10px; }
         .score-badge { background: #eef2f3; padding: 4px 12px; border-radius: 20px; font-weight: bold; color: #4f46e5; }
@@ -39,7 +37,6 @@ const AppState = {
             line-height: 1.6; 
             color: #333; 
             box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
-            transition: background 0.3s, color 0.3s;
         }
 
         .passage-tag {
@@ -63,7 +60,6 @@ const AppState = {
             box-sizing: border-box;
             font-size: 1em;
             background: #ffffff;
-            color: inherit;
         }
 
         #topic-container {
@@ -80,23 +76,6 @@ const AppState = {
         }
 
         select option:disabled { color: #aaa; background: #f1f1f1; }
-
-        /* Dark Mode Styles */
-        body.dark-mode { background-color: #121212; color: #e0e0e0; }
-        body.dark-mode .container { background: #1e1e1e; color: #e0e0e0; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #333; }
-        body.dark-mode .quiz-card, body.dark-mode .passage-box, body.dark-mode .leaderboard-container { background: #2d2d2d; color: #e0e0e0; border-color: #540606; }
-        body.dark-mode .option-box { background: #383838; color: #e0e0e0; border-color: #555; }
-        body.dark-mode .option-box:hover { background: #454545; border-color: #777; }
-        body.dark-mode input[type="text"], body.dark-mode select, body.dark-mode #topic-container { background: #2d2d2d; color: #e0e0e0; border-color: #555; }
-        body.dark-mode .explanation-box { background: #332701; color: #ffda6a; border-left-color: #ffc107; }
-        body.dark-mode .passage-tag { background: #383838; color: #e0e0e0; border-color: #555; }
-        body.dark-mode .score-badge { background: #333; color: #818cf8; }
-        body.dark-mode .leaderboard-item { border-bottom-color: #383838; }
-
-        /* Utility buttons */
-        .top-bar { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 10px; }
-        .icon-btn { background: #4f46e5; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.9em; font-weight: bold; display: inline-flex; align-items: center; gap: 5px; }
-        .icon-btn:hover { background: #4338ca; }
     `;
     document.head.appendChild(style);
 })();
@@ -147,41 +126,43 @@ function normalizeItem(item) {
             explanation: findKey(['explanation', 'giaithich', 'giai_thich', 'diễn giải', 'dien giai', 'giải thích', 'giai thich']),
             loai: findKey(['loai', 'loại', 'type']),
             level: findKey(['level', 'cấp độ', 'cap do', 'muc do']),
-            passage: findKey(['passage', 'doanvan', 'đoạn văn', 'doan_van', 'đoạn_văn', 'noidungdoanvan', 'noidung', 'reading', 'content'])
+            passage: findKey(['passage', 'doanvan', 'đoạn văn', 'doan_van', 'đoạn_văn', 'noidungdoanvan', 'noidung', 'reading', 'content']),
+            made: findKey(['made', 'mã đề', 'ma_de', 'mã đề'])
         };
     }
     
     let values = Array.isArray(item) ? item : [];
     if (values.length === 0) return null;
 
-    let v0 = String(values[0] || '').trim().toLowerCase();
-    if (v0 === 'id' || v0 === 'môn' || v0 === 'mon') {
+    let v1 = String(values[1] || '').trim().toLowerCase();
+    if (v1 === 'môn' || v1 === 'mon' || v1 === 'id') {
         return null;
     }
 
-    let hasStt = /^\d+$/.test(String(values[0]).trim());
-
-    const getVal = (indexWithoutId) => {
-        let idx = hasStt ? indexWithoutId + 1 : indexWithoutId;
+    const getCol = (idx) => {
         if (idx < values.length && values[idx] !== undefined && values[idx] !== null) {
             return String(values[idx]).trim();
         }
         return '';
     };
 
+    // Ánh xạ chuẩn xác theo các cột trong Google Sheets:
+    // 0: ID, 1: Môn, 2: Chủ đề, 3: Nội dung câu hỏi, 4: Đăng án A, 5: Đáp án B, 6: Đáp án C, 7: Đáp án D, 
+    // 8: Đáp án đúng, 9: Diễn giải, 10: loại, 11: Level, 12: passage, 13: MADE
     return {
-        mon: getVal(0),
-        chuDe: getVal(1),
-        question: getVal(2),
-        a: getVal(3),
-        b: getVal(4),
-        c: getVal(5),
-        d: getVal(6),
-        correct: getVal(7),
-        explanation: getVal(8),
-        loai: getVal(9),
-        level: getVal(10),
-        passage: getVal(11)
+        mon: getCol(1),
+        chuDe: getCol(2),
+        question: getCol(3),
+        a: getCol(4),
+        b: getCol(5),
+        c: getCol(6),
+        d: getCol(7),
+        correct: getCol(8),
+        explanation: getCol(9),
+        loai: getCol(10),
+        level: getCol(11),
+        passage: getCol(12),
+        made: getCol(13)
     };
 }
 
@@ -190,41 +171,22 @@ window.addEventListener('DOMContentLoaded', () => {
     const input = document.getElementById('student-code');
     if (input) input.value = savedMa;
     
-    // Khôi phục Dark Mode nếu đã bật trước đó
-    const savedDarkMode = localStorage.getItem('app_dark_mode') === 'true';
-    if (savedDarkMode) {
-        AppState.isDarkMode = true;
-        document.body.classList.add('dark-mode');
+    let topicCard = document.querySelector('#topic-container') ? document.querySelector('#topic-container').parentNode : null;
+    if (topicCard && !document.getElementById('made-select-container')) {
+        const madeDiv = document.createElement('div');
+        madeDiv.id = 'made-select-container';
+        madeDiv.style.marginTop = '15px';
+        madeDiv.innerHTML = `
+            <label><b>Hoặc chọn Mã đề (MADE) để thi trực tiếp:</b></label>
+            <select id="made-select" onchange="window.handleMadeChange()">
+                <option value="">-- Chọn mã đề --</option>
+            </select>
+        `;
+        topicCard.insertBefore(madeDiv, topicCard.querySelector('#topic-container').nextSibling);
     }
 
-    // Thêm các nút điều khiển nhanh (Dark mode, Tiến độ) nếu chưa có
-    injectTopControls();
     window.loadData();
 });
-
-function injectTopControls() {
-    const startScreen = document.getElementById('start-screen');
-    if (!startScreen) return;
-    
-    if (!document.getElementById('top-control-bar')) {
-        const topBar = document.createElement('div');
-        topBar.id = 'top-control-bar';
-        topBar.className = 'top-bar';
-        topBar.innerHTML = `
-            <button class="icon-btn" onclick="window.toggleDarkMode()">🌓 Giao diện: <span id="dark-mode-status">${AppState.isDarkMode ? 'Tối' : 'Sáng'}</span></button>
-            <button class="icon-btn" onclick="window.showProgressDashboard()">📊 Tiến độ cá nhân</button>
-        `;
-        startScreen.insertBefore(topBar, startScreen.firstChild);
-    }
-}
-
-window.toggleDarkMode = function() {
-    AppState.isDarkMode = !AppState.isDarkMode;
-    document.body.classList.toggle('dark-mode', AppState.isDarkMode);
-    localStorage.setItem('app_dark_mode', AppState.isDarkMode);
-    const statusSpan = document.getElementById('dark-mode-status');
-    if (statusSpan) statusSpan.textContent = AppState.isDarkMode ? 'Tối' : 'Sáng';
-};
 
 window.handleSubjectChange = function() {
     const mon = document.getElementById('subject-select').value;
@@ -233,8 +195,30 @@ window.handleSubjectChange = function() {
         levelContainer.style.display = (mon === 'Tiếng Anh') ? 'block' : 'none';
     }
     window.updateTopicList();
+    window.updateMadeOptions();
     window.updateLevelOptions();
     window.renderLeaderboard(mon);
+};
+
+window.updateMadeOptions = function() {
+    const monSelect = document.getElementById('subject-select').value.trim();
+    const madeSelect = document.getElementById('made-select');
+    if (!madeSelect) return;
+
+    const cleanMonSelect = cleanKey(monSelect);
+    const mades = [...new Set(AppState.allQuizData
+        .filter(i => (!monSelect || cleanKey(i.mon) === cleanMonSelect) && i.made && i.made !== '')
+        .map(i => i.made))];
+
+    madeSelect.innerHTML = `<option value="">-- Chọn mã đề --</option>` + mades.map(m => `<option value="${escapeHTML(m)}">${escapeHTML(m)}</option>`).join('');
+};
+
+window.handleMadeChange = function() {
+    const madeSelect = document.getElementById('made-select');
+    if (madeSelect && madeSelect.value) {
+        const checkboxes = document.querySelectorAll('input[name="topic"]');
+        checkboxes.forEach(cb => cb.checked = false);
+    }
 };
 
 window.updateLevelOptions = function() {
@@ -304,7 +288,7 @@ window.updateTopicList = function() {
     container.innerHTML = topics.map(topic => {
         const isAllowed = !hasSpecificPermissions || allowed.includes(topic);
         return `<label style="display:block; margin:5px 0; opacity:${isAllowed ? '1' : '0.5'}">
-            <input type="checkbox" name="topic" value="${escapeHTML(topic)}" ${isAllowed ? 'checked' : ''}> ${escapeHTML(topic)}
+            <input type="checkbox" name="topic" value="${escapeHTML(topic)}" ${isAllowed ? 'checked' : ''} onclick="document.getElementById('made-select').value=''"> ${escapeHTML(topic)}
         </label>`;
     }).join('');
 };
@@ -318,7 +302,7 @@ window.loadData = function() {
     const container = document.getElementById('topic-container');
     if (container) container.innerHTML = "Đang tải dữ liệu chủ đề...";
 
-    const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbwABOWdjRcG_rX9tVXjrLDsXFRMEbgUfn01QC6U5Z91qwdwq5askg7CrQHEDjf8np-H/exec";
     const script = document.createElement('script');
     script.src = `${API_URL}?ma=${encodeURIComponent(maHS)}&callback=handleQuizData`;
     script.onerror = () => { 
@@ -341,6 +325,7 @@ window.handleQuizData = function(data) {
     let lastLevel = '';
     let lastLoai = '';
     let lastPassage = '';
+    let lastMade = '';
 
     AppState.allQuizData = (data.questions || [])
         .map(rawItem => {
@@ -359,9 +344,12 @@ window.handleQuizData = function(data) {
             if (item.loai) lastLoai = item.loai;
             else if (lastLoai) item.loai = lastLoai;
 
+            if (item.made) lastMade = item.made;
+            else if (lastMade) item.made = lastMade;
+
             if (item.passage) {
                 lastPassage = item.passage;
-            } else if (cleanKey(item.mon) !== cleanKey('Tiếng Anh') || !String(item.chuDe || '').toUpperCase().startsWith('DH')) {
+            } else if (cleanKey(item.mon) !== cleanKey('Tiếng Anh') || !item.passage) {
                 lastPassage = ''; 
             } else if (lastPassage) {
                 item.passage = lastPassage;
@@ -398,6 +386,7 @@ window.handleQuizData = function(data) {
 
     window.renderLeaderboard();
     window.updateTopicList();
+    window.updateMadeOptions();
     window.updateLevelOptions();
 };
 
@@ -441,38 +430,45 @@ function getOriginalCorrectKey(item) {
 window.startQuiz = function() {
     const mon = document.getElementById('subject-select').value;
     const levelSelected = document.getElementById('level-select').value;
-    const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
-    if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
+    const selectedMade = document.getElementById('made-select') ? document.getElementById('made-select').value.trim() : '';
     
-    let readingTopics = selectedTopics.filter(t => t.toUpperCase().startsWith('DH'));
-    let normalTopics = selectedTopics.filter(t => !t.toUpperCase().startsWith('DH'));
+    let rawSelectedQuestions = [];
+    let isReadingComp = false;
 
-    let readingQuestions = AppState.allQuizData.filter(i => {
-        const isSameSubject = (cleanKey(i.mon) === cleanKey(mon));
-        const isTopicMatch = readingTopics.includes(i.chuDe);
-        return isSameSubject && isTopicMatch && i.question !== '';
-    });
-
-    let normalQuestions = [];
-    if (normalTopics.length > 0) {
-        let filteredNormal = AppState.allQuizData.filter(i => {
+    if (selectedMade !== '') {
+        rawSelectedQuestions = AppState.allQuizData.filter(i => {
             const isSameSubject = (cleanKey(i.mon) === cleanKey(mon));
-            const isTopicMatch = normalTopics.includes(i.chuDe);
-            const isLevelMatch = (cleanKey(mon) !== cleanKey('Tiếng Anh')) || (String(i.level).trim() === String(levelSelected).trim());
-            return isSameSubject && isTopicMatch && isLevelMatch && i.question !== '';
+            const isMadeMatch = String(i.made || '').trim().toLowerCase() === selectedMade.toLowerCase();
+            return isSameSubject && isMadeMatch && i.question !== '';
         });
-        normalQuestions = filteredNormal.sort(() => 0.5 - Math.random()).slice(0, 20);
+        isReadingComp = true; 
+    } else {
+        const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
+        if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề hoặc chọn Mã đề!");
+        
+        let normalTopics = selectedTopics;
+
+        let normalQuestions = [];
+        if (normalTopics.length > 0) {
+            let filteredNormal = AppState.allQuizData.filter(i => {
+                const isSameSubject = (cleanKey(i.mon) === cleanKey(mon));
+                const isTopicMatch = normalTopics.includes(i.chuDe);
+                const isLevelMatch = (cleanKey(mon) !== cleanKey('Tiếng Anh')) || (String(i.level).trim() === String(levelSelected).trim());
+                return isSameSubject && isTopicMatch && isLevelMatch && i.question !== '';
+            });
+            normalQuestions = filteredNormal.sort(() => 0.5 - Math.random()).slice(0, 20);
+        }
+
+        rawSelectedQuestions = normalQuestions;
+        isReadingComp = false;
     }
 
-    let rawSelectedQuestions = [...readingQuestions, ...normalQuestions];
     if (rawSelectedQuestions.length === 0) return alert("Không tìm thấy câu hỏi phù hợp cho lựa chọn này!");
-
-    let isReadingComp = readingTopics.length > 0;
     
     AppState.currentQuizData = rawSelectedQuestions.map(item => {
         let originalCorrectKey = getOriginalCorrectKey(item);
         let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k] !== '');
-        let isDH = item.chuDe && item.chuDe.toUpperCase().startsWith('DH');
+        let isDH = (item.made && item.made !== '');
         let shuffledKeys = isDH ? validKeys : [...validKeys].sort(() => 0.5 - Math.random());
 
         return {
@@ -486,17 +482,16 @@ window.startQuiz = function() {
     AppState.correctCount = 0; 
     AppState.wrongCount = 0;
     AppState.wrongQuestions = [];
-    AppState.userAnswersRecord = []; // Reset bản ghi đáp án
     
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('quiz-screen').style.display = 'block';
     window.renderQuiz();
     
-    let totalSeconds = 10 * 60;
-    if (isReadingComp) {
-        totalSeconds = 22 * 60; 
+    let totalSeconds = 10 * 60; // Mặc định Anh văn
+    if (selectedMade !== '') {
+        totalSeconds = 45 * 60; // Mã đề: 45 phút
     } else if (cleanKey(mon) === cleanKey('Toán')) {
-        totalSeconds = 15 * 60;
+        totalSeconds = 15 * 60; // Toán luyện tập: 15 phút
     }
     window.startTimerTotal(totalSeconds);
 };
@@ -505,30 +500,28 @@ window.renderQuiz = function() {
     const container = document.getElementById('quiz');
     if (!container) return;
 
-    let passageHtml = '';
-    let passageItems = AppState.currentQuizData.filter(i => cleanKey(i.mon) === cleanKey('Tiếng Anh') && i.passage && i.passage.trim() !== '');
-    if (passageItems.length > 0) {
-        let uniquePassages = {};
-        passageItems.forEach(item => {
-            if (!uniquePassages[item.chuDe]) {
-                uniquePassages[item.chuDe] = item.passage;
-            }
-        });
+    let contentHtml = '';
+    let currentChuDe = '';
 
-        for (let code in uniquePassages) {
-            passageHtml += `
+    AppState.currentQuizData.forEach((item, index) => {
+        let isEnglish = cleanKey(item.mon) === cleanKey('Tiếng Anh');
+        let itemChuDe = item.chuDe || '';
+
+        if (isEnglish && item.passage && item.passage.trim() !== '' && itemChuDe !== currentChuDe) {
+            currentChuDe = itemChuDe;
+            contentHtml += `
                 <div class="passage-box">
-                    <div class="passage-tag">${escapeHTML(code)}</div>
+                    <div class="passage-tag">${escapeHTML(itemChuDe)}</div>
                     <div>
-                        <button class="speaker-btn" data-question="${escapeHTML(uniquePassages[code])}" onclick="window.handleSpeak(this)">🔊 Nghe đoạn văn</button>
+                        <button class="speaker-btn" data-question="${escapeHTML(item.passage)}" onclick="window.handleSpeak(this)">🔊 Nghe đoạn văn</button>
                     </div>
-                    <div style="white-space: pre-line; margin-top: 10px;">${escapeHTML(uniquePassages[code])}</div>
+                    <div style="white-space: pre-line; margin-top: 10px;">${escapeHTML(item.passage)}</div>
                 </div>
             `;
+        } else if (!item.made) {
+            currentChuDe = '';
         }
-    }
 
-    let questionsHtml = AppState.currentQuizData.map((item, index) => {
         let loaiVal = (item.loai || '').toLowerCase();
         let hasNoOptions = (!item.a || item.a.trim() === '') &&
                             (!item.b || item.b.trim() === '') &&
@@ -542,18 +535,18 @@ window.renderQuiz = function() {
         let speakerBtn = '';
         let bodyHtml = '';
 
-        if (cleanKey(item.mon) === cleanKey('Tiếng Anh')) {
+        if (isEnglish) {
             let chuDeLower = String(item.chuDe || '').toLowerCase();
             let loaiLower = String(item.loai || '').toLowerCase();
             
             if (isVoca) {
                 const hasVietnameseChars = /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i.test(questionText);
                 const isVietAnh = chuDeLower.includes('việt anh') || chuDeLower.includes('viet anh') || 
-                                    loaiLower.includes('việt anh') || loaiLower.includes('viet anh') || 
-                                    hasVietnameseChars;
+                                  loaiLower.includes('việt anh') || loaiLower.includes('viet anh') || 
+                                  hasVietnameseChars;
                 const isAnhViet = chuDeLower.includes('anh việt') || chuDeLower.includes('anh viet') || 
-                                    loaiLower.includes('anh việt') || loaiLower.includes('anh viet') || 
-                                    (!hasVietnameseChars && !isVietAnh);
+                                  loaiLower.includes('anh việt') || loaiLower.includes('anh viet') || 
+                                  (!hasVietnameseChars && !isVietAnh);
 
                 let placeholderText = "Nhập đáp án tiếng Anh...";
                 let speakTextContent = questionText;
@@ -599,15 +592,15 @@ window.renderQuiz = function() {
             }).join('');
         }
 
-        return `<div class="quiz-card" id="q-card-${index}">
+        contentHtml += `<div class="quiz-card" id="q-card-${index}">
             <p><b>Câu ${index + 1}:</b> ${escapeHTML(questionText)}</p>
             ${speakerBtn}
             ${bodyHtml}
             <div class="explanation-box" id="exp-${index}"><b>Giải thích:</b> ${escapeHTML(explanationText)}</div>
         </div>`;
-    }).join('');
+    });
 
-    container.innerHTML = passageHtml + questionsHtml;
+    container.innerHTML = contentHtml;
 };
 
 window.handleSpeak = function(btn) {
@@ -623,34 +616,23 @@ window.checkAnswer = function(element, chosenKey, index) {
     const item = AppState.currentQuizData[index];
     const correctKey = item._correctKey;
     
-    // Ghi lại kết quả cho tính năng Xem lại chi tiết
-    AppState.userAnswersRecord[index] = {
-        questionIndex: index,
-        question: item.question,
-        chosenKey: chosenKey,
-        correctKey: correctKey,
-        isCorrect: chosenKey === correctKey,
-        options: { a: item.a, b: item.b, c: item.c, d: item.d },
-        explanation: item.explanation
-    };
-
     const options = card.querySelectorAll('.option-box');
     options.forEach(opt => {
         opt.style.pointerEvents = 'none';
         const optOrigKey = opt.getAttribute('data-orig-key');
         if (optOrigKey === correctKey) {
-            opt.style.backgroundColor = AppState.isDarkMode ? '#064e3b' : '#d4edda';
+            opt.style.backgroundColor = '#d4edda';
             opt.style.borderColor = '#28a745';
         }
     });
 
     if (chosenKey === correctKey) {
         AppState.correctCount++;
-        element.style.backgroundColor = AppState.isDarkMode ? '#064e3b' : '#d4edda';
+        element.style.backgroundColor = '#d4edda';
         element.style.borderColor = '#28a745';
     } else {
         AppState.wrongCount++;
-        element.style.backgroundColor = AppState.isDarkMode ? '#7f1d1d' : '#f8d7da';
+        element.style.backgroundColor = '#f8d7da';
         element.style.borderColor = '#dc3545';
         AppState.wrongQuestions.push(item);
     }
@@ -681,28 +663,17 @@ window.checkVocaAnswer = function(index) {
 
     const item = AppState.currentQuizData[index];
     const correctVal = String(item._correctKey || '').trim().toLowerCase();
-    const isCorrect = (userVal === correctVal);
-
-    AppState.userAnswersRecord[index] = {
-        questionIndex: index,
-        question: item.question,
-        chosenKey: userVal,
-        correctKey: correctVal,
-        isCorrect: isCorrect,
-        options: null,
-        explanation: item.explanation
-    };
 
     const expBox = document.getElementById(`exp-${index}`);
     if (expBox) expBox.style.display = 'block';
 
-    if (isCorrect) {
+    if (userVal === correctVal) {
         AppState.correctCount++;
-        inputElem.style.backgroundColor = AppState.isDarkMode ? '#064e3b' : '#d4edda';
+        inputElem.style.backgroundColor = '#d4edda';
         inputElem.style.borderColor = '#28a745';
     } else {
         AppState.wrongCount++;
-        inputElem.style.backgroundColor = AppState.isDarkMode ? '#7f1d1d' : '#f8d7da';
+        inputElem.style.backgroundColor = '#f8d7da';
         inputElem.style.borderColor = '#dc3545';
         if (expBox) {
             expBox.innerHTML = `<b>Đáp án đúng:</b> <span style="color: green; font-weight: bold;">${escapeHTML(item._correctKey)}</span><br>` + expBox.innerHTML;
@@ -726,25 +697,10 @@ window.submitQuiz = function() {
     let maHS = document.getElementById('student-code').value.trim();
     let mon = document.getElementById('subject-select').value;
     let levelSelected = document.getElementById('level-select') ? document.getElementById('level-select').value : 'Level 1';
-    let dateStr = new Date().toLocaleString('vi-VN');
-
-    // Lưu lịch sử tiến độ cá nhân vào LocalStorage
-    let history = JSON.parse(localStorage.getItem('quiz_history_' + maHS) || '[]');
-    history.unshift({
-        mon: mon,
-        level: levelSelected,
-        score: score,
-        correct: AppState.correctCount,
-        total: total,
-        date: dateStr
-    });
-    // Giữ tối đa 20 lần làm bài gần nhất
-    if (history.length > 20) history.pop();
-    localStorage.setItem('quiz_history_' + maHS, JSON.stringify(history));
 
     alert(`Bài làm kết thúc!\nĐúng: ${AppState.correctCount}/${total}\nĐiểm của bạn: ${score} điểm`);
 
-    const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbwABOWdjRcG_rX9tVXjrLDsXFRMEbgUfn01QC6U5Z91qwdwq5askg7CrQHEDjf8np-H/exec";
     fetch(API_URL, {
         method: 'POST',
         mode: 'no-cors',
@@ -759,107 +715,8 @@ window.submitQuiz = function() {
             <h2>Kết Quả Bài Thi</h2>
             <p>Số câu đúng: <b>${AppState.correctCount}/${total}</b></p>
             <p>Điểm số: <b style="color:blue; font-size: 1.5em;">${score} đ</b></p>
-            
-            <button onclick="window.showDetailedReview()" style="margin-top: 10px; padding: 10px 20px; background:#4f46e5; color:white; border:none; border-radius:8px; cursor:pointer; width:100%; font-weight:bold;">👁️ Xem lại chi tiết bài làm</button>
-            
             ${retryBtnHtml}
-            
-            <button onclick="location.reload()" style="margin-top: 15px; padding: 10px 20px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; width:100%;">Làm bài mới / Về trang chủ</button>
-        </div>
-    `;
-};
-
-// Tính năng 2: Hiển thị lịch sử tiến độ cá nhân (Progress Dashboard)
-window.showProgressDashboard = function() {
-    const maHS = document.getElementById('student-code').value.trim();
-    if (!maHS) return alert("Vui lòng nhập mã học sinh!");
-    
-    let history = JSON.parse(localStorage.getItem('quiz_history_' + maHS) || '[]');
-    
-    let modalOverlay = document.getElementById('dashboard-modal');
-    if (!modalOverlay) {
-        modalOverlay = document.createElement('div');
-        modalOverlay.id = 'dashboard-modal';
-        modalOverlay.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); display:flex; justify-content:center; align-items:center; z-index:9999;";
-        document.body.appendChild(modalOverlay);
-    }
-    
-    let historyHtml = history.length === 0 ? `<p style="text-align:center; color:#888;">Chưa có lịch sử làm bài trên thiết bị này.</p>` : `
-        <div style="max-height: 350px; overflow-y: auto;">
-            ${history.map(item => `
-                <div style="background: ${AppState.isDarkMode ? '#383838' : '#f8f9fa'}; border: 1px solid #540606; padding: 10px; margin-bottom: 8px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <b>${escapeHTML(item.mon)}</b> (${escapeHTML(item.level)})<br>
-                        <span style="font-size: 0.85em; color: #777;">Thời gian: ${escapeHTML(item.date)}</span>
-                    </div>
-                    <div style="text-align: right;">
-                        <span class="score-badge">${item.score} đ</span><br>
-                        <span style="font-size: 0.85em;">Đúng: ${item.correct}/${item.total}</span>
-                    </div>
-                </div>
-            `).join('')}
-        </div>
-    `;
-
-    modalOverlay.innerHTML = `
-        <div class="container" style="max-width: 500px; width: 90%; position: relative;">
-            <h3>📊 Lịch Sử Tiến Độ Cá Nhân (${escapeHTML(maHS)})</h3>
-            ${historyHtml}
-            <button onclick="document.getElementById('dashboard-modal').style.display='none'" style="margin-top: 15px; width: 100%; padding: 10px; background: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">Đóng</button>
-        </div>
-    `;
-    modalOverlay.style.display = 'flex';
-};
-
-// Tính năng 3: Chế độ xem lại chi tiết bài làm (Detailed Review Mode)
-window.showDetailedReview = function() {
-    const container = document.getElementById('quiz-screen');
-    if (!container) return;
-
-    let reviewHtml = AppState.userAnswersRecord.map((rec, index) => {
-        if (!rec) return '';
-        let isCorrect = rec.isCorrect;
-        let statusColor = isCorrect ? (AppState.isDarkMode ? '#064e3b' : '#d4edda') : (AppState.isDarkMode ? '#7f1d1d' : '#f8f9da');
-        let borderColor = isCorrect ? '#28a745' : '#dc3545';
-        let statusText = isCorrect ? '✅ Đúng' : '❌ Sai';
-
-        let optionsDetails = '';
-        if (rec.options) {
-            optionsDetails = ['a', 'b', 'c', 'd'].map(k => {
-                if (!rec.options[k]) return '';
-                let isChosen = (rec.chosenKey === k);
-                let isTheCorrect = (rec.correctKey === k);
-                let styleStr = '';
-                if (isTheCorrect) styleStr = 'background: #d4edda; border-color: #28a745; font-weight: bold;';
-                else if (isChosen && !isCorrect) styleStr = 'background: #f8d7da; border-color: #dc3545;';
-
-                return `<div class="option-box" style="${styleStr}">
-                    <b>${k.toUpperCase()}.</b> ${escapeHTML(rec.options[k])} ${isTheCorrect ? '(Đáp án đúng)' : ''} ${isChosen && !isTheCorrect ? '(Bạn chọn)' : ''}
-                </div>`;
-            }).join('');
-        } else {
-            optionsDetails = `
-                <p><b>Đáp án bạn nhập:</b> <span style="color: ${isCorrect ? 'green' : 'red'};">${escapeHTML(rec.chosenKey)}</span></p>
-                <p><b>Đáp án đúng chuẩn:</b> <span style="color: green; font-weight: bold;">${escapeHTML(rec.correctKey)}</span></p>
-            `;
-        }
-
-        return `
-            <div class="quiz-card" style="border-color: ${borderColor}; background: ${statusColor};">
-                <p><b>Câu ${index + 1}:</b> ${escapeHTML(rec.question)} <span style="float: right; font-weight: bold;">${statusText}</span></p>
-                ${optionsDetails}
-                <div class="explanation-box" style="display: block; margin-top: 10px;"><b>Giải thích:</b> ${escapeHTML(rec.explanation || 'Không có giải thích.')}</div>
-            </div>
-        `;
-    }).join('');
-
-    container.innerHTML = `
-        <div class="container" style="max-width: 700px;">
-            <h2>👁️ Xem Lại Chi Tiết Bài Làm</h2>
-            <div style="max-height: 500px; overflow-y: auto; margin-top: 15px;">
-                ${reviewHtml}
-            </div>
-            <button onclick="location.reload()" style="margin-top: 15px; width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">Về trang chủ</button>
+            <button onclick="location.reload()" style="margin-top: 15px; padding: 10px 20px; background:#007bff; color:white; border:none; border-radius:5px; cursor:pointer; width:100%;">Làm bài mới / Về trang chủ</button>
         </div>
     `;
 };
@@ -870,7 +727,7 @@ window.retryWrongAnswers = function() {
     AppState.currentQuizData = AppState.wrongQuestions.map(item => {
         let originalCorrectKey = getOriginalCorrectKey(item);
         let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k] !== '');
-        let isDH = item.chuDe && item.chuDe.toUpperCase().startsWith('DH');
+        let isDH = (item.made && item.made !== '');
         let shuffledKeys = isDH ? validKeys : [...validKeys].sort(() => 0.5 - Math.random());
         return {
             ...item,
@@ -882,17 +739,14 @@ window.retryWrongAnswers = function() {
     AppState.correctCount = 0;
     AppState.wrongCount = 0;
     AppState.wrongQuestions = [];
-    AppState.userAnswersRecord = [];
     
     document.getElementById('quiz-screen').innerHTML = `
-        <div class="container">
-            <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 10px;">
-                <div>Thời gian: <span id="timer-display" style="color: red;">--:--</span></div>
-                <div>Đúng: <span id="count-correct" style="color: green;">0</span> | Sai: <span id="count-wrong" style="color: red;">0</span></div>
-            </div>
-            <div id="quiz"></div>
-            <button type="button" id="submit-btn" onclick="window.submitQuiz()" style="width: 100%; padding: 15px; background: #28a745; color: white; border: none; cursor: pointer; margin-top: 15px; border-radius: 8px; font-weight: bold;">Nộp bài</button>
+        <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 10px;">
+            <div>Thời gian: <span id="timer-display" style="color: red;">--:--</span></div>
+            <div>Đúng: <span id="count-correct" style="color: green;">0</span> | Sai: <span id="count-wrong" style="color: red;">0</span></div>
         </div>
+        <div id="quiz"></div>
+        <button type="button" id="submit-btn" onclick="window.submitQuiz()" style="width: 100%; padding: 15px; background: #28a745; color: white; border: none; cursor: pointer; margin-top: 15px;">Nộp bài</button>
     `;
     window.renderQuiz();
     window.startTimerTotal(AppState.currentQuizData.length * 30);
