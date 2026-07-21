@@ -371,7 +371,6 @@ window.updateTopicList = function() {
         </label>`;
     }).join('');
 
-    // Attach click handlers to checkboxes to reset made-select
     container.querySelectorAll('input[name="topic"]').forEach(cb => {
         cb.onchange = function() {
             const madeSelect = document.getElementById('made-select');
@@ -569,6 +568,29 @@ window.startMistakeQuiz = function() {
 };
 
 function setupAndRunQuiz(rawQuestions, isReadingComp, totalSeconds) {
+    // Khôi phục lại cấu trúc HTML của màn hình làm bài (tránh lỗi mất thẻ #quiz khi bấm làm lại từ màn hình kết quả)
+    const quizScreen = document.getElementById('quiz-screen');
+    quizScreen.innerHTML = `
+        <div class="container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <span id="timer-display" style="font-size: 1.2em; font-weight: bold; color: #d9534f;">00:00</span>
+                <div>
+                    <span>Đúng: <b id="count-correct" style="color: green;">0</b></span> | 
+                    <span>Sai: <b id="count-wrong" style="color: red;">0</b></span>
+                </div>
+            </div>
+            <div id="quiz"></div>
+            <button type="button" id="submit-quiz-btn" style="margin-top: 20px; padding: 12px 20px; background: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold;">Nộp bài</button>
+        </div>
+    `;
+
+    const submitBtn = document.getElementById('submit-quiz-btn');
+    if (submitBtn) {
+        submitBtn.onclick = function() {
+            window.submitQuiz();
+        };
+    }
+
     AppState.currentQuizData = rawQuestions.map(item => {
         let originalCorrectKey = getOriginalCorrectKey(item);
         let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k] !== '');
@@ -588,7 +610,7 @@ function setupAndRunQuiz(rawQuestions, isReadingComp, totalSeconds) {
     AppState.wrongQuestions = [];
     
     document.getElementById('start-screen').style.display = 'none';
-    document.getElementById('quiz-screen').style.display = 'block';
+    quizScreen.style.display = 'block';
     window.renderQuiz();
     window.startTimerTotal(totalSeconds);
 }
@@ -699,7 +721,6 @@ window.renderQuiz = function() {
 
     container.innerHTML = contentHtml;
 
-    // Gắn sự kiện click an toàn cho các nút loa, đáp án và kiểm tra từ vựng
     container.querySelectorAll('.speaker-btn').forEach(btn => {
         btn.onclick = function() {
             window.handleSpeak(this);
@@ -833,7 +854,6 @@ window.submitQuiz = function() {
         body: JSON.stringify({ maHS: maHS, score: score, total: total, mon: mon, level: levelSelected })
     }).catch(err => console.error("Lỗi gửi kết quả:", err));
 
-    // Render kết quả và gắn sự kiện click bằng JS thuần để tránh lỗi chặn sự kiện
     const quizScreen = document.getElementById('quiz-screen');
     quizScreen.innerHTML = `
         <div class="container" style="text-align:center;">
