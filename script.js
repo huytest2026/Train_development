@@ -7,18 +7,20 @@ const AppState = {
     correctCount: 0,
     wrongCount: 0,
     wrongQuestions: [],
-    isReadingComp: false
+    isReadingComp: false,
+    userAnswersRecord: [], // Lưu lịch sử đáp án của học sinh để xem lại chi tiết
+    isDarkMode: false
 };
 
 (function injectStyles() {
     const style = document.createElement('style');
     style.innerHTML = `
-        .container { background: #bbe9f0; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 600px; margin: 20px auto; }
-        .quiz-card { background: #ffffff; border: 2px solid #540606; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .container { background: #bbe9f0; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 600px; margin: 20px auto; transition: background 0.3s, color 0.3s; }
+        .quiz-card { background: #ffffff; border: 2px solid #540606; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: background 0.3s, color 0.3s, border-color 0.3s; }
         .option-box { background: #f8f9fa; border: 1px solid #540606; border-radius: 8px; padding: 12px 15px; margin: 8px 0; cursor: pointer; transition: all 0.2s ease; font-weight: 500; }
         .option-box:hover { background: #e9ecef; border-color: #adb5bd; }
         .explanation-box { margin-top: 15px; padding: 12px; background: #fff3cd; border-left: 5px solid #ffc107; border-radius: 4px; display: none; color: #856404; font-size: 0.95em; line-height: 1.4; }
-        .leaderboard-container { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #eee; }
+        .leaderboard-container { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #eee; transition: background 0.3s, color 0.3s; }
         .leaderboard-item { padding: 10px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
         .medal { font-size: 1.2em; margin-right: 10px; }
         .score-badge { background: #eef2f3; padding: 4px 12px; border-radius: 20px; font-weight: bold; color: #4f46e5; }
@@ -37,6 +39,7 @@ const AppState = {
             line-height: 1.6; 
             color: #333; 
             box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+            transition: background 0.3s, color 0.3s;
         }
 
         .passage-tag {
@@ -60,6 +63,7 @@ const AppState = {
             box-sizing: border-box;
             font-size: 1em;
             background: #ffffff;
+            color: inherit;
         }
 
         #topic-container {
@@ -76,6 +80,23 @@ const AppState = {
         }
 
         select option:disabled { color: #aaa; background: #f1f1f1; }
+
+        /* Dark Mode Styles */
+        body.dark-mode { background-color: #121212; color: #e0e0e0; }
+        body.dark-mode .container { background: #1e1e1e; color: #e0e0e0; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #333; }
+        body.dark-mode .quiz-card, body.dark-mode .passage-box, body.dark-mode .leaderboard-container { background: #2d2d2d; color: #e0e0e0; border-color: #540606; }
+        body.dark-mode .option-box { background: #383838; color: #e0e0e0; border-color: #555; }
+        body.dark-mode .option-box:hover { background: #454545; border-color: #777; }
+        body.dark-mode input[type="text"], body.dark-mode select, body.dark-mode #topic-container { background: #2d2d2d; color: #e0e0e0; border-color: #555; }
+        body.dark-mode .explanation-box { background: #332701; color: #ffda6a; border-left-color: #ffc107; }
+        body.dark-mode .passage-tag { background: #383838; color: #e0e0e0; border-color: #555; }
+        body.dark-mode .score-badge { background: #333; color: #818cf8; }
+        body.dark-mode .leaderboard-item { border-bottom-color: #383838; }
+
+        /* Utility buttons */
+        .top-bar { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 10px; }
+        .icon-btn { background: #4f46e5; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.9em; font-weight: bold; display: inline-flex; align-items: center; gap: 5px; }
+        .icon-btn:hover { background: #4338ca; }
     `;
     document.head.appendChild(style);
 })();
@@ -169,8 +190,41 @@ window.addEventListener('DOMContentLoaded', () => {
     const input = document.getElementById('student-code');
     if (input) input.value = savedMa;
     
+    // Khôi phục Dark Mode nếu đã bật trước đó
+    const savedDarkMode = localStorage.getItem('app_dark_mode') === 'true';
+    if (savedDarkMode) {
+        AppState.isDarkMode = true;
+        document.body.classList.add('dark-mode');
+    }
+
+    // Thêm các nút điều khiển nhanh (Dark mode, Tiến độ) nếu chưa có
+    injectTopControls();
     window.loadData();
 });
+
+function injectTopControls() {
+    const startScreen = document.getElementById('start-screen');
+    if (!startScreen) return;
+    
+    if (!document.getElementById('top-control-bar')) {
+        const topBar = document.createElement('div');
+        topBar.id = 'top-control-bar';
+        topBar.className = 'top-bar';
+        topBar.innerHTML = `
+            <button class="icon-btn" onclick="window.toggleDarkMode()">🌓 Giao diện: <span id="dark-mode-status">${AppState.isDarkMode ? 'Tối' : 'Sáng'}</span></button>
+            <button class="icon-btn" onclick="window.showProgressDashboard()">📊 Tiến độ cá nhân</button>
+        `;
+        startScreen.insertBefore(topBar, startScreen.firstChild);
+    }
+}
+
+window.toggleDarkMode = function() {
+    AppState.isDarkMode = !AppState.isDarkMode;
+    document.body.classList.toggle('dark-mode', AppState.isDarkMode);
+    localStorage.setItem('app_dark_mode', AppState.isDarkMode);
+    const statusSpan = document.getElementById('dark-mode-status');
+    if (statusSpan) statusSpan.textContent = AppState.isDarkMode ? 'Tối' : 'Sáng';
+};
 
 window.handleSubjectChange = function() {
     const mon = document.getElementById('subject-select').value;
@@ -432,6 +486,7 @@ window.startQuiz = function() {
     AppState.correctCount = 0; 
     AppState.wrongCount = 0;
     AppState.wrongQuestions = [];
+    AppState.userAnswersRecord = []; // Reset bản ghi đáp án
     
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('quiz-screen').style.display = 'block';
@@ -568,23 +623,34 @@ window.checkAnswer = function(element, chosenKey, index) {
     const item = AppState.currentQuizData[index];
     const correctKey = item._correctKey;
     
+    // Ghi lại kết quả cho tính năng Xem lại chi tiết
+    AppState.userAnswersRecord[index] = {
+        questionIndex: index,
+        question: item.question,
+        chosenKey: chosenKey,
+        correctKey: correctKey,
+        isCorrect: chosenKey === correctKey,
+        options: { a: item.a, b: item.b, c: item.c, d: item.d },
+        explanation: item.explanation
+    };
+
     const options = card.querySelectorAll('.option-box');
     options.forEach(opt => {
         opt.style.pointerEvents = 'none';
         const optOrigKey = opt.getAttribute('data-orig-key');
         if (optOrigKey === correctKey) {
-            opt.style.backgroundColor = '#d4edda';
+            opt.style.backgroundColor = AppState.isDarkMode ? '#064e3b' : '#d4edda';
             opt.style.borderColor = '#28a745';
         }
     });
 
     if (chosenKey === correctKey) {
         AppState.correctCount++;
-        element.style.backgroundColor = '#d4edda';
+        element.style.backgroundColor = AppState.isDarkMode ? '#064e3b' : '#d4edda';
         element.style.borderColor = '#28a745';
     } else {
         AppState.wrongCount++;
-        element.style.backgroundColor = '#f8d7da';
+        element.style.backgroundColor = AppState.isDarkMode ? '#7f1d1d' : '#f8d7da';
         element.style.borderColor = '#dc3545';
         AppState.wrongQuestions.push(item);
     }
@@ -615,17 +681,28 @@ window.checkVocaAnswer = function(index) {
 
     const item = AppState.currentQuizData[index];
     const correctVal = String(item._correctKey || '').trim().toLowerCase();
+    const isCorrect = (userVal === correctVal);
+
+    AppState.userAnswersRecord[index] = {
+        questionIndex: index,
+        question: item.question,
+        chosenKey: userVal,
+        correctKey: correctVal,
+        isCorrect: isCorrect,
+        options: null,
+        explanation: item.explanation
+    };
 
     const expBox = document.getElementById(`exp-${index}`);
     if (expBox) expBox.style.display = 'block';
 
-    if (userVal === correctVal) {
+    if (isCorrect) {
         AppState.correctCount++;
-        inputElem.style.backgroundColor = '#d4edda';
+        inputElem.style.backgroundColor = AppState.isDarkMode ? '#064e3b' : '#d4edda';
         inputElem.style.borderColor = '#28a745';
     } else {
         AppState.wrongCount++;
-        inputElem.style.backgroundColor = '#f8d7da';
+        inputElem.style.backgroundColor = AppState.isDarkMode ? '#7f1d1d' : '#f8d7da';
         inputElem.style.borderColor = '#dc3545';
         if (expBox) {
             expBox.innerHTML = `<b>Đáp án đúng:</b> <span style="color: green; font-weight: bold;">${escapeHTML(item._correctKey)}</span><br>` + expBox.innerHTML;
@@ -649,6 +726,21 @@ window.submitQuiz = function() {
     let maHS = document.getElementById('student-code').value.trim();
     let mon = document.getElementById('subject-select').value;
     let levelSelected = document.getElementById('level-select') ? document.getElementById('level-select').value : 'Level 1';
+    let dateStr = new Date().toLocaleString('vi-VN');
+
+    // Lưu lịch sử tiến độ cá nhân vào LocalStorage
+    let history = JSON.parse(localStorage.getItem('quiz_history_' + maHS) || '[]');
+    history.unshift({
+        mon: mon,
+        level: levelSelected,
+        score: score,
+        correct: AppState.correctCount,
+        total: total,
+        date: dateStr
+    });
+    // Giữ tối đa 20 lần làm bài gần nhất
+    if (history.length > 20) history.pop();
+    localStorage.setItem('quiz_history_' + maHS, JSON.stringify(history));
 
     alert(`Bài làm kết thúc!\nĐúng: ${AppState.correctCount}/${total}\nĐiểm của bạn: ${score} điểm`);
 
@@ -667,8 +759,107 @@ window.submitQuiz = function() {
             <h2>Kết Quả Bài Thi</h2>
             <p>Số câu đúng: <b>${AppState.correctCount}/${total}</b></p>
             <p>Điểm số: <b style="color:blue; font-size: 1.5em;">${score} đ</b></p>
+            
+            <button onclick="window.showDetailedReview()" style="margin-top: 10px; padding: 10px 20px; background:#4f46e5; color:white; border:none; border-radius:8px; cursor:pointer; width:100%; font-weight:bold;">👁️ Xem lại chi tiết bài làm</button>
+            
             ${retryBtnHtml}
-            <button onclick="location.reload()" style="margin-top: 15px; padding: 10px 20px; background:#007bff; color:white; border:none; border-radius:5px; cursor:pointer; width:100%;">Làm bài mới / Về trang chủ</button>
+            
+            <button onclick="location.reload()" style="margin-top: 15px; padding: 10px 20px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; width:100%;">Làm bài mới / Về trang chủ</button>
+        </div>
+    `;
+};
+
+// Tính năng 2: Hiển thị lịch sử tiến độ cá nhân (Progress Dashboard)
+window.showProgressDashboard = function() {
+    const maHS = document.getElementById('student-code').value.trim();
+    if (!maHS) return alert("Vui lòng nhập mã học sinh!");
+    
+    let history = JSON.parse(localStorage.getItem('quiz_history_' + maHS) || '[]');
+    
+    let modalOverlay = document.getElementById('dashboard-modal');
+    if (!modalOverlay) {
+        modalOverlay = document.createElement('div');
+        modalOverlay.id = 'dashboard-modal';
+        modalOverlay.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); display:flex; justify-content:center; align-items:center; z-index:9999;";
+        document.body.appendChild(modalOverlay);
+    }
+    
+    let historyHtml = history.length === 0 ? `<p style="text-align:center; color:#888;">Chưa có lịch sử làm bài trên thiết bị này.</p>` : `
+        <div style="max-height: 350px; overflow-y: auto;">
+            ${history.map(item => `
+                <div style="background: ${AppState.isDarkMode ? '#383838' : '#f8f9fa'}; border: 1px solid #540606; padding: 10px; margin-bottom: 8px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <b>${escapeHTML(item.mon)}</b> (${escapeHTML(item.level)})<br>
+                        <span style="font-size: 0.85em; color: #777;">Thời gian: ${escapeHTML(item.date)}</span>
+                    </div>
+                    <div style="text-align: right;">
+                        <span class="score-badge">${item.score} đ</span><br>
+                        <span style="font-size: 0.85em;">Đúng: ${item.correct}/${item.total}</span>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+
+    modalOverlay.innerHTML = `
+        <div class="container" style="max-width: 500px; width: 90%; position: relative;">
+            <h3>📊 Lịch Sử Tiến Độ Cá Nhân (${escapeHTML(maHS)})</h3>
+            ${historyHtml}
+            <button onclick="document.getElementById('dashboard-modal').style.display='none'" style="margin-top: 15px; width: 100%; padding: 10px; background: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">Đóng</button>
+        </div>
+    `;
+    modalOverlay.style.display = 'flex';
+};
+
+// Tính năng 3: Chế độ xem lại chi tiết bài làm (Detailed Review Mode)
+window.showDetailedReview = function() {
+    const container = document.getElementById('quiz-screen');
+    if (!container) return;
+
+    let reviewHtml = AppState.userAnswersRecord.map((rec, index) => {
+        if (!rec) return '';
+        let isCorrect = rec.isCorrect;
+        let statusColor = isCorrect ? (AppState.isDarkMode ? '#064e3b' : '#d4edda') : (AppState.isDarkMode ? '#7f1d1d' : '#f8f9da');
+        let borderColor = isCorrect ? '#28a745' : '#dc3545';
+        let statusText = isCorrect ? '✅ Đúng' : '❌ Sai';
+
+        let optionsDetails = '';
+        if (rec.options) {
+            optionsDetails = ['a', 'b', 'c', 'd'].map(k => {
+                if (!rec.options[k]) return '';
+                let isChosen = (rec.chosenKey === k);
+                let isTheCorrect = (rec.correctKey === k);
+                let styleStr = '';
+                if (isTheCorrect) styleStr = 'background: #d4edda; border-color: #28a745; font-weight: bold;';
+                else if (isChosen && !isCorrect) styleStr = 'background: #f8d7da; border-color: #dc3545;';
+
+                return `<div class="option-box" style="${styleStr}">
+                    <b>${k.toUpperCase()}.</b> ${escapeHTML(rec.options[k])} ${isTheCorrect ? '(Đáp án đúng)' : ''} ${isChosen && !isTheCorrect ? '(Bạn chọn)' : ''}
+                </div>`;
+            }).join('');
+        } else {
+            optionsDetails = `
+                <p><b>Đáp án bạn nhập:</b> <span style="color: ${isCorrect ? 'green' : 'red'};">${escapeHTML(rec.chosenKey)}</span></p>
+                <p><b>Đáp án đúng chuẩn:</b> <span style="color: green; font-weight: bold;">${escapeHTML(rec.correctKey)}</span></p>
+            `;
+        }
+
+        return `
+            <div class="quiz-card" style="border-color: ${borderColor}; background: ${statusColor};">
+                <p><b>Câu ${index + 1}:</b> ${escapeHTML(rec.question)} <span style="float: right; font-weight: bold;">${statusText}</span></p>
+                ${optionsDetails}
+                <div class="explanation-box" style="display: block; margin-top: 10px;"><b>Giải thích:</b> ${escapeHTML(rec.explanation || 'Không có giải thích.')}</div>
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="container" style="max-width: 700px;">
+            <h2>👁️ Xem Lại Chi Tiết Bài Làm</h2>
+            <div style="max-height: 500px; overflow-y: auto; margin-top: 15px;">
+                ${reviewHtml}
+            </div>
+            <button onclick="location.reload()" style="margin-top: 15px; width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">Về trang chủ</button>
         </div>
     `;
 };
@@ -691,8 +882,8 @@ window.retryWrongAnswers = function() {
     AppState.correctCount = 0;
     AppState.wrongCount = 0;
     AppState.wrongQuestions = [];
+    AppState.userAnswersRecord = [];
     
-    // Đã bọc chuẩn trong class "container" để đồng bộ style và nút bấm hoạt động bình thường
     document.getElementById('quiz-screen').innerHTML = `
         <div class="container">
             <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 10px;">
