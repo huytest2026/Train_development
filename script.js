@@ -14,7 +14,7 @@ const AppState = {
 (function injectStyles() {
     const style = document.createElement('style');
     style.innerHTML = `
-        .container { background: #bbe9f0; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 600px; margin: 20px auto; }
+        .container { background: #bbe9f0; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 600px; margin: 20px auto; position: relative; z-index: 5; }
         .quiz-card { background: #ffffff; border: 2px solid #540606; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .option-box { background: #f8f9fa; border: 1px solid #540606; border-radius: 8px; padding: 12px 15px; margin: 8px 0; cursor: pointer; transition: all 0.2s ease; font-weight: 500; }
         .option-box:hover { background: #e9ecef; border-color: #adb5bd; }
@@ -26,7 +26,7 @@ const AppState = {
         .time-text { font-size: 0.8em; color: #888; display: block; }
         .speaker-btn { background: #6c757d; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-bottom: 10px; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; }
         .speaker-btn:hover { background: #5a6268; }
-        #retry-wrong-btn { background: #d9534f; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; margin-top: 10px; width: 100%; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        #retry-wrong-btn { background: #d9534f; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; margin-top: 10px; width: 100%; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1); position: relative; z-index: 10; }
         #retry-wrong-btn:hover { background: #c9302c; }
         
         .passage-box { 
@@ -223,7 +223,11 @@ function updateMistakeButtonUI() {
 
     if (filteredMistakes.length > 0) {
         container.style.display = 'block';
-        container.innerHTML = `<button type="button" class="mistake-btn" onclick="window.startMistakeQuiz()">🎯 Ôn tập câu hay sai (${filteredMistakes.length} câu)</button>`;
+        container.innerHTML = `<button type="button" class="mistake-btn" id="start-mistake-quiz-btn">🎯 Ôn tập câu hay sai (${filteredMistakes.length} câu)</button>`;
+        const btn = document.getElementById('start-mistake-quiz-btn');
+        if (btn) {
+            btn.onclick = function() { window.startMistakeQuiz(); };
+        }
     } else {
         container.style.display = 'none';
         container.innerHTML = '';
@@ -242,11 +246,16 @@ window.addEventListener('DOMContentLoaded', () => {
         madeDiv.style.marginTop = '15px';
         madeDiv.innerHTML = `
             <label><b>Hoặc chọn Mã đề (MADE) để thi trực tiếp:</b></label>
-            <select id="made-select" onchange="window.handleMadeChange()">
+            <select id="made-select">
                 <option value="">-- Chọn mã đề --</option>
             </select>
         `;
         topicCard.insertBefore(madeDiv, topicCard.querySelector('#topic-container').nextSibling);
+        
+        const madeSelect = document.getElementById('made-select');
+        if (madeSelect) {
+            madeSelect.onchange = function() { window.handleMadeChange(); };
+        }
 
         const mistakeDiv = document.createElement('div');
         mistakeDiv.id = 'mistake-container';
@@ -358,9 +367,17 @@ window.updateTopicList = function() {
     container.innerHTML = topics.map(topic => {
         const isAllowed = !hasSpecificPermissions || allowed.includes(topic);
         return `<label style="display:block; margin:5px 0; opacity:${isAllowed ? '1' : '0.5'}">
-            <input type="checkbox" name="topic" value="${escapeHTML(topic)}" ${isAllowed ? 'checked' : ''} onclick="document.getElementById('made-select').value=''"> ${escapeHTML(topic)}
+            <input type="checkbox" name="topic" value="${escapeHTML(topic)}" ${isAllowed ? 'checked' : ''}> ${escapeHTML(topic)}
         </label>`;
     }).join('');
+
+    // Attach click handlers to checkboxes to reset made-select
+    container.querySelectorAll('input[name="topic"]').forEach(cb => {
+        cb.onchange = function() {
+            const madeSelect = document.getElementById('made-select');
+            if (madeSelect) madeSelect.value = '';
+        };
+    });
 };
 
 window.loadData = function() {
@@ -593,7 +610,7 @@ window.renderQuiz = function() {
                 <div class="passage-box">
                     <div class="passage-tag">${escapeHTML(itemChuDe)}</div>
                     <div>
-                        <button class="speaker-btn" data-question="${escapeHTML(item.passage)}" onclick="window.handleSpeak(this)">🔊 Nghe đoạn văn</button>
+                        <button type="button" class="speaker-btn" data-question="${escapeHTML(item.passage)}">🔊 Nghe đoạn văn</button>
                     </div>
                     <div style="white-space: pre-line; margin-top: 10px;">${escapeHTML(item.passage)}</div>
                 </div>
@@ -612,7 +629,7 @@ window.renderQuiz = function() {
         let questionText = item.question;
         let explanationText = item.explanation || 'Không có giải thích.';
 
-        let speakerBtn = '';
+        let speakerBtnHtml = '';
         let bodyHtml = '';
 
         if (isEnglish) {
@@ -642,21 +659,21 @@ window.renderQuiz = function() {
                     speakTextContent = questionText;
                 }
 
-                speakerBtn = `<button class="speaker-btn" data-question="${escapeHTML(speakTextContent)}" onclick="window.handleSpeak(this)">${speakerLabel}</button>`;
+                speakerBtnHtml = `<button type="button" class="speaker-btn" data-question="${escapeHTML(speakTextContent)}">${speakerLabel}</button>`;
 
                 bodyHtml = `
                     <div style="margin-top: 10px;">
                         <input type="text" id="voca-input-${index}" placeholder="${placeholderText}">
-                        <button type="button" onclick="window.checkVocaAnswer(${index})" style="margin-top: 8px; padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">Kiểm tra</button>
+                        <button type="button" id="check-voca-${index}" style="margin-top: 8px; padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">Kiểm tra</button>
                     </div>
                 `;
             } else {
-                speakerBtn = `<button class="speaker-btn" data-question="${escapeHTML(questionText)}" onclick="window.handleSpeak(this)">🔊 Nghe câu hỏi</button>`;
+                speakerBtnHtml = `<button type="button" class="speaker-btn" data-question="${escapeHTML(questionText)}">🔊 Nghe câu hỏi</button>`;
                 let keysToRender = item._shuffledKeys.length > 0 ? item._shuffledKeys : ['a', 'b', 'c', 'd'].filter(k => item[k]);
                 bodyHtml = keysToRender.map((optKey, displayIndex) => {
                     if (!item[optKey]) return '';
                     let displayLetter = String.fromCharCode(65 + displayIndex);
-                    return `<div class="option-box" data-orig-key="${optKey}" onclick="window.checkAnswer(this, '${optKey}', ${index})">
+                    return `<div class="option-box option-item" data-orig-key="${optKey}" data-index="${index}">
                         <b>${displayLetter}.</b> ${escapeHTML(item[optKey])}
                     </div>`;
                 }).join('');
@@ -666,7 +683,7 @@ window.renderQuiz = function() {
             bodyHtml = keysToRender.map((optKey, displayIndex) => {
                 if (!item[optKey]) return '';
                 let displayLetter = String.fromCharCode(65 + displayIndex);
-                return `<div class="option-box" data-orig-key="${optKey}" onclick="window.checkAnswer(this, '${optKey}', ${index})">
+                return `<div class="option-box option-item" data-orig-key="${optKey}" data-index="${index}">
                     <b>${displayLetter}.</b> ${escapeHTML(item[optKey])}
                 </div>`;
             }).join('');
@@ -674,13 +691,37 @@ window.renderQuiz = function() {
 
         contentHtml += `<div class="quiz-card" id="q-card-${index}">
             <p><b>Câu ${index + 1}:</b> ${escapeHTML(questionText)}</p>
-            ${speakerBtn}
+            ${speakerBtnHtml}
             ${bodyHtml}
             <div class="explanation-box" id="exp-${index}"><b>Giải thích:</b> ${escapeHTML(explanationText)}</div>
         </div>`;
     });
 
     container.innerHTML = contentHtml;
+
+    // Gắn sự kiện click an toàn cho các nút loa, đáp án và kiểm tra từ vựng
+    container.querySelectorAll('.speaker-btn').forEach(btn => {
+        btn.onclick = function() {
+            window.handleSpeak(this);
+        };
+    });
+
+    container.querySelectorAll('.option-item').forEach(opt => {
+        opt.onclick = function() {
+            const origKey = this.getAttribute('data-orig-key');
+            const idx = parseInt(this.getAttribute('data-index'));
+            window.checkAnswer(this, origKey, idx);
+        };
+    });
+
+    AppState.currentQuizData.forEach((item, index) => {
+        const checkBtn = document.getElementById(`check-voca-${index}`);
+        if (checkBtn) {
+            checkBtn.onclick = function() {
+                window.checkVocaAnswer(index);
+            };
+        }
+    });
 };
 
 window.handleSpeak = function(btn) {
@@ -792,19 +833,38 @@ window.submitQuiz = function() {
         body: JSON.stringify({ maHS: maHS, score: score, total: total, mon: mon, level: levelSelected })
     }).catch(err => console.error("Lỗi gửi kết quả:", err));
 
-    let retryBtnHtml = (AppState.wrongQuestions && AppState.wrongQuestions.length > 0) 
-        ? `<button type="button" id="retry-wrong-btn" onclick="window.retryWrongAnswers()">Làm lại các câu sai trong bài (${AppState.wrongQuestions.length})</button>` 
-        : '';
-
-    document.getElementById('quiz-screen').innerHTML = `
+    // Render kết quả và gắn sự kiện click bằng JS thuần để tránh lỗi chặn sự kiện
+    const quizScreen = document.getElementById('quiz-screen');
+    quizScreen.innerHTML = `
         <div class="container" style="text-align:center;">
             <h2>Kết Quả Bài Thi</h2>
             <p>Số câu đúng: <b>${AppState.correctCount}/${total}</b></p>
             <p>Điểm số: <b style="color:blue; font-size: 1.5em;">${score} đ</b></p>
-            ${retryBtnHtml}
-            <button type="button" onclick="location.reload()" style="margin-top: 15px; padding: 12px 20px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; width:100%; font-weight:bold;">Làm bài mới / Về trang chủ</button>
+            <div id="retry-btn-container"></div>
+            <button type="button" id="home-btn" style="margin-top: 15px; padding: 12px 20px; background:#007bff; color:white; border:none; border-radius:8px; cursor:pointer; width:100%; font-weight:bold;">Làm bài mới / Về trang chủ</button>
         </div>
     `;
+
+    if (AppState.wrongQuestions && AppState.wrongQuestions.length > 0) {
+        const container = document.getElementById('retry-btn-container');
+        if (container) {
+            const retryBtn = document.createElement('button');
+            retryBtn.type = 'button';
+            retryBtn.id = 'retry-wrong-btn';
+            retryBtn.textContent = `Làm lại các câu sai trong bài (${AppState.wrongQuestions.length})`;
+            retryBtn.onclick = function() {
+                window.retryWrongAnswers();
+            };
+            container.appendChild(retryBtn);
+        }
+    }
+
+    const homeBtn = document.getElementById('home-btn');
+    if (homeBtn) {
+        homeBtn.onclick = function() {
+            location.reload();
+        };
+    }
 };
 
 window.retryWrongAnswers = function() {
