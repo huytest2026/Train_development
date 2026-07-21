@@ -134,45 +134,35 @@ function normalizeItem(item) {
     let values = Array.isArray(item) ? item : [];
     if (values.length === 0) return null;
 
-    let v0 = String(values[0] || '').trim().toLowerCase();
-    if (v0 === 'id' || v0 === 'môn' || v0 === 'mon') {
+    let v1 = String(values[1] || '').trim().toLowerCase();
+    if (v1 === 'môn' || v1 === 'mon' || v1 === 'id') {
         return null;
     }
 
-    let hasStt = /^\d+$/.test(String(values[0]).trim());
-
-    const getVal = (indexWithoutId) => {
-        let idx = hasStt ? indexWithoutId + 1 : indexWithoutId;
+    const getCol = (idx) => {
         if (idx < values.length && values[idx] !== undefined && values[idx] !== null) {
             return String(values[idx]).trim();
         }
         return '';
     };
 
-    // Tìm kiếm trong mảng xem phần tử nào khớp với định dạng mã đề hoặc lấy đúng cột chỉ định
-    let foundMade = '';
-    for (let val of values) {
-        let strVal = String(val || '').trim();
-        if (strVal.toUpperCase().startsWith('DH') || strVal.toUpperCase().startsWith('MD')) {
-            foundMade = strVal;
-            break;
-        }
-    }
-
+    // Ánh xạ chuẩn xác theo các cột trong Google Sheets:
+    // 0: ID, 1: Môn, 2: Chủ đề, 3: Nội dung câu hỏi, 4: Đăng án A, 5: Đáp án B, 6: Đáp án C, 7: Đáp án D, 
+    // 8: Đáp án đúng, 9: Diễn giải, 10: loại, 11: Level, 12: passage, 13: MADE
     return {
-        mon: getVal(0),
-        chuDe: getVal(1),
-        question: getVal(2),
-        a: getVal(3),
-        b: getVal(4),
-        c: getVal(5),
-        d: getVal(6),
-        correct: getVal(7),
-        explanation: getVal(8),
-        loai: getVal(9),
-        level: getVal(10),
-        passage: getVal(11),
-        made: getVal(13) !== '' ? getVal(13) : foundMade
+        mon: getCol(1),
+        chuDe: getCol(2),
+        question: getCol(3),
+        a: getCol(4),
+        b: getCol(5),
+        c: getCol(6),
+        d: getCol(7),
+        correct: getCol(8),
+        explanation: getCol(9),
+        loai: getCol(10),
+        level: getCol(11),
+        passage: getCol(12),
+        made: getCol(13)
     };
 }
 
@@ -285,7 +275,7 @@ window.updateTopicList = function() {
         .map(p => String(p.chuDe).trim());
 
     const topics = [...new Set(AppState.allQuizData
-        .filter(i => cleanKey(i.mon) === cleanMonSelect && i.question !== '' && (!i.chuDe.toUpperCase().startsWith('DH')))
+        .filter(i => cleanKey(i.mon) === cleanMonSelect && i.question !== '')
         .map(i => i.chuDe))].filter(topic => topic !== "");
 
     if (topics.length === 0) {
