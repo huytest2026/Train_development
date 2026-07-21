@@ -81,13 +81,14 @@ const AppState = {
             background: #6f42c1;
             color: white;
             border: none;
-            padding: 10px 20px;
+            padding: 12px 20px;
             border-radius: 8px;
             cursor: pointer;
             margin-top: 10px;
             width: 100%;
             font-weight: bold;
             transition: background 0.2s;
+            font-size: 1em;
         }
         .mistake-bank-btn:hover { background: #5a32a3; }
     `;
@@ -196,14 +197,16 @@ window.addEventListener('DOMContentLoaded', () => {
         topicCard.insertBefore(madeDiv, topicCard.querySelector('#topic-container').nextSibling);
     }
 
-    // Thêm nút Ngân hàng câu sai vào giao diện chính nếu có màn hình start-screen
+    // Thêm nút Ngân hàng câu sai vào màn hình chính một cách an toàn
     const startScreen = document.getElementById('start-screen');
     if (startScreen && !document.getElementById('open-mistake-bank-btn')) {
         const mistakeBtn = document.createElement('button');
         mistakeBtn.id = 'open-mistake-bank-btn';
         mistakeBtn.className = 'mistake-bank-btn';
         mistakeBtn.onclick = window.openMistakeBank;
-        startScreen.appendChild(mistakeBtn);
+        
+        const targetContainer = startScreen.querySelector('.container') || startScreen;
+        targetContainer.appendChild(mistakeBtn);
         window.updateMistakeButtonText();
     }
 
@@ -242,7 +245,6 @@ window.addQuestionsToMistakeBank = function(newWrongItems) {
     let currentMistakes = window.getMistakeBank(maHS);
 
     newWrongItems.forEach(newItem => {
-        // Kiểm tra tránh trùng lặp dựa vào nội dung câu hỏi và môn
         const exists = currentMistakes.some(m => m.question === newItem.question && m.mon === newItem.mon);
         if (!exists) {
             currentMistakes.push(newItem);
@@ -273,9 +275,9 @@ window.openMistakeBank = function() {
         <div class="container">
             <h2>📚 Ngân hàng câu sai (${mistakes.length} câu)</h2>
             <p>Ôn tập lại các câu hỏi bạn đã làm sai trước đây để nắm vững kiến thức.</p>
-            <button onclick="window.startMistakeQuiz()" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; margin-bottom: 10px;">Làm bài ôn tập câu sai này</button>
-            <button onclick="window.clearMistakeBank()" style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; margin-bottom: 15px;">Xóa sạch ngân hàng câu sai</button>
-            <button onclick="location.reload()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; width: 100%;">Quay lại trang chủ</button>
+            <button onclick="window.startMistakeQuiz()" style="padding: 12px 20px; background: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; margin-bottom: 10px;">Làm bài ôn tập câu sai này</button>
+            <button onclick="window.clearMistakeBank()" style="padding: 12px 20px; background: #dc3545; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; margin-bottom: 15px;">Xóa sạch ngân hàng câu sai</button>
+            <button onclick="location.reload()" style="padding: 12px 20px; background: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; width: 100%;">Quay lại trang chủ</button>
         </div>
     `;
     container.innerHTML = html;
@@ -839,7 +841,6 @@ window.submitQuiz = function() {
     let mon = document.getElementById('subject-select').value;
     let levelSelected = document.getElementById('level-select') ? document.getElementById('level-select').value : 'Level 1';
 
-    // Tự động lưu các câu sai vào ngân hàng câu sai
     if (AppState.wrongQuestions.length > 0) {
         window.addQuestionsToMistakeBank(AppState.wrongQuestions);
     }
@@ -886,7 +887,6 @@ window.retryWrongAnswers = function() {
     AppState.wrongCount = 0;
     AppState.wrongQuestions = [];
     
-    // Khôi phục giao diện màn hình làm bài thi cho câu sai
     document.getElementById('quiz-screen').innerHTML = `
         <div class="container" style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
             <div><b>Làm lại các câu sai</b></div>
