@@ -9,7 +9,7 @@ const AppState = {
     wrongQuestions: [],
     isReadingComp: false,
     darkMode: false,
-    userAnswers: {} // Lưu lại lịch sử đáp án để xem lại chi tiết
+    userAnswers: {}
 };
 
 (function injectStyles() {
@@ -30,8 +30,8 @@ const AppState = {
         .speaker-btn:hover { background: #5a6268; }
         #retry-wrong-btn { background: #d9534f; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-top: 10px; width: 100%; font-weight: bold; }
         
-        /* Cố định khung đầu trang khi cuộn */
-        #quiz-screen > .container:first-child, #timer-display {
+        /* Cố định khung đầu trang (chứa cả thời gian và điểm số) khi cuộn */
+        #sticky-quiz-header {
             position: sticky;
             top: 10px;
             z-index: 1000;
@@ -117,7 +117,7 @@ const AppState = {
             box-shadow: 0 10px 25px rgba(0,0,0,0.5);
             border: 1px solid #333;
         }
-        body.dark-mode #quiz-screen > .container:first-child, body.dark-mode #timer-display {
+        body.dark-mode #sticky-quiz-header {
             background: #1e1e1e !important;
             border: 1px solid #bb86fc;
         }
@@ -445,13 +445,18 @@ window.startMistakeQuiz = function() {
     AppState.wrongQuestions = [];
     AppState.userAnswers = {};
     
-    document.getElementById('quiz-screen').innerHTML = `
-        <div class="container" style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
-            <div><b>Ôn tập Ngân hàng câu sai</b></div>
-            <div>Đúng: <span id="count-correct">0</span> | Sai: <span id="count-wrong">0</span></div>
+    const quizScreen = document.getElementById('quiz-screen');
+    quizScreen.style.display = 'block';
+    quizScreen.innerHTML = `
+        <div id="sticky-quiz-header" class="container">
+            <div id="timer-display" style="text-align: center; font-weight: bold; font-size: 1.2em; margin-bottom: 8px;">📚 Ôn tập Ngân hàng câu sai</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; font-weight: bold;">
+                <span>Danh sách câu sai</span>
+                <div>Đúng: <span id="count-correct">0</span> | Sai: <span id="count-wrong">0</span></div>
+            </div>
         </div>
         <div id="quiz"></div>
-        <div style="text-align: center; margin-top: 20px;">
+        <div style="text-align: center; margin-top: 20px; margin-bottom: 30px;">
             <button onclick="window.submitQuiz()" style="padding: 12px 30px; background: #28a745; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">Nộp bài</button>
         </div>
     `;
@@ -757,7 +762,21 @@ window.startQuiz = function() {
     AppState.userAnswers = {};
     
     document.getElementById('start-screen').style.display = 'none';
-    document.getElementById('quiz-screen').style.display = 'block';
+    const quizScreen = document.getElementById('quiz-screen');
+    quizScreen.style.display = 'block';
+
+    // Tạo thanh header dính (sticky) chứa đồng hồ đếm ngược và điểm số đúng/sai, đồng thời xóa bỏ hoàn toàn dòng Thời gian: --:-- cũ
+    quizScreen.innerHTML = `
+        <div id="sticky-quiz-header" class="container">
+            <div id="timer-display" style="text-align: center; font-weight: bold; font-size: 1.2em; margin-bottom: 8px;">⏱️ Đang tải thời gian...</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; font-weight: bold;">
+                <span>${escapeHTML(mon)} ${levelSelected ? '- ' + escapeHTML(levelSelected) : ''}</span>
+                <div>Đúng: <span id="count-correct">0</span> | Sai: <span id="count-wrong">0</span></div>
+            </div>
+        </div>
+        <div id="quiz"></div>
+    `;
+
     window.renderQuiz();
     
     let totalSeconds = 10 * 60; 
@@ -962,16 +981,8 @@ window.checkVocaAnswer = function(index) {
 
 window.startTimerTotal = function(seconds) {
     let timeLeft = seconds;
-    const timerContainer = document.createElement('div');
-    timerContainer.id = 'timer-display';
-    timerContainer.className = 'container';
-    timerContainer.style.textAlign = 'center';
-    timerContainer.style.fontWeight = 'bold';
-    timerContainer.style.marginBottom = '15px';
-    timerContainer.style.fontSize = '1.2em';
-
-    const quizScreen = document.getElementById('quiz-screen');
-    if (quizScreen) quizScreen.insertBefore(timerContainer, quizScreen.firstChild);
+    const timerContainer = document.getElementById('timer-display');
+    if (!timerContainer) return;
 
     if (AppState.timerInterval) clearInterval(AppState.timerInterval);
 
