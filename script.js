@@ -95,6 +95,18 @@ function cleanKey(str) {
     return removeDiacritics(str).toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+function standardizeSubject(monStr) {
+    if (!monStr) return '';
+    const cleanM = cleanKey(monStr);
+    if (cleanM.includes('anh') || cleanM.includes('english')) {
+        return 'Tiếng Anh';
+    }
+    if (cleanM.includes('toan') || cleanM.includes('math')) {
+        return 'Toán';
+    }
+    return monStr.trim();
+}
+
 function normalizeItem(item) {
     if (!item) return null;
     
@@ -126,7 +138,8 @@ function normalizeItem(item) {
             explanation: findKey(['explanation', 'giaithich', 'giai_thich', 'diễn giải', 'dien giai', 'giải thích', 'giai thich']),
             loai: findKey(['loai', 'loại', 'type']),
             level: findKey(['level', 'cấp độ', 'cap do', 'muc do']),
-            passage: findKey(['passage', 'doanvan', 'đoạn văn', 'doan_van', 'đoạn_văn', 'noidungdoanvan', 'noidung', 'reading', 'content'])
+            passage: findKey(['passage', 'doanvan', 'đoạn văn', 'doan_van', 'đoạn_văn', 'noidungdoanvan', 'noidung', 'reading', 'content']),
+            made: findKey(['made', 'ma_de', 'mã đề', 'madề'])
         };
     }
     
@@ -160,7 +173,8 @@ function normalizeItem(item) {
         explanation: getVal(8),
         loai: getVal(9),
         level: getVal(10),
-        passage: getVal(11)
+        passage: getVal(11),
+        made: getVal(12)
     };
 }
 
@@ -255,6 +269,15 @@ window.updateTopicList = function() {
     }).join('');
 };
 
+window.toggleAllTopics = function() {
+    const checkboxes = document.querySelectorAll('input[name="topic"]');
+    if (checkboxes.length === 0) return;
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    checkboxes.forEach(cb => {
+        cb.checked = !allChecked;
+    });
+};
+
 window.loadData = function() {
     const maHS = document.getElementById('student-code').value.trim();
     if (!maHS) return alert("Vui lòng nhập mã học sinh!");
@@ -287,6 +310,7 @@ window.handleQuizData = function(data) {
     let lastLevel = '';
     let lastLoai = '';
     let lastPassage = '';
+    let lastMade = '';
 
     AppState.allQuizData = (data.questions || [])
         .map(rawItem => {
@@ -296,16 +320,9 @@ window.handleQuizData = function(data) {
             if (item.mon) lastMon = item.mon;
             else item.mon = lastMon;
 
-            // --- CHUẨN HÓA TÊN MÔN HỌC ---
             if (item.mon) {
-                let cleanM = cleanKey(item.mon);
-                if (cleanM === cleanKey('Tiếng Anh')) {
-                    item.mon = 'Tiếng Anh';
-                } else if (cleanM === cleanKey('Toán')) {
-                    item.mon = 'Toán';
-                }
+                item.mon = standardizeSubject(item.mon);
             }
-            // ---------------------------
 
             if (item.chuDe) lastChuDe = item.chuDe;
             else item.chuDe = lastChuDe;
@@ -315,6 +332,9 @@ window.handleQuizData = function(data) {
 
             if (item.loai) lastLoai = item.loai;
             else if (lastLoai) item.loai = lastLoai;
+
+            if (item.made) lastMade = item.made;
+            else if (lastMade) item.made = lastMade;
 
             if (item.passage) {
                 lastPassage = item.passage;
@@ -343,9 +363,7 @@ window.handleQuizData = function(data) {
         else maHS = lastMaHS;
         
         if (mon !== '') {
-            let cleanM = cleanKey(mon);
-            if (cleanM === cleanKey('Tiếng Anh')) mon = 'Tiếng Anh';
-            else if (cleanM === cleanKey('Toán')) mon = 'Toán';
+            mon = standardizeSubject(mon);
             lastPermMon = mon;
         } else {
             mon = lastPermMon;
@@ -359,7 +377,6 @@ window.handleQuizData = function(data) {
     const maHS = document.getElementById('student-code').value.trim();
     localStorage.setItem('cache_quiz_data_' + maHS, JSON.stringify(data));
 
-    // Cập nhật danh sách môn vào thẻ select (chỉ lấy các tên môn đã chuẩn hóa, không bị trùng)
     const subjectSelect = document.getElementById('subject-select');
     if (subjectSelect) {
         const currentVal = subjectSelect.value;
@@ -368,6 +385,19 @@ window.handleQuizData = function(data) {
             subjects.map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join('');
         if (subjects.includes(currentVal)) {
             subjectSelect.value = currentVal;
+        }
+    }
+
+    const madeSelect = document.getElementById('made-select');
+    const madeContainer = document.getElementById('made-container');
+    if (madeSelect && madeContainer) {
+        const mades = [...new Set(AppState.allQuizData.map(i => i.made).filter(Boolean))];
+        if (mades.length > 0) {
+            madeContainer.style.display = 'block';
+            madeSelect.innerHTML = `<option value="">-- Tất cả mã đề --</option>` + 
+                mades.map(m => `<option value="${escapeHTML(m)}">Mã đề: ${escapeHTML(m)}</option>`).join('');
+        } else {
+            madeContainer.style.display = 'none';
         }
     }
 
@@ -416,6 +446,7 @@ function getOriginalCorrectKey(item) {
 window.startQuiz = function() {
     const mon = document.getElementById('subject-select').value;
     const levelSelected = document.getElementById('level-select') ? document.getElementById('level-select').value : '';
+    const selectedMade = document.getElementById('made-select') ? document.getElementById('made-select').value.trim() : '';
     const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
     if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
     
@@ -425,7 +456,8 @@ window.startQuiz = function() {
     let readingQuestions = AppState.allQuizData.filter(i => {
         const isSameSubject = (cleanKey(i.mon) === cleanKey(mon));
         const isTopicMatch = readingTopics.includes(i.chuDe);
-        return isSameSubject && isTopicMatch && i.question !== '';
+        const isMadeMatch = !selectedMade || (String(i.made).trim() === selectedMade);
+        return isSameSubject && isTopicMatch && isMadeMatch && i.question !== '';
     });
 
     let normalQuestions = [];
@@ -434,7 +466,8 @@ window.startQuiz = function() {
             const isSameSubject = (cleanKey(i.mon) === cleanKey(mon));
             const isTopicMatch = normalTopics.includes(i.chuDe);
             const isLevelMatch = (cleanKey(mon) !== cleanKey('Tiếng Anh')) || (String(i.level).trim() === String(levelSelected).trim());
-            return isSameSubject && isTopicMatch && isLevelMatch && i.question !== '';
+            const isMadeMatch = !selectedMade || (String(i.made).trim() === selectedMade);
+            return isSameSubject && isTopicMatch && isLevelMatch && isMadeMatch && i.question !== '';
         });
         normalQuestions = filteredNormal.sort(() => 0.5 - Math.random()).slice(0, 20);
     }
@@ -743,7 +776,7 @@ window.startTimerTotal = function(totalSeconds) {
         let minutes = Math.floor(totalSeconds / 60);
         let seconds = totalSeconds % 60;
         display.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-        
+
         if (totalSeconds <= 0) {
             clearInterval(AppState.timerInterval);
             alert("Hết thời gian làm bài!");
