@@ -612,7 +612,6 @@ window.startQuiz = function() {
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('quiz-screen').style.display = 'block';
     
-    // Xóa container kết quả cũ nếu có
     const oldResult = document.getElementById('result-container');
     if (oldResult) oldResult.remove();
 
@@ -737,6 +736,14 @@ window.handleSpeak = function(btn) {
     window.speakText(text);
 };
 
+// Hàm cập nhật điểm số trực tiếp lên giao diện thanh trạng thái
+function updateScoreDisplay() {
+    const correctEl = document.getElementById('correct-count-display');
+    const wrongEl = document.getElementById('wrong-count-display');
+    if (correctEl) correctEl.textContent = AppState.correctCount;
+    if (wrongEl) wrongEl.textContent = AppState.wrongCount;
+}
+
 window.checkAnswer = function(element, chosenKey, index) {
     const card = document.getElementById(`q-card-${index}`);
     if (card.getAttribute('data-answered') === 'true') return;
@@ -745,7 +752,6 @@ window.checkAnswer = function(element, chosenKey, index) {
     const item = AppState.currentQuizData[index];
     const correctKey = item._correctKey;
     
-    // Lưu lại lựa chọn của người dùng để phục vụ chức năng xem chi tiết
     item._userChoiceKey = chosenKey;
 
     const options = card.querySelectorAll('.option-box');
@@ -769,6 +775,8 @@ window.checkAnswer = function(element, chosenKey, index) {
         element.style.backgroundColor = '#f8d7da';
         element.style.borderColor = '#842029';
     }
+
+    updateScoreDisplay(); // Cập nhật lại số Đúng / Sai trên màn hình
 
     const expBox = document.getElementById(`exp-${index}`);
     if (expBox) expBox.style.display = 'block';
@@ -804,6 +812,8 @@ window.checkVocaAnswer = function(index) {
         input.style.borderColor = '#842029';
     }
 
+    updateScoreDisplay(); // Cập nhật lại số Đúng / Sai trên màn hình
+
     const expBox = document.getElementById(`exp-${index}`);
     if (expBox) expBox.style.display = 'block';
     checkQuizFinished();
@@ -828,10 +838,16 @@ window.startTimerTotal = function(seconds) {
         const quizScreen = document.getElementById('quiz-screen');
         if (quizScreen) {
             const topBar = document.createElement('div');
-            topBar.innerHTML = `Thời gian còn lại: <span id="timer-display" style="color: red; font-weight: bold;">--:--</span>`;
+            topBar.style.display = 'flex';
+            topBar.style.justifyContent = 'space-between';
+            topBar.style.marginBottom = '15px';
+            topBar.style.fontWeight = 'bold';
+            topBar.innerHTML = `Thời gian: <span id="timer-display" style="color: red;">--:--</span> <span>Đúng: <span id="correct-count-display">0</span> | Sai: <span id="wrong-count-display">0</span></span>`;
             quizScreen.insertBefore(topBar, quizScreen.firstChild);
             timerDisplay = document.getElementById('timer-display');
         }
+    } else {
+        updateScoreDisplay();
     }
 
     AppState.timerInterval = setInterval(() => {
@@ -854,7 +870,6 @@ window.submitQuiz = function() {
 
     const totalQ = AppState.currentQuizData.length;
     
-    // Tự động thêm các câu chưa trả lời vào danh sách câu sai
     AppState.currentQuizData.forEach((item, index) => {
         const card = document.getElementById(`q-card-${index}`);
         if (card && card.getAttribute('data-answered') !== 'true') {
@@ -917,7 +932,6 @@ window.submitQuiz = function() {
     window.renderLeaderboard(mon);
 };
 
-// Khôi phục tính năng Xem lại chi tiết bài làm
 window.viewDetailedReview = function() {
     const container = document.getElementById('detailed-review-container');
     if (!container) return;
@@ -955,7 +969,6 @@ window.viewDetailedReview = function() {
     container.innerHTML = reviewHtml;
 };
 
-// Khôi phục tính năng Làm lại câu sai
 window.retryWrongQuestions = function() {
     if (!AppState.wrongQuestions || AppState.wrongQuestions.length === 0) return;
     AppState.currentQuizData = [...AppState.wrongQuestions];
