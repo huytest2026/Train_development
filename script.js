@@ -452,12 +452,6 @@ window.handleQuizData = function(data) {
     window.updateMadePassagePreview();
 };
 
-    window.renderLeaderboard();
-    window.updateTopicList();
-    window.updateLevelOptions();
-    window.updateMadePassagePreview();
-};
-
 window.renderLeaderboard = function(subjectFilter = null) {
     const list = document.getElementById('ranking-list');
     if (!list) return;
@@ -502,8 +496,14 @@ window.startQuiz = function() {
     const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
     if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
     
-    let readingTopics = selectedTopics.filter(t => t.toUpperCase().startsWith('DH'));
-    let normalTopics = selectedTopics.filter(t => !t.toUpperCase().startsWith('DH'));
+    let readingTopics = selectedTopics.filter(t => {
+        let u = t.toUpperCase();
+        return u.startsWith('DH') || u.startsWith('TV');
+    });
+    let normalTopics = selectedTopics.filter(t => {
+        let u = t.toUpperCase();
+        return !u.startsWith('DH') && !u.startsWith('TV');
+    });
 
     let readingQuestions = AppState.allQuizData.filter(i => {
         const isSameSubject = (cleanKey(i.mon) === cleanKey(mon));
@@ -532,8 +532,9 @@ window.startQuiz = function() {
     AppState.currentQuizData = rawSelectedQuestions.map(item => {
         let originalCorrectKey = getOriginalCorrectKey(item);
         let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k] !== '');
-        let isDH = item.chuDe && item.chuDe.toUpperCase().startsWith('DH');
-        let shuffledKeys = isDH ? validKeys : [...validKeys].sort(() => 0.5 - Math.random());
+        let chuDeU = String(item.chuDe || '').toUpperCase();
+        let isSpecial = chuDeU.startsWith('DH') || chuDeU.startsWith('TV');
+        let shuffledKeys = isSpecial ? validKeys : [...validKeys].sort(() => 0.5 - Math.random());
 
         return {
             ...item,
@@ -560,7 +561,6 @@ window.startQuiz = function() {
     window.startTimerTotal(totalSeconds);
 };
 
-// ĐÃ CẬP NHẬT HÀM NÀY: Đoạn văn (passage) sẽ hiển thị đi liền theo đúng nhóm câu hỏi tương ứng
 window.renderQuiz = function() {
     const container = document.getElementById('quiz');
     if (!container) return;
@@ -572,7 +572,6 @@ window.renderQuiz = function() {
         let passage = item.passage;
         let chuDe = item.chuDe;
 
-        // Nếu câu hỏi có đoạn văn và đoạn văn này chưa được render trước đó, hãy hiển thị nó ngay trước câu hỏi
         if (passage && passage.trim() !== '' && !renderedPassages.has(passage)) {
             renderedPassages.add(passage);
             html += `
@@ -581,7 +580,7 @@ window.renderQuiz = function() {
                     <div>
                         <button class="speaker-btn" data-question="${escapeHTML(passage)}" onclick="window.handleSpeak(this)">🔊 Nghe đoạn văn</button>
                     </div>
-                    <div style="white-space: pre-line; margin-top: 10px;">${escapeHTML(passage)}</div>
+                    <div style="white-space: pre-line; margin-top: 10px; max-height: 250px; overflow-y: auto;">${escapeHTML(passage)}</div>
                 </div>
             `;
         }
@@ -791,8 +790,9 @@ window.retryWrongAnswers = function() {
     AppState.currentQuizData = AppState.wrongQuestions.map(item => {
         let originalCorrectKey = getOriginalCorrectKey(item);
         let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k] !== '');
-        let isDH = item.chuDe && item.chuDe.toUpperCase().startsWith('DH');
-        let shuffledKeys = isDH ? validKeys : [...validKeys].sort(() => 0.5 - Math.random());
+        let chuDeU = String(item.chuDe || '').toUpperCase();
+        let isSpecial = chuDeU.startsWith('DH') || chuDeU.startsWith('TV');
+        let shuffledKeys = isSpecial ? validKeys : [...validKeys].sort(() => 0.5 - Math.random());
         return {
             ...item,
             _shuffledKeys: shuffledKeys,
