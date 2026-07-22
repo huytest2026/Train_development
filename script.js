@@ -736,7 +736,6 @@ window.handleSpeak = function(btn) {
     window.speakText(text);
 };
 
-// Hàm cập nhật điểm số trực tiếp lên giao diện thanh trạng thái
 function updateScoreDisplay() {
     const correctEl = document.getElementById('correct-count-display');
     const wrongEl = document.getElementById('wrong-count-display');
@@ -776,7 +775,7 @@ window.checkAnswer = function(element, chosenKey, index) {
         element.style.borderColor = '#842029';
     }
 
-    updateScoreDisplay(); // Cập nhật lại số Đúng / Sai trên màn hình
+    updateScoreDisplay();
 
     const expBox = document.getElementById(`exp-${index}`);
     if (expBox) expBox.style.display = 'block';
@@ -812,7 +811,7 @@ window.checkVocaAnswer = function(index) {
         input.style.borderColor = '#842029';
     }
 
-    updateScoreDisplay(); // Cập nhật lại số Đúng / Sai trên màn hình
+    updateScoreDisplay();
 
     const expBox = document.getElementById(`exp-${index}`);
     if (expBox) expBox.style.display = 'block';
@@ -823,6 +822,7 @@ function checkQuizFinished() {
     const cards = document.querySelectorAll('.quiz-card');
     const answeredCards = document.querySelectorAll('.quiz-card[data-answered="true"]');
     if (cards.length > 0 && cards.length === answeredCards.length) {
+        // Tự động kết thúc sau khi làm xong câu cuối 1 giây
         setTimeout(() => {
             window.submitQuiz();
         }, 1000);
@@ -914,7 +914,7 @@ window.submitQuiz = function() {
     }
 
     resultContainer.innerHTML = `
-        <h2 style="text-align: center; color: #007bff;">🎉 Kết Quả Bài Làm</h2>
+        <h2 style="text-align: center; color: #007bff;">🎉 Tổng Kết Bài Làm</h2>
         <p>Học sinh: <b>${escapeHTML(maHS)}</b></p>
         <p>Môn: <b>${escapeHTML(mon)}</b></p>
         <p>Số câu đúng: <span style="color: green; font-weight: bold;">${AppState.correctCount}</span> / ${totalQ}</p>
