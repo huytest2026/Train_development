@@ -457,7 +457,7 @@ window.startMistakeQuiz = function() {
         </div>
         <div id="quiz"></div>
         <div style="text-align: center; margin-top: 20px; margin-bottom: 30px;">
-            <button onclick="window.submitQuiz()" style="padding: 12px 30px; background: #28a745; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">Nộp bài</button>
+            <button onclick="window.submitQuiz()" style="padding: 12px 30px; background: #28a745; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.1em;">Nộp bài</button>
         </div>
     `;
     window.renderQuiz();
@@ -765,7 +765,7 @@ window.startQuiz = function() {
     const quizScreen = document.getElementById('quiz-screen');
     quizScreen.style.display = 'block';
 
-    // Tạo thanh header dính (sticky) chứa đồng hồ đếm ngược và điểm số đúng/sai, đồng thời xóa bỏ hoàn toàn dòng Thời gian: --:-- cũ
+    // Đã bổ sung lại nút Nộp bài ở bên dưới
     quizScreen.innerHTML = `
         <div id="sticky-quiz-header" class="container">
             <div id="timer-display" style="text-align: center; font-weight: bold; font-size: 1.2em; margin-bottom: 8px;">⏱️ Đang tải thời gian...</div>
@@ -775,6 +775,9 @@ window.startQuiz = function() {
             </div>
         </div>
         <div id="quiz"></div>
+        <div style="text-align: center; margin-top: 20px; margin-bottom: 30px;">
+            <button onclick="window.submitQuiz()" style="padding: 12px 30px; background: #28a745; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.1em;">Nộp bài</button>
+        </div>
     `;
 
     window.renderQuiz();
