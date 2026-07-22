@@ -399,7 +399,7 @@ function getOriginalCorrectKey(item) {
 
 window.startQuiz = function() {
     const mon = document.getElementById('subject-select').value;
-    const levelSelected = document.getElementById('level-select').value;
+    const levelSelected = document.getElementById('level-select') ? document.getElementById('level-select').value : '';
     const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
     if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
     
@@ -745,6 +745,6 @@ window.speakText = function(text) {
         utterance.lang = 'en-US';
         window.speechSynthesis.speak(utterance);
     } else {
-        alert("Trình duyệt không hỗ trợ đọc văn bản!");
+        alert("Trình duyệt không hỗ trợ đọc văn bản.");
     }
 };
