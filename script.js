@@ -13,7 +13,7 @@ const AppState = {
 (function injectStyles() {
     const style = document.createElement('style');
     style.innerHTML = `
-        .container { background: #bbe9f0; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 600px; margin: 20px auto; transition: background 0.3s, color 0.3s; }
+        .container { background: #bbe9f0; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 600px; margin: 20px auto; transition: background 0.3s, color 0.3s; position: relative; }
         .quiz-card { background: #ffffff; border: 2px solid #540606; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: background 0.3s, border-color 0.3s, color 0.3s; }
         .option-box { background: #f8f9fa; border: 1px solid #540606; border-radius: 8px; padding: 12px 15px; margin: 8px 0; cursor: pointer; transition: all 0.2s ease; font-weight: 500; }
         .option-box:hover { background: #e9ecef; border-color: #adb5bd; }
@@ -92,19 +92,20 @@ const AppState = {
         body.dark-mode .explanation-box { background: #332701; color: #ffeb3b; border-left-color: #ffc107; }
 
         .dark-mode-btn {
-            position: fixed;
+            position: absolute;
             top: 20px;
             right: 20px;
             background: #ffffff;
             color: #333;
             border: 2px solid #540606;
-            padding: 8px 14px;
+            padding: 6px 12px;
             border-radius: 8px;
             cursor: pointer;
             font-weight: bold;
-            z-index: 1000;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            font-size: 0.9em;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             transition: all 0.2s;
+            z-index: 10;
         }
         .dark-mode-btn:hover { background: #f1f1f1; }
         body.dark-mode .dark-mode-btn {
@@ -220,14 +221,15 @@ window.addEventListener('DOMContentLoaded', () => {
     const input = document.getElementById('student-code');
     if (input) input.value = savedMa;
 
-    // Thiết lập nút Dark Mode
-    if (!document.getElementById('dark-mode-toggle-btn')) {
+    // Chèn nút Dark Mode vào bên trong khung container chính (ở góc trên bên phải)
+    const startScreen = document.getElementById('start-screen');
+    if (startScreen && !document.getElementById('dark-mode-toggle-btn')) {
         const btn = document.createElement('button');
         btn.id = 'dark-mode-toggle-btn';
         btn.className = 'dark-mode-btn';
         btn.innerHTML = localStorage.getItem('theme') === 'dark' ? '☀️ Sáng' : '🌙 Tối';
         btn.onclick = window.toggleDarkMode;
-        document.body.appendChild(btn);
+        startScreen.insertBefore(btn, startScreen.firstChild);
     }
 
     if (localStorage.getItem('theme') === 'dark') {
