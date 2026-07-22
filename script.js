@@ -381,16 +381,16 @@ window.handleQuizData = function(data) {
             if (item.made) lastMade = item.made;
             else if (lastMade) item.made = lastMade;
 
+            let chuDeUpper = String(item.chuDe || '').toUpperCase();
+            let isDH = chuDeUpper.startsWith('DH');
+            let isTV = chuDeUpper.startsWith('TV');
+
             if (item.passage) {
                 lastPassage = item.passage;
-            } else if (cleanKey(item.mon) !== cleanKey('Tiếng Anh') || !String(item.chuDe || '').toUpperCase().startsWith('DH')) {
+            } else if (!isDH && !isTV) {
                 lastPassage = ''; 
             } else if (lastPassage) {
                 item.passage = lastPassage;
-            }
-
-            if (cleanKey(item.mon) !== cleanKey('Tiếng Anh')) {
-                item.passage = '';
             }
 
             return item;
@@ -445,6 +445,12 @@ window.handleQuizData = function(data) {
             madeContainer.style.display = 'none';
         }
     }
+
+    window.renderLeaderboard();
+    window.updateTopicList();
+    window.updateLevelOptions();
+    window.updateMadePassagePreview();
+};
 
     window.renderLeaderboard();
     window.updateTopicList();
