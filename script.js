@@ -822,7 +822,6 @@ function checkQuizFinished() {
     const cards = document.querySelectorAll('.quiz-card');
     const answeredCards = document.querySelectorAll('.quiz-card[data-answered="true"]');
     if (cards.length > 0 && cards.length === answeredCards.length) {
-        // Tự động kết thúc sau khi làm xong câu cuối 1 giây
         setTimeout(() => {
             window.submitQuiz();
         }, 1000);
@@ -833,26 +832,28 @@ window.startTimerTotal = function(seconds) {
     if (AppState.timerInterval) clearInterval(AppState.timerInterval);
     let timeLeft = seconds;
     
-    let timerDisplay = document.getElementById('timer-display');
-    if (!timerDisplay) {
-        const quizScreen = document.getElementById('quiz-screen');
-        if (quizScreen) {
-            const topBar = document.createElement('div');
-            topBar.style.display = 'flex';
-            topBar.style.justifyContent = 'space-between';
-            topBar.style.marginBottom = '15px';
-            topBar.style.fontWeight = 'bold';
-            topBar.innerHTML = `Thời gian: <span id="timer-display" style="color: red;">--:--</span> <span>Đúng: <span id="correct-count-display">0</span> | Sai: <span id="wrong-count-display">0</span></span>`;
-            quizScreen.insertBefore(topBar, quizScreen.firstChild);
-            timerDisplay = document.getElementById('timer-display');
-        }
-    } else {
-        updateScoreDisplay();
+    // Xóa top bar cũ nếu có để tránh xung đột ID
+    const oldTopBar = document.getElementById('quiz-top-bar');
+    if (oldTopBar) oldTopBar.remove();
+
+    const quizScreen = document.getElementById('quiz-screen');
+    if (quizScreen) {
+        const topBar = document.createElement('div');
+        topBar.id = 'quiz-top-bar';
+        topBar.style.display = 'flex';
+        topBar.style.justifyContent = 'space-between';
+        topBar.style.marginBottom = '15px';
+        topBar.style.fontWeight = 'bold';
+        topBar.innerHTML = `Thời gian: <span id="timer-display" style="color: red;">--:--</span> <span>Đúng: <span id="correct-count-display">0</span> | Sai: <span id="wrong-count-display">0</span></span>`;
+        quizScreen.insertBefore(topBar, quizScreen.firstChild);
     }
+
+    updateScoreDisplay();
 
     AppState.timerInterval = setInterval(() => {
         let m = Math.floor(timeLeft / 60);
         let s = timeLeft % 60;
+        let timerDisplay = document.getElementById('timer-display');
         if (timerDisplay) {
             timerDisplay.textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
         }
