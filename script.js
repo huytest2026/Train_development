@@ -195,6 +195,50 @@ window.handleSubjectChange = function() {
     window.updateTopicList();
     window.updateLevelOptions();
     window.renderLeaderboard(mon);
+    window.updateMadePassagePreview();
+};
+
+window.handleMadeChange = function() {
+    window.updateTopicList();
+    window.updateMadePassagePreview();
+};
+
+window.updateMadePassagePreview = function() {
+    const selectedMade = document.getElementById('made-select') ? document.getElementById('made-select').value.trim() : '';
+    const previewContainer = document.getElementById('made-passage-preview');
+    if (!previewContainer) return;
+
+    if (!selectedMade) {
+        previewContainer.innerHTML = '';
+        return;
+    }
+
+    let passageItems = AppState.allQuizData.filter(i => String(i.made).trim() === selectedMade && i.passage && i.passage.trim() !== '');
+    if (passageItems.length === 0) {
+        previewContainer.innerHTML = '';
+        return;
+    }
+
+    let uniquePassages = {};
+    passageItems.forEach(item => {
+        if (!uniquePassages[item.chuDe]) {
+            uniquePassages[item.chuDe] = item.passage;
+        }
+    });
+
+    let html = '<h4 style="margin: 10px 0 5px 0; color: #540606;">📖 Đoạn văn (Passage) trong Mã đề:</h4>';
+    for (let code in uniquePassages) {
+        html += `
+            <div class="passage-box" style="margin-top: 5px; font-size: 0.95em;">
+                <div class="passage-tag">${escapeHTML(code)}</div>
+                <div>
+                    <button class="speaker-btn" data-question="${escapeHTML(uniquePassages[code])}" onclick="window.handleSpeak(this)">🔊 Nghe đoạn văn</button>
+                </div>
+                <div style="white-space: pre-line; margin-top: 5px; max-height: 150px; overflow-y: auto;">${escapeHTML(uniquePassages[code])}</div>
+            </div>
+        `;
+    }
+    previewContainer.innerHTML = html;
 };
 
 window.updateLevelOptions = function() {
@@ -406,6 +450,7 @@ window.handleQuizData = function(data) {
     window.renderLeaderboard();
     window.updateTopicList();
     window.updateLevelOptions();
+    window.updateMadePassagePreview();
 };
 
 window.renderLeaderboard = function(subjectFilter = null) {
