@@ -144,6 +144,11 @@ function standardizeSubject(monStr) {
     return monStr.trim();
 }
 
+// Kiểm tra xem đoạn văn bản có chứa tiếng Việt hay không
+function isVietnameseText(text) {
+    return /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđĐ]/i.test(text);
+}
+
 function normalizeItem(item) {
     if (!item) return null;
     
@@ -289,13 +294,17 @@ window.updateMadePassagePreview = function() {
 
     let html = '<h4 style="margin: 10px 0 5px 0;">📖 Đoạn văn (Passage) trong Mã đề:</h4>';
     for (let code in uniquePassages) {
+        let pText = uniquePassages[code];
+        let isVi = code.toUpperCase().startsWith('TV') || isVietnameseText(pText);
+        let lang = isVi ? 'vi-VN' : 'en-US';
+
         html += `
             <div class="passage-box" style="margin-top: 5px; font-size: 0.95em;">
                 <div class="passage-tag">${escapeHTML(code)}</div>
                 <div>
-                    <button class="speaker-btn" data-question="${escapeHTML(uniquePassages[code])}" onclick="window.handleSpeak(this)">🔊 Nghe đoạn văn</button>
+                    <button class="speaker-btn" data-question="${escapeHTML(pText)}" data-lang="${lang}" onclick="window.handleSpeak(this)">🔊 Nghe đoạn văn</button>
                 </div>
-                <div style="white-space: pre-line; margin-top: 5px; max-height: 150px; overflow-y: auto;">${escapeHTML(uniquePassages[code])}</div>
+                <div style="white-space: pre-line; margin-top: 5px; max-height: 150px; overflow-y: auto;">${escapeHTML(pText)}</div>
             </div>
         `;
     }
@@ -639,11 +648,14 @@ window.renderQuiz = function() {
 
         if (passage && passage.trim() !== '' && !renderedPassages.has(passage)) {
             renderedPassages.add(passage);
+            let isViPassage = String(chuDe || '').toUpperCase().startsWith('TV') || isVietnameseText(passage);
+            let passageLang = isViPassage ? 'vi-VN' : 'en-US';
+
             html += `
                 <div class="passage-box">
                     <div class="passage-tag">${escapeHTML(chuDe)}</div>
                     <div>
-                        <button class="speaker-btn" data-question="${escapeHTML(passage)}" onclick="window.handleSpeak(this)">🔊 Nghe đoạn văn</button>
+                        <button class="speaker-btn" data-question="${escapeHTML(passage)}" data-lang="${passageLang}" onclick="window.handleSpeak(this)">🔊 Nghe đoạn văn</button>
                     </div>
                     <div style="white-space: pre-line; margin-top: 10px; max-height: 250px; overflow-y: auto;">${escapeHTML(passage)}</div>
                 </div>
@@ -668,7 +680,8 @@ window.renderQuiz = function() {
             let loaiLower = String(item.loai || '').toLowerCase();
             
             if (isVoca) {
-                const hasVietnameseChars = /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i.test(questionText);
+                // GIỮ NGUYÊN HOÀN TOÀN LOGIC VCA CŨ
+                const hasVietnameseChars = isVietnameseText(questionText);
                 const isVietAnh = chuDeLower.includes('việt anh') || chuDeLower.includes('viet anh') || 
                                   loaiLower.includes('việt anh') || loaiLower.includes('viet anh') || 
                                   hasVietnameseChars;
@@ -690,7 +703,7 @@ window.renderQuiz = function() {
                     speakTextContent = questionText;
                 }
 
-                speakerBtn = `<button class="speaker-btn" data-question="${escapeHTML(speakTextContent)}" onclick="window.handleSpeak(this)">${speakerLabel}</button>`;
+                speakerBtn = `<button class="speaker-btn" data-question="${escapeHTML(speakTextContent)}" data-lang="en-US" onclick="window.handleSpeak(this)">${speakerLabel}</button>`;
 
                 bodyHtml = `
                     <div style="margin-top: 10px;">
@@ -699,7 +712,9 @@ window.renderQuiz = function() {
                     </div>
                 `;
             } else {
-                speakerBtn = `<button class="speaker-btn" data-question="${escapeHTML(questionText)}" onclick="window.handleSpeak(this)">🔊 Nghe câu hỏi</button>`;
+                let isViQ = isVietnameseText(questionText);
+                let qLang = isViQ ? 'vi-VN' : 'en-US';
+                speakerBtn = `<button class="speaker-btn" data-question="${escapeHTML(questionText)}" data-lang="${qLang}" onclick="window.handleSpeak(this)">🔊 Nghe câu hỏi</button>`;
                 let keysToRender = item._shuffledKeys.length > 0 ? item._shuffledKeys : ['a', 'b', 'c', 'd'].filter(k => item[k]);
                 bodyHtml = keysToRender.map((optKey, displayIndex) => {
                     if (!item[optKey]) return '';
@@ -710,6 +725,10 @@ window.renderQuiz = function() {
                 }).join('');
             }
         } else {
+            let isViQ = isVietnameseText(questionText) || cleanKey(item.mon) !== cleanKey('Tiếng Anh');
+            let qLang = isViQ ? 'vi-VN' : 'en-US';
+            speakerBtn = `<button class="speaker-btn" data-question="${escapeHTML(questionText)}" data-lang="${qLang}" onclick="window.handleSpeak(this)">🔊 Nghe câu hỏi</button>`;
+
             let keysToRender = item._shuffledKeys.length > 0 ? item._shuffledKeys : ['a', 'b', 'c', 'd'].filter(k => item[k]);
             bodyHtml = keysToRender.map((optKey, displayIndex) => {
                 if (!item[optKey]) return '';
@@ -733,7 +752,8 @@ window.renderQuiz = function() {
 
 window.handleSpeak = function(btn) {
     const text = btn.getAttribute('data-question');
-    window.speakText(text);
+    const lang = btn.getAttribute('data-lang') || 'en-US';
+    window.speakText(text, lang);
 };
 
 function updateScoreDisplay() {
@@ -972,13 +992,13 @@ window.retryWrongQuestions = function() {
     }
 };
 
-window.speakText = function(text) {
+window.speakText = function(text, lang = 'en-US') {
     if (!('speechSynthesis' in window)) {
         alert("Trình duyệt của bạn không hỗ trợ tính năng đọc văn bản.");
         return;
     }
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-US';
+    utterance.lang = lang;
     window.speechSynthesis.speak(utterance);
 };
