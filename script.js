@@ -291,7 +291,6 @@ window.updateTopicList = function() {
 
     const cleanMonSelect = cleanKey(monSelect);
 
-    // KHI CHỌN MÃ ĐỀ (MADE) THÌ BỎ QUA SỰ PHÂN QUYỀN
     const allowed = selectedMade ? [] : AppState.userPermissions
         .filter(p => String(p.maHS).trim() === maHS && cleanKey(p.mon) === cleanMonSelect)
         .map(p => String(p.chuDe).trim());
@@ -555,34 +554,32 @@ window.startQuiz = function() {
     window.startTimerTotal(totalSeconds);
 };
 
+// ĐÃ CẬP NHẬT HÀM NÀY: Đoạn văn (passage) sẽ hiển thị đi liền theo đúng nhóm câu hỏi tương ứng
 window.renderQuiz = function() {
     const container = document.getElementById('quiz');
     if (!container) return;
 
-    let passageHtml = '';
-    let passageItems = AppState.currentQuizData.filter(i => cleanKey(i.mon) === cleanKey('Tiếng Anh') && i.passage && i.passage.trim() !== '');
-    if (passageItems.length > 0) {
-        let uniquePassages = {};
-        passageItems.forEach(item => {
-            if (!uniquePassages[item.chuDe]) {
-                uniquePassages[item.chuDe] = item.passage;
-            }
-        });
+    let renderedPassages = new Set();
+    let html = '';
 
-        for (let code in uniquePassages) {
-            passageHtml += `
+    AppState.currentQuizData.forEach((item, index) => {
+        let passage = item.passage;
+        let chuDe = item.chuDe;
+
+        // Nếu câu hỏi có đoạn văn và đoạn văn này chưa được render trước đó, hãy hiển thị nó ngay trước câu hỏi
+        if (passage && passage.trim() !== '' && !renderedPassages.has(passage)) {
+            renderedPassages.add(passage);
+            html += `
                 <div class="passage-box">
-                    <div class="passage-tag">${escapeHTML(code)}</div>
+                    <div class="passage-tag">${escapeHTML(chuDe)}</div>
                     <div>
-                        <button class="speaker-btn" data-question="${escapeHTML(uniquePassages[code])}" onclick="window.handleSpeak(this)">🔊 Nghe đoạn văn</button>
+                        <button class="speaker-btn" data-question="${escapeHTML(passage)}" onclick="window.handleSpeak(this)">🔊 Nghe đoạn văn</button>
                     </div>
-                    <div style="white-space: pre-line; margin-top: 10px;">${escapeHTML(uniquePassages[code])}</div>
+                    <div style="white-space: pre-line; margin-top: 10px;">${escapeHTML(passage)}</div>
                 </div>
             `;
         }
-    }
 
-    let questionsHtml = AppState.currentQuizData.map((item, index) => {
         let loaiVal = (item.loai || '').toLowerCase();
         let hasNoOptions = (!item.a || item.a.trim() === '') &&
                            (!item.b || item.b.trim() === '') &&
@@ -653,15 +650,15 @@ window.renderQuiz = function() {
             }).join('');
         }
 
-        return `<div class="quiz-card" id="q-card-${index}">
+        html += `<div class="quiz-card" id="q-card-${index}">
             <p><b>Câu ${index + 1}:</b> ${escapeHTML(questionText)}</p>
             ${speakerBtn}
             ${bodyHtml}
             <div class="explanation-box" id="exp-${index}"><b>Giải thích:</b> ${escapeHTML(explanationText)}</div>
         </div>`;
-    }).join('');
+    });
 
-    container.innerHTML = passageHtml + questionsHtml;
+    container.innerHTML = html;
 };
 
 window.handleSpeak = function(btn) {
