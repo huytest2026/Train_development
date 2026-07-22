@@ -116,7 +116,7 @@ function normalizeItem(item) {
 
         return {
             mon: findKey(['mon', 'môn', 'subject']),
-            chuDe: findKey(['chude', 'chủ đề', 'chu de', 'topic']),
+            chuDe: findKey(['chude', 'chủ đề', 'chu de', 'topic', 'made', 'mã đề']),
             question: findKey(['question', 'noidungcauhoi', 'noi_dung_cau_hoi', 'noi_dung', 'noidung', 'cauhoi', 'cau_hoi', 'cau', 'de_bai', 'de', 'nd', 'content', 'text', 'câu hỏi', 'nội dung câu hỏi', 'đề bài', 'đề']),
             a: findKey(['a', 'dapan_a', 'dap an a', 'đáp án a', 'option_a']),
             b: findKey(['b', 'dapan_b', 'dap an b', 'đáp án b', 'option_b']),
@@ -176,7 +176,7 @@ window.handleSubjectChange = function() {
     const mon = document.getElementById('subject-select').value;
     const levelContainer = document.getElementById('level-container');
     if (levelContainer) {
-        levelContainer.style.display = (mon === 'Tiếng Anh') ? 'block' : 'none';
+        levelContainer.style.display = (cleanKey(mon) === cleanKey('Tiếng Anh')) ? 'block' : 'none';
     }
     window.updateTopicList();
     window.updateLevelOptions();
@@ -187,7 +187,7 @@ window.updateLevelOptions = function() {
     const mon = document.getElementById('subject-select').value;
     const levelSelect = document.getElementById('level-select');
     if (!levelSelect) return;
-    if (mon !== 'Tiếng Anh') return;
+    if (cleanKey(mon) !== cleanKey('Tiếng Anh')) return;
 
     const rankings = AppState.rankings || [];
 
@@ -264,7 +264,7 @@ window.loadData = function() {
     const container = document.getElementById('topic-container');
     if (container) container.innerHTML = "Đang tải dữ liệu chủ đề...";
 
-    const API_URL = "https://script.google.com/macros/s/AKfycbwABOWdjRcG_rX9tVXjrLDsXFRMEbgUfn01QC6U5Z91qwdwq5askg7CrQHEDjf8np-H/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
     const script = document.createElement('script');
     script.src = `${API_URL}?ma=${encodeURIComponent(maHS)}&callback=handleQuizData`;
     script.onerror = () => { 
@@ -296,7 +296,7 @@ window.handleQuizData = function(data) {
             if (item.mon) lastMon = item.mon;
             else item.mon = lastMon;
 
-            // --- CHUẨN HÓA TÊN MÔN HỌC ---
+            // Chuẩn hóa tên môn học để gộp Tiếng Anh/Tiếng anh
             if (item.mon) {
                 let cleanM = cleanKey(item.mon);
                 if (cleanM === cleanKey('Tiếng Anh')) {
@@ -305,7 +305,6 @@ window.handleQuizData = function(data) {
                     item.mon = 'Toán';
                 }
             }
-            // ---------------------------
 
             if (item.chuDe) lastChuDe = item.chuDe;
             else item.chuDe = lastChuDe;
@@ -359,7 +358,7 @@ window.handleQuizData = function(data) {
     const maHS = document.getElementById('student-code').value.trim();
     localStorage.setItem('cache_quiz_data_' + maHS, JSON.stringify(data));
 
-    // Cập nhật danh sách môn vào thẻ select (chỉ lấy các tên môn đã chuẩn hóa, không bị trùng)
+    // Cập nhật danh sách môn học
     const subjectSelect = document.getElementById('subject-select');
     if (subjectSelect) {
         const currentVal = subjectSelect.value;
@@ -369,6 +368,14 @@ window.handleQuizData = function(data) {
         if (subjects.includes(currentVal)) {
             subjectSelect.value = currentVal;
         }
+    }
+
+    // Cập nhật danh sách Mã đề (MADE)
+    const madeSelect = document.getElementById('made-select');
+    if (madeSelect) {
+        const codes = [...new Set(AppState.allQuizData.map(i => i.chuDe).filter(Boolean))];
+        madeSelect.innerHTML = `<option value="">-- Chọn mã đề --</option>` +
+            codes.map(c => `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`).join('');
     }
 
     window.renderLeaderboard();
@@ -415,34 +422,44 @@ function getOriginalCorrectKey(item) {
 
 window.startQuiz = function() {
     const mon = document.getElementById('subject-select').value;
-    const levelSelected = document.getElementById('level-select').value;
+    const selectedMade = document.getElementById('made-select') ? document.getElementById('made-select').value : '';
+    const levelSelected = document.getElementById('level-select') ? document.getElementById('level-select').value : '';
     const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
-    if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
     
-    let readingTopics = selectedTopics.filter(t => t.toUpperCase().startsWith('DH'));
-    let normalTopics = selectedTopics.filter(t => !t.toUpperCase().startsWith('DH'));
+    let rawSelectedQuestions = [];
 
-    let readingQuestions = AppState.allQuizData.filter(i => {
-        const isSameSubject = (cleanKey(i.mon) === cleanKey(mon));
-        const isTopicMatch = readingTopics.includes(i.chuDe);
-        return isSameSubject && isTopicMatch && i.question !== '';
-    });
+    // Nếu người dùng chọn trực tiếp Mã đề (MADE)
+    if (selectedMade) {
+        rawSelectedQuestions = AppState.allQuizData.filter(i => String(i.chuDe).trim() === String(selectedMade).trim());
+    } else {
+        if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề hoặc chọn Mã đề (MADE)!");
+        
+        let readingTopics = selectedTopics.filter(t => t.toUpperCase().startsWith('DH'));
+        let normalTopics = selectedTopics.filter(t => !t.toUpperCase().startsWith('DH'));
 
-    let normalQuestions = [];
-    if (normalTopics.length > 0) {
-        let filteredNormal = AppState.allQuizData.filter(i => {
+        let readingQuestions = AppState.allQuizData.filter(i => {
             const isSameSubject = (cleanKey(i.mon) === cleanKey(mon));
-            const isTopicMatch = normalTopics.includes(i.chuDe);
-            const isLevelMatch = (cleanKey(mon) !== cleanKey('Tiếng Anh')) || (String(i.level).trim() === String(levelSelected).trim());
-            return isSameSubject && isTopicMatch && isLevelMatch && i.question !== '';
+            const isTopicMatch = readingTopics.includes(i.chuDe);
+            return isSameSubject && isTopicMatch && i.question !== '';
         });
-        normalQuestions = filteredNormal.sort(() => 0.5 - Math.random()).slice(0, 20);
+
+        let normalQuestions = [];
+        if (normalTopics.length > 0) {
+            let filteredNormal = AppState.allQuizData.filter(i => {
+                const isSameSubject = (cleanKey(i.mon) === cleanKey(mon));
+                const isTopicMatch = normalTopics.includes(i.chuDe);
+                const isLevelMatch = (cleanKey(mon) !== cleanKey('Tiếng Anh')) || (String(i.level).trim() === String(levelSelected).trim());
+                return isSameSubject && isTopicMatch && isLevelMatch && i.question !== '';
+            });
+            normalQuestions = filteredNormal.sort(() => 0.5 - Math.random()).slice(0, 20);
+        }
+
+        rawSelectedQuestions = [...readingQuestions, ...normalQuestions];
     }
 
-    let rawSelectedQuestions = [...readingQuestions, ...normalQuestions];
     if (rawSelectedQuestions.length === 0) return alert("Không tìm thấy câu hỏi phù hợp cho lựa chọn này!");
 
-    let isReadingComp = readingTopics.length > 0;
+    let isReadingComp = rawSelectedQuestions.some(i => i.chuDe && i.chuDe.toUpperCase().startsWith('DH'));
     
     AppState.currentQuizData = rawSelectedQuestions.map(item => {
         let originalCorrectKey = getOriginalCorrectKey(item);
@@ -676,12 +693,12 @@ window.submitQuiz = function() {
     let total = AppState.currentQuizData.length;
     let score = Math.round((AppState.correctCount / total) * 10 * 10) / 10;
     let maHS = document.getElementById('student-code').value.trim();
-    let mon = document.getElementById('subject-select').value;
+    let mon = document.getElementById('subject-select').value || "Mã đề trực tiếp";
     let levelSelected = document.getElementById('level-select') ? document.getElementById('level-select').value : 'Level 1';
 
     alert(`Bài làm kết thúc!\nĐúng: ${AppState.correctCount}/${total}\nĐiểm của bạn: ${score} điểm`);
 
-    const API_URL = "https://script.google.com/macros/s/AKfycbwABOWdjRcG_rX9tVXjrLDsXFRMEbgUfn01QC6U5Z91qwdwq5askg7CrQHEDjf8np-H/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
     fetch(API_URL, {
         method: 'POST',
         mode: 'no-cors',
@@ -761,6 +778,6 @@ window.speakText = function(text) {
         utterance.lang = 'en-US';
         window.speechSynthesis.speak(utterance);
     } else {
-        alert("Trình duyệt không hỗ trợ đọc văn bản!");
+        alert("Trình duyệt không hỗ trợ đọc văn bản.");
     }
 };
