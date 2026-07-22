@@ -296,6 +296,17 @@ window.handleQuizData = function(data) {
             if (item.mon) lastMon = item.mon;
             else item.mon = lastMon;
 
+            // --- CHUẨN HÓA TÊN MÔN HỌC ---
+            if (item.mon) {
+                let cleanM = cleanKey(item.mon);
+                if (cleanM === cleanKey('Tiếng Anh')) {
+                    item.mon = 'Tiếng Anh';
+                } else if (cleanM === cleanKey('Toán')) {
+                    item.mon = 'Toán';
+                }
+            }
+            // ---------------------------
+
             if (item.chuDe) lastChuDe = item.chuDe;
             else item.chuDe = lastChuDe;
 
@@ -331,8 +342,14 @@ window.handleQuizData = function(data) {
         if (maHS !== '') lastMaHS = maHS;
         else maHS = lastMaHS;
         
-        if (mon !== '') lastPermMon = mon;
-        else mon = lastPermMon;
+        if (mon !== '') {
+            let cleanM = cleanKey(mon);
+            if (cleanM === cleanKey('Tiếng Anh')) mon = 'Tiếng Anh';
+            else if (cleanM === cleanKey('Toán')) mon = 'Toán';
+            lastPermMon = mon;
+        } else {
+            mon = lastPermMon;
+        }
         
         return { maHS, mon, chuDe };
     }).filter(p => p.chuDe !== '');
@@ -342,7 +359,7 @@ window.handleQuizData = function(data) {
     const maHS = document.getElementById('student-code').value.trim();
     localStorage.setItem('cache_quiz_data_' + maHS, JSON.stringify(data));
 
-    // --- TỰ ĐỘNG CẬP NHẬT DANH SÁCH MÔN VÀO THẺ SELECT ---
+    // Cập nhật danh sách môn vào thẻ select (chỉ lấy các tên môn đã chuẩn hóa, không bị trùng)
     const subjectSelect = document.getElementById('subject-select');
     if (subjectSelect) {
         const currentVal = subjectSelect.value;
@@ -353,7 +370,6 @@ window.handleQuizData = function(data) {
             subjectSelect.value = currentVal;
         }
     }
-    // ----------------------------------------------------
 
     window.renderLeaderboard();
     window.updateTopicList();
