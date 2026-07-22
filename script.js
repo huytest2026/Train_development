@@ -543,19 +543,7 @@ window.startQuiz = function() {
     
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('quiz-screen').style.display = 'block';
-    window.renderQuiz();
-    
-    let totalSeconds = 10 * 60;
-    if (isReadingComp) {
-        totalSeconds = 22 * 60; 
-    } else if (cleanKey(mon) === cleanKey('Toán')) {
-        totalSeconds = 15 * 60;
-    }
-    window.startTimerTotal(totalSeconds);
-};
-
-// ĐÃ CẬP NHẬT HÀM NÀY: Đoạn văn (passage) sẽ hiển thị đi liền theo đúng nhóm câu hỏi tương ứng
-window.renderQuiz = function() {
+    window.renderQuiz = function() {
     const container = document.getElementById('quiz');
     if (!container) return;
 
@@ -566,7 +554,7 @@ window.renderQuiz = function() {
         let passage = item.passage;
         let chuDe = item.chuDe;
 
-        // Nếu câu hỏi có đoạn văn và đoạn văn này chưa được render trước đó, hãy hiển thị nó ngay trước câu hỏi
+        // Hiển thị passage nếu có và chưa được render cho câu này
         if (passage && passage.trim() !== '' && !renderedPassages.has(passage)) {
             renderedPassages.add(passage);
             html += `
@@ -575,7 +563,7 @@ window.renderQuiz = function() {
                     <div>
                         <button class="speaker-btn" data-question="${escapeHTML(passage)}" onclick="window.handleSpeak(this)">🔊 Nghe đoạn văn</button>
                     </div>
-                    <div style="white-space: pre-line; margin-top: 10px;">${escapeHTML(passage)}</div>
+                    <div style="white-space: pre-line; margin-top: 10px; max-height: 250px; overflow-y: auto;">${escapeHTML(passage)}</div>
                 </div>
             `;
         }
