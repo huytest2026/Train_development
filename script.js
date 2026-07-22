@@ -13,12 +13,12 @@ const AppState = {
 (function injectStyles() {
     const style = document.createElement('style');
     style.innerHTML = `
-        .container { background: #bbe9f0; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 600px; margin: 20px auto; }
-        .quiz-card { background: #ffffff; border: 2px solid #540606; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .container { background: #bbe9f0; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 600px; margin: 20px auto; transition: background 0.3s, color 0.3s; }
+        .quiz-card { background: #ffffff; border: 2px solid #540606; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: background 0.3s, border-color 0.3s, color 0.3s; }
         .option-box { background: #f8f9fa; border: 1px solid #540606; border-radius: 8px; padding: 12px 15px; margin: 8px 0; cursor: pointer; transition: all 0.2s ease; font-weight: 500; }
         .option-box:hover { background: #e9ecef; border-color: #adb5bd; }
         .explanation-box { margin-top: 15px; padding: 12px; background: #fff3cd; border-left: 5px solid #ffc107; border-radius: 4px; display: none; color: #856404; font-size: 0.95em; line-height: 1.4; }
-        .leaderboard-container { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #eee; }
+        .leaderboard-container { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #eee; transition: background 0.3s, border-color 0.3s, color 0.3s; }
         .leaderboard-item { padding: 10px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
         .medal { font-size: 1.2em; margin-right: 10px; }
         .score-badge { background: #eef2f3; padding: 4px 12px; border-radius: 20px; font-weight: bold; color: #4f46e5; }
@@ -37,6 +37,7 @@ const AppState = {
             line-height: 1.6; 
             color: #333; 
             box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+            transition: background 0.3s, border-color 0.3s, color 0.3s;
         }
 
         .passage-tag {
@@ -60,6 +61,7 @@ const AppState = {
             box-sizing: border-box;
             font-size: 1em;
             background: #ffffff;
+            color: #000;
         }
 
         #topic-container {
@@ -76,6 +78,41 @@ const AppState = {
         }
 
         select option:disabled { color: #aaa; background: #f1f1f1; }
+
+        /* --- Dark Mode Styles --- */
+        body.dark-mode { background-color: #121212 !important; color: #e0e0e0; transition: background 0.3s, color 0.3s; }
+        body.dark-mode .container { background: #1e1e1e; color: #e0e0e0; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        body.dark-mode .quiz-card, body.dark-mode .passage-box, body.dark-mode .leaderboard-container { background: #2d2d2d; border-color: #777; color: #e0e0e0; }
+        body.dark-mode .option-box { background: #3a3a3a; border-color: #666; color: #e0e0e0; }
+        body.dark-mode .option-box:hover { background: #4a4a4a; border-color: #888; }
+        body.dark-mode input[type="text"], body.dark-mode select { background: #2d2d2d; color: #e0e0e0; border-color: #777; }
+        body.dark-mode #topic-container { background: #2d2d2d; border-color: #777; color: #e0e0e0; }
+        body.dark-mode select option { background: #2d2d2d; color: #e0e0e0; }
+        body.dark-mode .passage-tag { background: #3a3a3a; border-color: #666; color: #e0e0e0; }
+        body.dark-mode .explanation-box { background: #332701; color: #ffeb3b; border-left-color: #ffc107; }
+
+        .dark-mode-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #ffffff;
+            color: #333;
+            border: 2px solid #540606;
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            z-index: 1000;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+        .dark-mode-btn:hover { background: #f1f1f1; }
+        body.dark-mode .dark-mode-btn {
+            background: #2d2d2d;
+            color: #f8f9fa;
+            border-color: #777;
+        }
+        body.dark-mode .dark-mode-btn:hover { background: #3a3a3a; }
     `;
     document.head.appendChild(style);
 })();
@@ -182,9 +219,33 @@ window.addEventListener('DOMContentLoaded', () => {
     const savedMa = localStorage.getItem('saved_maHS') || 'Huy';
     const input = document.getElementById('student-code');
     if (input) input.value = savedMa;
+
+    // Thiết lập nút Dark Mode
+    if (!document.getElementById('dark-mode-toggle-btn')) {
+        const btn = document.createElement('button');
+        btn.id = 'dark-mode-toggle-btn';
+        btn.className = 'dark-mode-btn';
+        btn.innerHTML = localStorage.getItem('theme') === 'dark' ? '☀️ Sáng' : '🌙 Tối';
+        btn.onclick = window.toggleDarkMode;
+        document.body.appendChild(btn);
+    }
+
+    if (localStorage.getItem('theme') === 'dark') {
+        document.body.classList.add('dark-mode');
+    }
     
     window.loadData();
 });
+
+window.toggleDarkMode = function() {
+    document.body.classList.toggle('dark-mode');
+    const isDark = document.body.classList.contains('dark-mode');
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    const btn = document.getElementById('dark-mode-toggle-btn');
+    if (btn) {
+        btn.innerHTML = isDark ? '☀️ Sáng' : '🌙 Tối';
+    }
+};
 
 window.handleSubjectChange = function() {
     const mon = document.getElementById('subject-select').value;
@@ -226,7 +287,7 @@ window.updateMadePassagePreview = function() {
         }
     });
 
-    let html = '<h4 style="margin: 10px 0 5px 0; color: #540606;">📖 Đoạn văn (Passage) trong Mã đề:</h4>';
+    let html = '<h4 style="margin: 10px 0 5px 0;">📖 Đoạn văn (Passage) trong Mã đề:</h4>';
     for (let code in uniquePassages) {
         html += `
             <div class="passage-box" style="margin-top: 5px; font-size: 0.95em;">
@@ -469,7 +530,7 @@ window.renderLeaderboard = function(subjectFilter = null) {
     list.innerHTML = top3.map((item, index) => {
         let medal = index === 0 ? "🥇" : (index === 1 ? "🥈" : "🥉");
         let dateDisplay = item.date ? `<span class="time-text">Ngày: ${escapeHTML(item.date)}</span>` : "";
-        let levelDisplay = item.level ? ` - <span style="font-size:0.85em; color:#555;">${escapeHTML(item.level)}</span>` : "";
+        let levelDisplay = item.level ? ` - <span style="font-size:0.85em;">${escapeHTML(item.level)}</span>` : "";
         return `<div class="leaderboard-item"><div><span class="medal">${medal}</span> <b>${escapeHTML(item.name)}</b>${levelDisplay}${dateDisplay}</div><span class="score-badge">${item.score} đ</span></div>`;
     }).join('');
 };
@@ -686,6 +747,7 @@ window.checkAnswer = function(element, chosenKey, index) {
         if (optOrigKey === correctKey) {
             opt.style.backgroundColor = '#d4edda';
             opt.style.borderColor = '#28a745';
+            opt.style.color = '#155724';
         }
     });
 
@@ -693,10 +755,12 @@ window.checkAnswer = function(element, chosenKey, index) {
         AppState.correctCount++;
         element.style.backgroundColor = '#d4edda';
         element.style.borderColor = '#28a745';
+        element.style.color = '#155724';
     } else {
         AppState.wrongCount++;
         element.style.backgroundColor = '#f8d7da';
         element.style.borderColor = '#dc3545';
+        element.style.color = '#721c24';
         AppState.wrongQuestions.push(item);
     }
 
@@ -734,12 +798,14 @@ window.checkVocaAnswer = function(index) {
         AppState.correctCount++;
         inputElem.style.backgroundColor = '#d4edda';
         inputElem.style.borderColor = '#28a745';
+        inputElem.style.color = '#155724';
     } else {
         AppState.wrongCount++;
         inputElem.style.backgroundColor = '#f8d7da';
         inputElem.style.borderColor = '#dc3545';
+        inputElem.style.color = '#721c24';
         if (expBox) {
-            expBox.innerHTML = `<b>Đáp án đúng:</b> <span style="color: green; font-weight: bold;">${escapeHTML(item._correctKey)}</span><br>` + expBox.innerHTML;
+            expBox.innerHTML = `<b>Đáp án đúng:</b> <span style="color: #28a745; font-weight: bold;">${escapeHTML(item._correctKey)}</span><br>` + expBox.innerHTML;
         }
         AppState.wrongQuestions.push(item);
     }
@@ -777,7 +843,7 @@ window.submitQuiz = function() {
         <div class="container" style="text-align:center;">
             <h2>Kết Quả Bài Thi</h2>
             <p>Số câu đúng: <b>${AppState.correctCount}/${total}</b></p>
-            <p>Điểm số: <b style="color:blue; font-size: 1.5em;">${score} đ</b></p>
+            <p>Điểm số: <b style="color:#007bff; font-size: 1.5em;">${score} đ</b></p>
             ${retryBtnHtml}
             <button onclick="location.reload()" style="margin-top: 15px; padding: 10px 20px; background:#007bff; color:white; border:none; border-radius:5px; cursor:pointer; width:100%;">Làm bài mới / Về trang chủ</button>
         </div>
