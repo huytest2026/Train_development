@@ -35,7 +35,17 @@
         </select>
     </div>
 
-    <label style="display:block; margin-top:10px;">Chọn chủ đề:</label>
+    <div id="made-container" style="display: none;">
+        <label style="display:block; margin-top:10px;">Chọn Mã đề (MADE):</label>
+        <select id="made-select" style="width: 100%; padding: 10px; margin: 10px 0;">
+            <option value="">-- Tất cả mã đề / Mặc định --</option>
+        </select>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+        <label style="margin: 0;">Chọn chủ đề:</label>
+        <button type="button" onclick="window.toggleAllTopics()" style="padding: 3px 8px; font-size: 0.85em; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">Chọn/Bỏ chọn tất cả</button>
+    </div>
     <div id="topic-container">Chưa tải dữ liệu...</div>
 
     <button type="button" id="start-btn" onclick="window.startQuiz()" style="width: 100%; padding: 15px; background: #007bff; color: white; border: none; cursor: pointer; margin-top: 10px;">Bắt Đầu Làm Bài</button>
