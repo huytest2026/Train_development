@@ -241,12 +241,14 @@ window.updateLevelOptions = function() {
 window.updateTopicList = function() {
     const monSelect = document.getElementById('subject-select').value.trim();
     const maHS = document.getElementById('student-code').value.trim();
+    const selectedMade = document.getElementById('made-select') ? document.getElementById('made-select').value.trim() : '';
     const container = document.getElementById('topic-container');
     if (!container || !monSelect) return;
 
     const cleanMonSelect = cleanKey(monSelect);
 
-    const allowed = AppState.userPermissions
+    // KHI CHỌN MÃ ĐỀ (MADE) THÌ BỎ QUA SỰ PHÂN QUYỀN
+    const allowed = selectedMade ? [] : AppState.userPermissions
         .filter(p => String(p.maHS).trim() === maHS && cleanKey(p.mon) === cleanMonSelect)
         .map(p => String(p.chuDe).trim());
 
