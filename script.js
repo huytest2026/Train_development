@@ -1000,7 +1000,7 @@ window.retryWrongQuestions = function() {
     }
 };
 
-window._currentUtterance = null; // Biến toàn cục giữ tham chiếu tránh bị Garbage Collection trên Chrome
+window._currentUtterance = null; // Giữ tham chiếu chống Garbage Collection
 
 window.speakText = function(text, lang = 'en-US') {
     if (!('speechSynthesis' in window)) {
@@ -1017,33 +1017,48 @@ window.speakText = function(text, lang = 'en-US') {
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = lang;
-    window._currentUtterance = utterance; // Gán vào biến toàn cục để không bị trình duyệt xóa ngầm
+    window._currentUtterance = utterance;
 
-    let voices = window.speechSynthesis.getVoices();
-    if (voices && voices.length > 0) {
-        let selectedVoice = null;
-        if (lang.toLowerCase().startsWith('vi')) {
-            selectedVoice = voices.find(v => 
-                v.lang.toLowerCase().includes('vi') || 
-                v.lang.toLowerCase().includes('vn') || 
-                v.name.toLowerCase().includes('vietnamese')
-            );
-        } else {
-            selectedVoice = voices.find(v => v.lang.toLowerCase().startsWith('en'));
+    const speakNow = () => {
+        let voices = window.speechSynthesis.getVoices();
+        if (voices && voices.length > 0) {
+            let selectedVoice = null;
+            if (lang.toLowerCase().startsWith('vi')) {
+                selectedVoice = voices.find(v => 
+                    v.lang.toLowerCase().includes('vi') || 
+                    v.lang.toLowerCase().includes('vn') || 
+                    v.name.toLowerCase().includes('vietnamese')
+                );
+            } else {
+                selectedVoice = voices.find(v => v.lang.toLowerCase().startsWith('en'));
+            }
+            
+            if (selectedVoice) {
+                utterance.voice = selectedVoice;
+                utterance.lang = selectedVoice.lang;
+            }
         }
-        
-        if (selectedVoice) {
-            utterance.voice = selectedVoice;
-            utterance.lang = selectedVoice.lang;
-        }
-    }
+        window.speechSynthesis.speak(utterance);
+    };
 
     utterance.onerror = (event) => {
         console.error("Lỗi SpeechSynthesis:", event);
-        if (lang.toLowerCase().startsWith('vi')) {
-            alert("Trình duyệt hoặc thiết bị của bạn chưa có gói giọng đọc Tiếng Việt. Vui lòng kiểm tra lại cài đặt ngôn ngữ hệ thống.");
-        }
     };
 
-    window.speechSynthesis.speak(utterance);
+    // Xử lý bất đồng bộ khi danh sách giọng đọc chưa kịp load
+    let voices = window.speechSynthesis.getVoices();
+    if (voices.length === 0) {
+        window.speechSynthesis.onvoiceschanged = () => {
+            speakNow();
+            window.speechSynthesis.onvoiceschanged = null;
+        };
+        // Fallback sau 300ms nếu sự kiện onvoiceschanged không kích hoạt
+        setTimeout(() => {
+            if (!window.speechSynthesis.speaking) {
+                speakNow();
+            }
+        }, 300);
+    } else {
+        speakNow();
+    }
 };
