@@ -117,6 +117,16 @@ const AppState = {
     document.head.appendChild(style);
 })();
 
+// Khởi tạo sẵn danh sách giọng đọc của trình duyệt nếu có hỗ trợ
+if ('speechSynthesis' in window) {
+    window.speechSynthesis.getVoices();
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = () => {
+            window.speechSynthesis.getVoices();
+        };
+    }
+}
+
 function escapeHTML(str) {
     if (!str) return "";
     return String(str).replace(/[&<>"']/g, function(m) {
@@ -144,7 +154,6 @@ function standardizeSubject(monStr) {
     return monStr.trim();
 }
 
-// Kiểm tra xem đoạn văn bản có chứa tiếng Việt hay không
 function isVietnameseText(text) {
     return /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđĐ]/i.test(text);
 }
@@ -680,7 +689,6 @@ window.renderQuiz = function() {
             let loaiLower = String(item.loai || '').toLowerCase();
             
             if (isVoca) {
-                // GIỮ NGUYÊN HOÀN TOÀN LOGIC VCA CŨ
                 const hasVietnameseChars = isVietnameseText(questionText);
                 const isVietAnh = chuDeLower.includes('việt anh') || chuDeLower.includes('viet anh') || 
                                   loaiLower.includes('việt anh') || loaiLower.includes('viet anh') || 
@@ -998,7 +1006,28 @@ window.speakText = function(text, lang = 'en-US') {
         return;
     }
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = lang;
+    
+    let cleanText = String(text)
+        .replace(/<[^>]*>?/gm, '')
+        .replace(/->/g, 'đến')
+        .replace(/['"„“‘’]/g, '');
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = lang; // Luôn giữ đúng ngôn ngữ truyền vào (vi-VN hoặc en-US)
+
+    const voices = window.speechSynthesis.getVoices();
+    if (voices && voices.length > 0) {
+        let selectedVoice = null;
+        if (lang.toLowerCase().startsWith('vi')) {
+            selectedVoice = voices.find(v => v.lang.toLowerCase().includes('vi') || v.lang.toLowerCase().includes('vn'));
+        } else {
+            selectedVoice = voices.find(v => v.lang.toLowerCase().startsWith('en'));
+        }
+        if (selectedVoice) {
+            utterance.voice = selectedVoice;
+            utterance.lang = selectedVoice.lang;
+        }
+    }
+
     window.speechSynthesis.speak(utterance);
 };
