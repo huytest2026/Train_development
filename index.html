@@ -37,9 +37,11 @@
 
     <div id="made-container" style="display: none;">
         <label style="display:block; margin-top:10px;">Chọn Mã đề (MADE):</label>
-        <select id="made-select" onchange="window.updateTopicList()" style="width: 100%; padding: 10px; margin: 10px 0;">
+        <select id="made-select" onchange="window.handleMadeChange()" style="width: 100%; padding: 10px; margin: 10px 0;">
             <option value="">-- Tất cả mã đề / Mặc định --</option>
         </select>
+        <!-- Khu vực hiển thị passage khi chọn MADE -->
+        <div id="made-passage-preview"></div>
     </div>
 
     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
