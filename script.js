@@ -30,6 +30,14 @@ const AppState = {
         .speaker-btn:hover { background: #5a6268; }
         #retry-wrong-btn { background: #d9534f; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-top: 10px; width: 100%; font-weight: bold; }
         
+        /* Cố định khung đầu trang khi cuộn */
+        #quiz-screen > .container:first-child, #timer-display {
+            position: sticky;
+            top: 10px;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        }
+
         .passage-box { 
             background: #ffffff; 
             border: 2px solid #540606; 
@@ -108,6 +116,10 @@ const AppState = {
             color: #e0e0e0 !important;
             box-shadow: 0 10px 25px rgba(0,0,0,0.5);
             border: 1px solid #333;
+        }
+        body.dark-mode #quiz-screen > .container:first-child, body.dark-mode #timer-display {
+            background: #1e1e1e !important;
+            border: 1px solid #bb86fc;
         }
         body.dark-mode .quiz-card {
             background: #2d2d2d !important;
@@ -247,19 +259,16 @@ window.addEventListener('DOMContentLoaded', () => {
     const input = document.getElementById('student-code');
     if (input) input.value = savedMa;
     
-    // Khôi phục Dark Mode nếu đã bật trước đó
     const savedDarkMode = localStorage.getItem('app_dark_mode') === 'true';
     if (savedDarkMode) {
         AppState.darkMode = true;
         document.body.classList.add('dark-mode');
     }
 
-    // Thêm nút Dark Mode và nút Bỏ chọn tất cả vào màn hình chính
     const startScreen = document.getElementById('start-screen');
     if (startScreen && !document.getElementById('dark-mode-toggle-btn')) {
         const targetContainer = startScreen.querySelector('.container') || startScreen;
         
-        // Nút Dark Mode
         const darkModeBtn = document.createElement('button');
         darkModeBtn.id = 'dark-mode-toggle-btn';
         darkModeBtn.className = 'speaker-btn';
@@ -274,7 +283,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
     let topicCard = document.querySelector('#topic-container') ? document.querySelector('#topic-container').parentNode : null;
     if (topicCard && !document.getElementById('made-select-container')) {
-        // Thêm nút Bỏ chọn tất cả chủ đề
         const uncheckAllDiv = document.createElement('div');
         uncheckAllDiv.style.marginBottom = '8px';
         uncheckAllDiv.innerHTML = `
@@ -295,7 +303,6 @@ window.addEventListener('DOMContentLoaded', () => {
         topicCard.insertBefore(madeDiv, topicContainerEl.nextSibling);
     }
 
-    // Thêm nút Ngân hàng câu sai vào màn hình chính một cách an toàn
     if (startScreen && !document.getElementById('open-mistake-bank-btn')) {
         const mistakeBtn = document.createElement('button');
         mistakeBtn.id = 'open-mistake-bank-btn';
@@ -310,7 +317,6 @@ window.addEventListener('DOMContentLoaded', () => {
     window.loadData();
 });
 
-// Chức năng bật/tắt Dark Mode
 window.toggleDarkMode = function() {
     AppState.darkMode = !AppState.darkMode;
     localStorage.setItem('app_dark_mode', AppState.darkMode);
@@ -328,7 +334,6 @@ window.toggleDarkMode = function() {
     }
 };
 
-// Chức năng bỏ chọn tất cả chủ đề
 window.uncheckAllTopics = function() {
     const checkboxes = document.querySelectorAll('input[name="topic"]');
     checkboxes.forEach(cb => cb.checked = false);
@@ -871,7 +876,6 @@ window.renderQuiz = function() {
     container.innerHTML = contentHtml;
 };
 
-// Ghi nhận câu trả lời dạng điền từ
 window.recordVocaAnswer = function(index, value) {
     AppState.userAnswers[index] = value;
 };
@@ -880,7 +884,6 @@ window.checkAnswer = function(element, chosenKey, index) {
     const card = document.getElementById(`q-card-${index}`);
     if (!card) return;
     
-    // Nếu đã chọn rồi thì không cho chọn lại trong bài thi thông thường
     if (card.dataset.answered === 'true') return;
     card.dataset.answered = 'true';
 
@@ -989,7 +992,6 @@ window.startTimerTotal = function(seconds) {
 window.submitQuiz = function() {
     if (AppState.timerInterval) clearInterval(AppState.timerInterval);
 
-    // Tự động chấm điểm các câu chưa làm
     AppState.currentQuizData.forEach((item, index) => {
         const card = document.getElementById(`q-card-${index}`);
         if (card && card.dataset.answered !== 'true') {
@@ -1010,7 +1012,6 @@ window.submitQuiz = function() {
         window.addQuestionsToMistakeBank(AppState.wrongQuestions);
     }
 
-    // Lưu kết quả lên server hoặc hiển thị màn hình kết quả kèm chế độ xem lại chi tiết
     const quizScreen = document.getElementById('quiz-screen');
     if (quizScreen) {
         quizScreen.innerHTML = `
@@ -1030,7 +1031,6 @@ window.submitQuiz = function() {
     }
 };
 
-// Chế độ xem lại chi tiết bài làm (Detailed Review Mode)
 window.renderDetailedReview = function() {
     const reviewContainer = document.getElementById('detailed-review-container');
     if (!reviewContainer) return;
