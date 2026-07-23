@@ -1000,6 +1000,10 @@ window.retryWrongQuestions = function() {
     }
 };
 
+// ==========================================
+// FILE: script.js (Đầy đủ sau cập nhật)
+// ==========================================
+
 window._currentUtterance = null; // Giữ tham chiếu chống Garbage Collection
 
 window.speakText = function(text, lang = 'en-US') {
@@ -1008,12 +1012,19 @@ window.speakText = function(text, lang = 'en-US') {
         return;
     }
     
+    // Hủy các lệnh đọc đang xếp hàng trước đó
     window.speechSynthesis.cancel();
     
+    // Làm sạch văn bản chuyên sâu: xóa thẻ HTML, số thứ tự (1), (2), dấu chấm lửng, gạch đầu dòng...
     let cleanText = String(text)
-        .replace(/<[^>]*>?/gm, '')
-        .replace(/->/g, 'đến')
-        .replace(/['"„“‘’]/g, '');
+        .replace(/<[^>]*>?/gm, '')           // Xóa thẻ HTML
+        .replace(/->/g, ' đến ')             // Thay thế mũi tên thành chữ
+        .replace(/\(\d+\)/g, '')             // Xóa các số trong ngoặc như (1), (2)...
+        .replace(/\.\.\./g, ' ')             // Xóa dấu chấm lửng (...)
+        .replace(/[-–—]/g, ' ')              // Xóa các loại dấu gạch ngang
+        .replace(/['"„“‘’]/g, '')            // Xóa dấu ngoặc kép, nháy đơn
+        .replace(/\s+/g, ' ')                // Gom nhiều khoảng trắng liên tiếp thành 1 khoảng trắng
+        .trim();
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = lang;
@@ -1024,13 +1035,14 @@ window.speakText = function(text, lang = 'en-US') {
         if (voices && voices.length > 0) {
             let selectedVoice = null;
             if (lang.toLowerCase().startsWith('vi')) {
+                // Ưu tiên tìm giọng tiếng Việt chính xác của hệ thống/trình duyệt
                 selectedVoice = voices.find(v => 
                     v.lang.toLowerCase().includes('vi') || 
                     v.lang.toLowerCase().includes('vn') || 
                     v.name.toLowerCase().includes('vietnamese')
                 );
             } else {
-                selectedVoice = voices.find(v => v.lang.toLowerCase().startsWith('en'));
+                selectedVoice = voices.find(v => v.lang.toLowerCase().includes('en'));
             }
             
             if (selectedVoice) {
@@ -1045,7 +1057,7 @@ window.speakText = function(text, lang = 'en-US') {
         console.error("Lỗi SpeechSynthesis:", event);
     };
 
-    // Xử lý bất đồng bộ khi danh sách giọng đọc chưa kịp load
+    // Xử lý bất đồng bộ khi danh sách giọng đọc chưa được tải kịp
     let voices = window.speechSynthesis.getVoices();
     if (voices.length === 0) {
         window.speechSynthesis.onvoiceschanged = () => {
