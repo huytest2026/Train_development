@@ -105,7 +105,7 @@ window.speakQuestion = function(index) {
         textToRead = item.question;
     }
 
-    // Xử lý thay thế các dấu gạch dưới (_) bằng phẩy để tạo khoảng nghỉ ngắt giọng tự nhiên, không đọc chữ "underscore"
+    // Thay thế các dấu gạch dưới (_) bằng phẩy để tạo khoảng nghỉ ngắt giọng tự nhiên, không đọc chữ "underscore"
     if (textToRead) {
         textToRead = textToRead.replace(/_+/g, ', ');
     }
@@ -204,10 +204,39 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-mode');
     
+    // Tự động chèn giao diện checkbox Mã đề và vùng chọn Mã đề nếu thiếu trên HTML gốc
+    ensureMadeElementsExist();
+
     if (savedMa) {
         window.loadData();
     }
 });
+
+function ensureMadeElementsExist() {
+    const subjectSelect = document.getElementById('subject-select');
+    if (!subjectSelect || document.getElementById('made-toggle-wrapper')) return;
+
+    const wrapper = document.createElement('div');
+    wrapper.id = 'made-toggle-wrapper';
+    wrapper.style.cssText = 'margin: 12px 0;';
+    wrapper.innerHTML = `
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 500;">
+            <input type="checkbox" id="toggle-made" onchange="window.toggleMadeMode()"> Làm bài theo Mã đề (MADE) riêng
+        </label>
+    `;
+    subjectSelect.parentNode.insertBefore(wrapper, subjectSelect.nextSibling);
+
+    const madeContainer = document.createElement('div');
+    madeContainer.id = 'made-container';
+    madeContainer.style.cssText = 'display: none; margin-bottom: 15px;';
+    madeContainer.innerHTML = `
+        <label style="font-weight: bold; display: block; margin-bottom: 5px;">Chọn mã đề (MADE):</label>
+        <select id="made-select">
+            <option value="">-- Chọn mã đề --</option>
+        </select>
+    `;
+    wrapper.parentNode.insertBefore(madeContainer, wrapper.nextSibling);
+}
 
 window.toggleDarkMode = function() {
     document.body.classList.toggle('dark-mode');
@@ -217,13 +246,45 @@ window.toggleDarkMode = function() {
     if (btn) btn.innerHTML = isDark ? '☀️ Sáng' : '🌙 Tối';
 };
 
+window.toggleMadeMode = function() {
+    const toggleMade = document.getElementById('toggle-made');
+    const madeContainer = document.getElementById('made-container');
+    const topicContainer = document.getElementById('topic-container');
+    
+    // Tìm nhãn hoặc khối chứa phần "Chọn chủ đề" để ẩn/hiện tương ứng
+    const topicWrapper = topicContainer ? topicContainer.previousElementSibling : null;
+    const selectAllBtn = document.querySelector('button[onclick*="toggleAllTopics"]') || Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Chọn/Bỏ chọn tất cả'));
+
+    const isChecked = toggleMade ? toggleMade.checked : false;
+
+    if (madeContainer) madeContainer.style.display = isChecked ? 'block' : 'none';
+    if (topicContainer) topicContainer.style.display = isChecked ? 'none' : 'block';
+    if (topicWrapper && topicWrapper !== madeContainer) topicWrapper.style.display = isChecked ? 'none' : 'block';
+    if (selectAllBtn) selectAllBtn.style.display = isChecked ? 'none' : 'inline-block';
+};
+
 window.handleSubjectChange = function() {
     const mon = document.getElementById('subject-select').value;
     const levelContainer = document.getElementById('level-container');
     if (levelContainer) levelContainer.style.display = (mon === 'Tiếng Anh') ? 'block' : 'none';
     
     window.updateTopicList();
+    window.updateMadeList();
     window.renderLeaderboard(mon);
+};
+
+window.updateMadeList = function() {
+    const monSelect = document.getElementById('subject-select') ? document.getElementById('subject-select').value.trim() : '';
+    const madeSelect = document.getElementById('made-select');
+    if (!madeSelect || !monSelect) return;
+
+    const cleanMonSelect = cleanKey(monSelect);
+    const mades = [...new Set(AppState.allQuizData
+        .filter(i => cleanKey(i.mon) === cleanMonSelect && i.made && String(i.made).trim() !== '')
+        .map(i => String(i.made).trim())
+    )].filter(Boolean);
+
+    madeSelect.innerHTML = `<option value="">-- Chọn mã đề --</option>` + mades.map(m => `<option value="${escapeHTML(m)}">Mã đề: ${escapeHTML(m)}</option>`).join('');
 };
 
 window.updateTopicList = function() {
@@ -276,6 +337,7 @@ window.initInterface = function() {
     }
     window.renderLeaderboard();
     window.updateTopicList();
+    window.updateMadeList();
 };
 
 window.loadData = function() {
