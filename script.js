@@ -345,56 +345,100 @@ window.startQuiz = function() {
     if (!mon) return alert("Vui lòng chọn môn học trước khi bắt đầu!");
 
     const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
-    const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
-    if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
-
-    // Kiểm tra nếu chọn chủ đề Động từ bất quy tắc thì gán số lượng câu là 10
-    const isIrregularVerbs = selectedTopics.some(t => 
-        cleanKey(t).includes('dongtubatquytac') || 
-        t.toLowerCase().includes('động từ bất quy tắc')
-    );
-
-    let storedWrongs = getStoredWrongQuestions(maHS, mon);
-    let targetCount = 20;
+    const toggleMade = document.getElementById('toggle-made');
+    const selectedMade = (toggleMade && toggleMade.checked && document.getElementById('made-select')) ? document.getElementById('made-select').value.trim() : '';
+    
+    let rawSelectedQuestions = [];
     let totalSeconds = 10 * 60;
     const cleanM = standardizeSubject(mon);
 
-    if (isIrregularVerbs) {
-        targetCount = 10;
-        totalSeconds = 10 * 60;
-    } else if (cleanM === 'Tiếng Anh') {
-        targetCount = 20;
-        totalSeconds = 10 * 60;
-    } else if (cleanM === 'Toán') {
-        targetCount = 10;
-        totalSeconds = 20 * 60;
-    } else if (cleanM === 'Tiếng Việt') {
-        targetCount = 10;
-        totalSeconds = 15 * 60;
-    }
+    if (selectedMade) {
+        rawSelectedQuestions = AppState.allQuizData.filter(i => cleanKey(i.mon) === cleanKey(mon) && String(i.made).trim() === selectedMade && i.question !== '');
+        totalSeconds = 45 * 60;
+    } else {
+        const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
+        if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
 
-    let topicPool = AppState.allQuizData.filter(i => 
-        cleanKey(i.mon) === cleanKey(mon) && 
-        selectedTopics.includes(i.chuDe) && 
-        i.question !== ''
-    );
+        // Kiểm tra nếu chọn chủ đề Động từ bất quy tắc
+        const isIrregularVerbs = selectedTopics.some(t => 
+            cleanKey(t).includes('dongtubatquytac') || 
+            t.toLowerCase().includes('động từ bất quy tắc')
+        );
 
-    let uniquePool = [];
-    let seenQ = new Set();
-    for (let item of topicPool) {
-        if (!seenQ.has(item.question + (item.a || ''))) {
-            seenQ.add(item.question + (item.a || ''));
-            uniquePool.push(item);
+        let storedWrongs = getStoredWrongQuestions(maHS, mon);
+        let targetCount = 20;
+
+        let topicPool = AppState.allQuizData.filter(i => 
+            cleanKey(i.mon) === cleanKey(mon) && 
+            selectedTopics.includes(i.chuDe) && 
+            i.question !== ''
+        );
+
+        let uniquePool = [];
+        let seenQ = new Set();
+        for (let item of topicPool) {
+            if (!seenQ.has(item.question + (item.a || ''))) {
+                seenQ.add(item.question + (item.a || ''));
+                uniquePool.push(item);
+            }
         }
-    }
 
-    let wrongPool = uniquePool.filter(i => storedWrongs.some(w => w.question === i.question && w.chuDe === i.chuDe));
-    let normalPool = shuffleArray(uniquePool.filter(i => !storedWrongs.some(w => w.question === i.question && w.chuDe === i.chuDe)));
+        if (isIrregularVerbs) {
+            targetCount = 10;
+            totalSeconds = 10 * 60;
 
-    let rawSelectedQuestions = [...wrongPool, ...normalPool];
+            // Nhóm theo từng động từ lấy trong dấu nháy "" để đảm bảo lấy đủ cặp 1 câu nhập tay + 1 câu trắc nghiệm
+            let verbMap = {};
+            uniquePool.forEach(item => {
+                let match = item.question.match(/["']([^"']+)["']/);
+                let verb = match ? match[1].toLowerCase() : item.question.toLowerCase();
+                if (!verbMap[verb]) {
+                    verbMap[verb] = { textQ: [], mcqQ: [] };
+                }
+                let hasOptions = item.a || item.b || item.c || item.d;
+                if (!hasOptions) {
+                    verbMap[verb].textQ.push(item);
+                } else {
+                    verbMap[verb].mcqQ.push(item);
+                }
+            });
 
-    if (rawSelectedQuestions.length > targetCount) {
-        rawSelectedQuestions = rawSelectedQuestions.slice(0, targetCount);
+            let finalSelected = [];
+            let verbs = Object.keys(verbMap);
+            verbs = shuffleArray(verbs);
+
+            for (let v of verbs) {
+                if (finalSelected.length >= 10) break;
+                let group = verbMap[v];
+                if (group.textQ.length > 0 && finalSelected.length < 10) {
+                    finalSelected.push(group.textQ[Math.floor(Math.random() * group.textQ.length)]);
+                }
+                if (group.mcqQ.length > 0 && finalSelected.length < 10) {
+                    finalSelected.push(group.mcqQ[Math.floor(Math.random() * group.mcqQ.length)]);
+                }
+            }
+            rawSelectedQuestions = finalSelected;
+        } else {
+            if (cleanM === 'Tiếng Anh') {
+                targetCount = 20;
+                totalSeconds = 10 * 60;
+            } else if (cleanM === 'Toán') {
+                targetCount = 10;
+                totalSeconds = 20 * 60;
+            } else if (cleanM === 'Tiếng Việt') {
+                targetCount = 10;
+                totalSeconds = 15 * 60;
+            }
+
+            let wrongPool = uniquePool.filter(i => storedWrongs.some(w => w.question === i.question && w.chuDe === i.chuDe));
+            let normalPool = shuffleArray(uniquePool.filter(i => !storedWrongs.some(w => w.question === i.question && w.chuDe === i.chuDe)));
+
+            rawSelectedQuestions = [...wrongPool, ...normalPool];
+
+            if (rawSelectedQuestions.length > targetCount) {
+                rawSelectedQuestions = rawSelectedQuestions.slice(0, targetCount);
+            }
+        }
     }
 
     if (rawSelectedQuestions.length === 0) return alert("Không tìm thấy câu hỏi phù hợp!");
