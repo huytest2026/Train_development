@@ -843,6 +843,23 @@ window.submitQuiz = function() {
     let totalQuestions = AppState.currentQuizData.length;
     let score = Math.round((AppState.correctCount / totalQuestions) * 10 * 10) / 10;
     
+    // Lấy thông tin học sinh và môn học để gửi lên Google Sheets
+    const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
+    const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
+    const levelSelect = document.getElementById('level-select');
+    const level = levelSelect ? levelSelect.value : '';
+
+    // Gửi điểm tự động về Google Apps Script Web App
+    const API_URL = "https://script.google.com/macros/s/AKfycbwABOWdjRcG_rX9tVXjrLDsXFRMEbgUfn01QC6U5Z91qwdwq5askg7CrQHEDjf8np-H/exec"; // Giữ nguyên URL hiện tại của bạn
+    if (maHS && mon) {
+        fetch(API_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ maHS: maHS, mon: mon, score: score, level: level })
+        }).catch(err => console.log(err));
+    }
+
     const quizScreen = document.getElementById('quiz-screen');
     if (quizScreen) quizScreen.style.display = 'none';
 
