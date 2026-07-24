@@ -81,7 +81,30 @@ window.speakQuestion = function(index) {
     if (!item) return;
     const chuDeLower = (item.chuDe || '').toLowerCase();
     const isVietAnh = chuDeLower.includes('việt anh') || chuDeLower.includes('viet anh');
-    let textToRead = isVietAnh ? item.correct : item.question;
+    const isIrregularVerbs = chuDeLower.includes('dongtubatquytac') || chuDeLower.includes('động từ bất quy tắc');
+
+    let textToRead = '';
+    if (isVietAnh) {
+        textToRead = item.correct;
+    } else if (isIrregularVerbs) {
+        let match = item.question.match(/["']([^"']+)["']/);
+        if (match) {
+            textToRead = match[1].trim();
+        } else {
+            let matchDt = item.question.match(/(?:động từ|từ)\s+["']?([a-zA-Z\-]+)["']?/i);
+            if (matchDt) {
+                textToRead = matchDt[1].trim();
+            } else {
+                let cleanQ = item.question.toLowerCase()
+                    .replace(/dạng quá khứ|v2|v3|của|động từ|là gì|\(|\)|\?/g, '')
+                    .trim();
+                textToRead = cleanQ || item.question;
+            }
+        }
+    } else {
+        textToRead = item.question;
+    }
+
     if (textToRead && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(textToRead);
@@ -389,17 +412,14 @@ window.startQuiz = function() {
             let verbMap = {};
             uniquePool.forEach(item => {
                 let verb = '';
-                // 1. Thử tìm từ trong dấu nháy kép hoặc đơn ("...", '...')
                 let match = item.question.match(/["']([^"']+)["']/);
                 if (match) {
                     verb = match[1].toLowerCase().trim();
                 } else {
-                    // 2. Thử tìm từ nằm ngay sau cụm từ "động từ" hoặc "từ"
                     let matchDt = item.question.match(/(?:động từ|từ)\s+["']?([a-zA-Z\-]+)["']?/i);
                     if (matchDt) {
                         verb = matchDt[1].toLowerCase().trim();
                     } else {
-                        // 3. Fallback thông minh: Làm sạch câu hỏi và lấy từ tiếng Anh cuối cùng hoặc chuỗi định danh
                         let cleanQ = item.question.toLowerCase()
                             .replace(/dạng quá khứ|v2|v3|của|động từ|là gì|\(|\)|\?/g, '')
                             .trim();
