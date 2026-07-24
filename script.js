@@ -9,7 +9,11 @@ const AppState = {
     wrongQuestions: []
 };
 
-// Hàm xử lý khi tích/bỏ tích ô checkbox Mã đề sẵn có trên giao diện
+// Định nghĩa đầy đủ hàm để triệt tiêu hoàn toàn lỗi đỏ trong Console
+window.handleMadeChange = function() {
+    window.toggleMadeMode();
+};
+
 window.toggleMadeMode = function() {
     const toggleMade = document.getElementById('toggle-made');
     if (!toggleMade) return;
@@ -273,6 +277,7 @@ window.updateMadeList = function() {
         .map(i => String(i.made).trim())
     )].filter(Boolean);
 
+    // Giữ cho thẻ select luôn hoạt động bình thường, không bị khóa (disabled)
     madeSelect.innerHTML = `<option value="">-- Chọn mã đề --</option>` + mades.map(m => `<option value="${escapeHTML(m)}">Mã đề: ${escapeHTML(m)}</option>`).join('');
 };
 
