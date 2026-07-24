@@ -359,7 +359,6 @@ window.startQuiz = function() {
         const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
         if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
 
-        // Kiểm tra nếu chọn chủ đề Động từ bất quy tắc
         const isIrregularVerbs = selectedTopics.some(t => 
             cleanKey(t).includes('dongtubatquytac') || 
             t.toLowerCase().includes('động từ bất quy tắc')
@@ -387,11 +386,27 @@ window.startQuiz = function() {
             targetCount = 10;
             totalSeconds = 10 * 60;
 
-            // Nhóm theo từng động từ lấy trong dấu nháy "" để đảm bảo lấy đủ cặp 1 câu nhập tay + 1 câu trắc nghiệm
             let verbMap = {};
             uniquePool.forEach(item => {
+                let verb = '';
+                // 1. Thử tìm từ trong dấu nháy kép hoặc đơn ("...", '...')
                 let match = item.question.match(/["']([^"']+)["']/);
-                let verb = match ? match[1].toLowerCase() : item.question.toLowerCase();
+                if (match) {
+                    verb = match[1].toLowerCase().trim();
+                } else {
+                    // 2. Thử tìm từ nằm ngay sau cụm từ "động từ" hoặc "từ"
+                    let matchDt = item.question.match(/(?:động từ|từ)\s+["']?([a-zA-Z\-]+)["']?/i);
+                    if (matchDt) {
+                        verb = matchDt[1].toLowerCase().trim();
+                    } else {
+                        // 3. Fallback thông minh: Làm sạch câu hỏi và lấy từ tiếng Anh cuối cùng hoặc chuỗi định danh
+                        let cleanQ = item.question.toLowerCase()
+                            .replace(/dạng quá khứ|v2|v3|của|động từ|là gì|\(|\)|\?/g, '')
+                            .trim();
+                        verb = cleanQ || item.question.toLowerCase();
+                    }
+                }
+
                 if (!verbMap[verb]) {
                     verbMap[verb] = { textQ: [], mcqQ: [] };
                 }
