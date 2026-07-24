@@ -9,11 +9,7 @@ const AppState = {
     wrongQuestions: []
 };
 
-// Đồng bộ tên hàm với HTML hiện tại của bạn
-window.handleMadeChange = function() {
-    window.toggleMadeMode();
-};
-
+// Hàm xử lý khi tích/bỏ tích ô checkbox Mã đề sẵn có trên giao diện
 window.toggleMadeMode = function() {
     const toggleMade = document.getElementById('toggle-made');
     if (!toggleMade) return;
