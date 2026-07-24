@@ -9,12 +9,13 @@ const AppState = {
     wrongQuestions: []
 };
 
-// Định nghĩa trước toàn cục để tránh lỗi "is not a function" khi HTML gọi onchange
+// Hàm xử lý khi tích/bỏ tích ô checkbox Mã đề sẵn có trên giao diện
 window.toggleMadeMode = function() {
     const toggleMade = document.getElementById('toggle-made');
+    if (!toggleMade) return;
+
     let madeContainer = document.getElementById('made-container');
-    
-    if (!madeContainer && toggleMade) {
+    if (!madeContainer) {
         madeContainer = document.createElement('div');
         madeContainer.id = 'made-container';
         madeContainer.style.cssText = 'display: none; margin-bottom: 15px;';
@@ -32,7 +33,7 @@ window.toggleMadeMode = function() {
     const topicWrapper = topicContainer ? topicContainer.previousElementSibling : null;
     const selectAllBtn = document.querySelector('button[onclick*="toggleAllTopics"]') || Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Chọn/Bỏ chọn tất cả'));
 
-    const isChecked = toggleMade ? toggleMade.checked : false;
+    const isChecked = toggleMade.checked;
 
     if (madeContainer) madeContainer.style.display = isChecked ? 'block' : 'none';
     if (topicContainer) topicContainer.style.display = isChecked ? 'none' : 'block';
