@@ -105,6 +105,11 @@ window.speakQuestion = function(index) {
         textToRead = item.question;
     }
 
+    // Xử lý thay thế các dấu gạch dưới (_) bằng phẩy để tạo khoảng nghỉ ngắt giọng tự nhiên, không đọc chữ "underscore"
+    if (textToRead) {
+        textToRead = textToRead.replace(/_+/g, ', ');
+    }
+
     if (textToRead && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(textToRead);
