@@ -1,13 +1,30 @@
 const AppState = {
-    allQuizData: [],
-    userPermissions: [],
+    allQuizData: [
+        // --- DỮ LIỆU MẪU ĐỘNG TỪ BẤT QUY TẮC (10 câu: 5 từ x 2 dạng) ---
+        { mon: "Tiếng Anh", chuDe: "Động từ bất quy tắc", question: "Dạng quá khứ (V2) của động từ \"shake\" là gì?", a: "", b: "", c: "", d: "", correct: "shook", explanation: "Động từ bất quy tắc shake chuyển sang V2 là shook.", loai: "v2", level: "1", passage: "", made: "" },
+        { mon: "Tiếng Anh", chuDe: "Động từ bất quy tắc", question: "Dạng quá khứ (V2) của động từ \"shake\" là gì?", a: "shaked", b: "shake", c: "shaken", d: "shook", correct: "d", explanation: "Động từ bất quy tắc shake chuyển sang V2 là shook.", loai: "vocab", level: "1", passage: "", made: "" },
+        
+        { mon: "Tiếng Anh", chuDe: "Động từ bất quy tắc", question: "Dạng quá khứ (V2) của động từ \"dig\" là gì?", a: "", b: "", c: "", d: "", correct: "dug", explanation: "Động từ bất quy tắc dig chuyển sang V2 là dug.", loai: "v2", level: "1", passage: "", made: "" },
+        { mon: "Tiếng Anh", chuDe: "Động từ bất quy tắc", question: "Dạng quá khứ (V2) của động từ \"dig\" là gì?", a: "dug", b: "dugged", c: "digged", d: "dog", correct: "a", explanation: "Động từ bất quy tắc dig chuyển sang V2 là dug.", loai: "vocab", level: "1", passage: "", made: "" },
+        
+        { mon: "Tiếng Anh", chuDe: "Động từ bất quy tắc", question: "Dạng quá khứ (V2) của động từ \"write\" là gì?", a: "", b: "", c: "", d: "", correct: "wrote", explanation: "Động từ bất quy tắc write chuyển sang V2 là wrote.", loai: "v2", level: "1", passage: "", made: "" },
+        { mon: "Tiếng Anh", chuDe: "Động từ bất quy tắc", question: "Dạng quá khứ (V2) của động từ \"write\" là gì?", a: "writed", b: "written", c: "wrote", d: "writes", correct: "c", explanation: "Động từ bất quy tắc write chuyển sang V2 là wrote.", loai: "vocab", level: "1", passage: "", made: "" },
+        
+        { mon: "Tiếng Anh", chuDe: "Động từ bất quy tắc", question: "Dạng quá khứ (V2) của động từ \"eat\" là gì?", a: "", b: "", c: "", d: "", correct: "ate", explanation: "Động từ bất quy tắc eat chuyển sang V2 là ate.", loai: "v2", level: "1", passage: "", made: "" },
+        { mon: "Tiếng Anh", chuDe: "Động từ bất quy tắc", question: "Dạng quá khứ (V2) của động từ \"eat\" là gì?", a: "eated", b: "ate", c: "eaten", d: "eats", correct: "b", explanation: "Động từ bất quy tắc eat chuyển sang V2 là ate.", loai: "vocab", level: "1", passage: "", made: "" },
+        
+        { mon: "Tiếng Anh", chuDe: "Động từ bất quy tắc", question: "Dạng quá khứ (V2) của động từ \"go\" là gì?", a: "", b: "", c: "", d: "", correct: "went", explanation: "Động từ bất quy tắc go chuyển sang V2 là went.", loai: "v2", level: "1", passage: "", made: "" },
+        { mon: "Tiếng Anh", chuDe: "Động từ bất quy tắc", question: "Dạng quá khứ (V2) của động từ \"go\" là gì?", a: "goed", b: "gone", c: "went", d: "goes", correct: "c", explanation: "Động từ bất quy tắc go chuyển sang V2 là went.", loai: "vocab", level: "1", passage: "", made: "" }
+    ],
+    userPermissions: [
+        { maHS: "Huy", mon: "Tiếng Anh", chuDe: "Động từ bất quy tắc" }
+    ],
     rankings: [],
     currentQuizData: [],
     timerInterval: null,
     correctCount: 0,
     wrongCount: 0,
-    wrongQuestions: [],
-    isReadingComp: false
+    wrongQuestions: []
 };
 
 function shuffleArray(array) {
@@ -176,7 +193,9 @@ window.addEventListener('DOMContentLoaded', () => {
         startScreen.insertBefore(btn, startScreen.firstChild);
     }
     if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-mode');
-    window.loadData();
+    
+    // Khởi tạo giao diện từ dữ liệu mẫu có sẵn
+    window.initInterface();
 });
 
 window.toggleDarkMode = function() {
@@ -341,6 +360,16 @@ window.toggleAllTopics = function() {
     checkboxes.forEach(cb => cb.checked = !allChecked);
 };
 
+window.initInterface = function() {
+    const subjectSelect = document.getElementById('subject-select');
+    if (subjectSelect) {
+        const subjects = [...new Set(AppState.allQuizData.map(i => i.mon).filter(s => s && cleanKey(s) !== 'id'))];
+        subjectSelect.innerHTML = `<option value="">-- Chọn môn --</option>` + subjects.map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join('');
+    }
+    window.renderLeaderboard();
+    window.updateTopicList();
+};
+
 window.loadData = function() {
     const maHS = document.getElementById('student-code').value.trim();
     if (!maHS) return alert("Vui lòng nhập mã học sinh!");
@@ -352,68 +381,54 @@ window.loadData = function() {
     const API_URL = "https://script.google.com/macros/s/AKfycbwABOWdjRcG_rX9tVXjrLDsXFRMEbgUfn01QC6U5Z91qwdwq5askg7CrQHEDjf8np-H/exec";
     const script = document.createElement('script');
     script.src = `${API_URL}?ma=${encodeURIComponent(maHS)}&callback=handleQuizData`;
-    script.onerror = () => { script.remove(); if (container) container.innerHTML = "Lỗi kết nối tải dữ liệu."; };
+    script.onerror = () => { 
+        script.remove(); 
+        if (container) container.innerHTML = "Lỗi kết nối mạng, đang dùng dữ liệu tích hợp sẵn.";
+        window.initInterface();
+    };
     document.body.appendChild(script);
     script.onload = () => script.remove();
 };
 
 window.handleQuizData = function(data) {
-    if (!data || data.error) return;
-    let lastMon = '', lastChuDe = '', lastLevel = '', lastLoai = '', lastPassage = '', lastMade = '';
+    if (data && !data.error && data.questions && data.questions.length > 0) {
+        let lastMon = '', lastChuDe = '', lastLevel = '', lastLoai = '', lastPassage = '', lastMade = '';
 
-    AppState.allQuizData = (data.questions || []).map(rawItem => {
-        let item = normalizeItem(rawItem);
-        if (!item) return null;
+        AppState.allQuizData = (data.questions || []).map(rawItem => {
+            let item = normalizeItem(rawItem);
+            if (!item) return null;
 
-        if (item.mon) {
-            lastMon = standardizeSubject(item.mon);
-            lastChuDe = '';
-            lastLevel = '';
-            lastLoai = '';
-            lastPassage = '';
-            lastMade = '';
-        }
-        item.mon = lastMon;
-
-        if (item.made) {
-            if (item.made !== lastMade) {
-                lastPassage = '';
+            if (item.mon) {
+                lastMon = standardizeSubject(item.mon);
+                lastChuDe = ''; lastLevel = ''; lastLoai = ''; lastPassage = ''; lastMade = '';
             }
-            lastMade = item.made;
-        } else if (lastMade) {
-            item.made = lastMade;
-        }
+            item.mon = lastMon;
 
-        if (item.chuDe) lastChuDe = item.chuDe; else item.chuDe = lastChuDe;
-        if (item.level) lastLevel = item.level; else if (lastLevel) item.level = lastLevel;
-        if (item.loai) lastLoai = item.loai; else if (lastLoai) item.loai = lastLoai;
+            if (item.made) {
+                if (item.made !== lastMade) lastPassage = '';
+                lastMade = item.made;
+            } else if (lastMade) {
+                item.made = lastMade;
+            }
 
-        if (item.passage) {
-            lastPassage = item.passage;
-        } else if (lastPassage) {
-            item.passage = lastPassage;
-        }
+            if (item.chuDe) lastChuDe = item.chuDe; else item.chuDe = lastChuDe;
+            if (item.level) lastLevel = item.level; else if (lastLevel) item.level = lastLevel;
+            if (item.loai) lastLoai = item.loai; else if (lastLoai) item.loai = lastLoai;
+            if (item.passage) lastPassage = item.passage; else if (lastPassage) item.passage = lastPassage;
 
-        return item;
-    }).filter(item => item && item.question !== '' && item.mon !== '' && cleanKey(item.mon) !== 'id');
+            return item;
+        }).filter(item => item && item.question !== '' && item.mon !== '' && cleanKey(item.mon) !== 'id');
 
-    AppState.userPermissions = (data.permissions || []).map(p => ({
-        maHS: String(p.maHS || p[0] || '').trim(),
-        mon: standardizeSubject(String(p.mon || p[1] || '').trim()),
-        chuDe: String(p.chuDe || p[2] || '').trim()
-    })).filter(p => p.chuDe !== '');
+        AppState.userPermissions = (data.permissions || []).map(p => ({
+            maHS: String(p.maHS || p[0] || '').trim(),
+            mon: standardizeSubject(String(p.mon || p[1] || '').trim()),
+            chuDe: String(p.chuDe || p[2] || '').trim()
+        })).filter(p => p.chuDe !== '');
 
-    AppState.rankings = data.rankings || [];
-
-    const subjectSelect = document.getElementById('subject-select');
-    if (subjectSelect) {
-        const subjects = [...new Set(AppState.allQuizData.map(i => i.mon).filter(s => s && cleanKey(s) !== 'id'))];
-        subjectSelect.innerHTML = `<option value="">-- Chọn môn --</option>` + subjects.map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join('');
+        AppState.rankings = data.rankings || [];
     }
 
-    window.renderLeaderboard();
-    window.updateTopicList();
-    window.updateMadePassagePreview();
+    window.initInterface();
 };
 
 window.renderLeaderboard = function(subjectFilter = null) {
@@ -466,72 +481,41 @@ window.startQuiz = function() {
         if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
 
         const isIrregularVerbs = selectedTopics.some(t => cleanKey(t).includes('dongtubatquytac'));
-
         let storedWrongs = getStoredWrongQuestions(maHS, mon);
         let targetCount = 10;
+
+        let topicPool = AppState.allQuizData.filter(i => 
+            cleanKey(i.mon) === cleanKey(mon) && 
+            selectedTopics.includes(i.chuDe) && 
+            i.question !== ''
+        );
+
+        let uniquePool = [];
+        let seenQ = new Set();
+        for (let item of topicPool) {
+            if (!seenQ.has(item.question + (item.a || ''))) {
+                seenQ.add(item.question + (item.a || ''));
+                uniquePool.push(item);
+            }
+        }
+
+        let wrongPool = uniquePool.filter(i => storedWrongs.some(w => w.question === i.question && w.chuDe === i.chuDe));
+        let normalPool = shuffleArray(uniquePool.filter(i => !storedWrongs.some(w => w.question === i.question && w.chuDe === i.chuDe)));
+
+        rawSelectedQuestions = [...wrongPool, ...normalPool];
 
         if (isIrregularVerbs) {
             targetCount = 10;
             totalSeconds = 10 * 60;
-
-            let topicPool = AppState.allQuizData.filter(i => 
-                cleanKey(i.mon) === cleanKey(mon) && 
-                selectedTopics.includes(i.chuDe) && 
-                i.question !== ''
-            );
-
-            // Lọc danh sách độc nhất (unique) để tránh lặp câu hỏi
-            let uniquePool = [];
-            let seenQ = new Set();
-            for (let item of topicPool) {
-                if (!seenQ.has(item.question)) {
-                    seenQ.add(item.question);
-                    uniquePool.push(item);
-                }
-            }
-
-            let vocaPool = uniquePool.filter(i => {
-                const l = cleanKey(i.loai || '');
-                return l.includes('voca') || l.includes('vocab') || l.includes('v2') || l.includes('tu_vung');
-            });
-            let otherPool = uniquePool.filter(i => !vocaPool.includes(i));
-            let orderedPool = [...vocaPool, ...otherPool];
-
-            let wrongPool = orderedPool.filter(i => storedWrongs.some(w => w.question === i.question && w.chuDe === i.chuDe));
-            let normalPool = shuffleArray(orderedPool.filter(i => !storedWrongs.some(w => w.question === i.question && w.chuDe === i.chuDe)));
-
-            rawSelectedQuestions = [...wrongPool, ...normalPool];
-        } else {
-            let topicPool = AppState.allQuizData.filter(i => 
-                cleanKey(i.mon) === cleanKey(mon) && 
-                selectedTopics.includes(i.chuDe) && 
-                i.question !== ''
-            );
-
-            let uniquePool = [];
-            let seenQ = new Set();
-            for (let item of topicPool) {
-                if (!seenQ.has(item.question)) {
-                    seenQ.add(item.question);
-                    uniquePool.push(item);
-                }
-            }
-
-            let wrongPool = uniquePool.filter(i => storedWrongs.some(w => w.question === i.question && w.chuDe === i.chuDe));
-            let normalPool = shuffleArray(uniquePool.filter(i => !wrongPool.some(w => w.question === i.question && w.chuDe === i.chuDe)));
-
-            if (cleanM === 'Tiếng Anh') {
-                targetCount = 20;
-                totalSeconds = 10 * 60;
-            } else if (cleanM === 'Toán') {
-                targetCount = 10;
-                totalSeconds = 20 * 60;
-            } else if (cleanM === 'Tiếng Việt') {
-                targetCount = 10;
-                totalSeconds = 15 * 60;
-            }
-
-            rawSelectedQuestions = [...wrongPool, ...normalPool];
+        } else if (cleanM === 'Tiếng Anh') {
+            targetCount = 20;
+            totalSeconds = 10 * 60;
+        } else if (cleanM === 'Toán') {
+            targetCount = 10;
+            totalSeconds = 20 * 60;
+        } else if (cleanM === 'Tiếng Việt') {
+            targetCount = 10;
+            totalSeconds = 15 * 60;
         }
 
         if (rawSelectedQuestions.length > targetCount) {
@@ -598,7 +582,7 @@ window.renderQuiz = function() {
                 `;
             }).join('');
         } else {
-            // Hiển thị ô nhập văn bản thủ công và nút Gửi đáp án như yêu cầu giao diện Động từ bất quy tắc
+            // Hiển thị ô nhập văn bản thủ công và nút Gửi đáp án cho các câu không có options (như Động từ bất quy tắc dạng text)
             bodyHtml = `
                 <div style="margin-top: 10px;">
                     <input type="text" id="text-input-${index}" placeholder="Nhập dạng V2 của từ...">
@@ -658,7 +642,6 @@ window.selectAnswer = function(index, optKey) {
         }
     }
     saveStoredWrongQuestions(maHS, item.mon, storedWrongs);
-
     updateScoreDisplay();
 
     item._shuffledKeys.forEach(k => {
