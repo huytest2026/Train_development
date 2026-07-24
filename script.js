@@ -256,6 +256,7 @@ window.handleMadeChange = function() {
     const toggleMade = document.getElementById('toggle-made');
     const selectedMade = (toggleMade && toggleMade.checked && document.getElementById('made-select')) ? document.getElementById('made-select').value.trim() : '';
     const previewDiv = document.getElementById('made-passage-preview');
+    const monSelect = document.getElementById('subject-select') ? document.getElementById('subject-select').value.trim() : '';
     if (!previewDiv) return;
 
     if (!selectedMade) {
@@ -264,7 +265,9 @@ window.handleMadeChange = function() {
         return;
     }
 
-    const matchedItem = AppState.allQuizData.find(i => String(i.made).trim() === selectedMade && i.passage && i.passage.trim() !== '');
+    const cleanMon = cleanKey(monSelect);
+    // Đã bổ sung lọc chính xác theo môn học (cleanKey(i.mon) === cleanMon) để tránh lấy nhầm đoạn văn của môn khác
+    const matchedItem = AppState.allQuizData.find(i => cleanKey(i.mon) === cleanMon && String(i.made).trim() === selectedMade && i.passage && i.passage.trim() !== '');
     if (matchedItem) {
         previewDiv.innerHTML = `
             <div class="passage-box" style="margin-top: 10px; font-size: 0.95em;">
@@ -349,13 +352,38 @@ window.handleQuizData = function(data) {
     AppState.allQuizData = (data.questions || []).map(rawItem => {
         let item = normalizeItem(rawItem);
         if (!item) return null;
-        if (item.mon) lastMon = item.mon; else item.mon = lastMon;
-        if (item.mon) item.mon = standardizeSubject(item.mon);
+
+        // Nếu đổi môn, reset hoàn toàn context cũ để tránh dính dữ liệu giữa các môn
+        if (item.mon) {
+            lastMon = standardizeSubject(item.mon);
+            lastChuDe = '';
+            lastLevel = '';
+            lastLoai = '';
+            lastPassage = '';
+            lastMade = '';
+        }
+        item.mon = lastMon;
+
+        // Nếu đổi mã đề (made), reset passage cũ để không bị dính đoạn văn của mã đề trước
+        if (item.made) {
+            if (item.made !== lastMade) {
+                lastPassage = '';
+            }
+            lastMade = item.made;
+        } else if (lastMade) {
+            item.made = lastMade;
+        }
+
         if (item.chuDe) lastChuDe = item.chuDe; else item.chuDe = lastChuDe;
         if (item.level) lastLevel = item.level; else if (lastLevel) item.level = lastLevel;
         if (item.loai) lastLoai = item.loai; else if (lastLoai) item.loai = lastLoai;
-        if (item.made) lastMade = item.made; else if (lastMade) item.made = lastMade;
-        if (item.passage) lastPassage = item.passage; else if (lastPassage) item.passage = lastPassage;
+
+        if (item.passage) {
+            lastPassage = item.passage;
+        } else if (lastPassage) {
+            item.passage = lastPassage;
+        }
+
         return item;
     }).filter(item => item && item.question !== '' && item.mon !== '' && cleanKey(item.mon) !== 'id');
 
