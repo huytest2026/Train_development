@@ -447,7 +447,7 @@ function getOriginalCorrectKey(item) {
 }
 
 window.startQuiz = function() {
-    const mon = document.getElementById('subject-select') ? document.getElementById('subject-select'].value : '';
+    const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
     if (!mon) return alert("Vui lòng chọn môn học trước khi bắt đầu!");
 
     const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
