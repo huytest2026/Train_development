@@ -9,11 +9,7 @@ const AppState = {
     wrongQuestions: []
 };
 
-// Đồng bộ tên hàm với HTML hiện tại của bạn
-window.handleMadeChange = function() {
-    window.toggleMadeMode();
-};
-
+// Hàm xử lý khi tích/bỏ tích ô checkbox Mã đề sẵn có trên giao diện
 window.toggleMadeMode = function() {
     const toggleMade = document.getElementById('toggle-made');
     if (!toggleMade) return;
@@ -277,13 +273,7 @@ window.updateMadeList = function() {
         .map(i => String(i.made).trim())
     )].filter(Boolean);
 
-    if (mades.length === 0) {
-        madeSelect.innerHTML = `<option value="">-- Môn này không có mã đề riêng --</option>`;
-        madeSelect.disabled = true;
-    } else {
-        madeSelect.disabled = false;
-        madeSelect.innerHTML = `<option value="">-- Chọn mã đề --</option>` + mades.map(m => `<option value="${escapeHTML(m)}">Mã đề: ${escapeHTML(m)}</option>`).join('');
-    }
+    madeSelect.innerHTML = `<option value="">-- Chọn mã đề --</option>` + mades.map(m => `<option value="${escapeHTML(m)}">Mã đề: ${escapeHTML(m)}</option>`).join('');
 };
 
 window.updateTopicList = function() {
