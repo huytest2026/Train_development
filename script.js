@@ -9,9 +9,24 @@ const AppState = {
     wrongQuestions: []
 };
 
-// Định nghĩa đầy đủ hàm để triệt tiêu hoàn toàn lỗi đỏ trong Console
+// Định nghĩa hàm xử lý khi thay đổi mã đề (Made) và hiển thị xem trước đoạn văn
 window.handleMadeChange = function() {
-    window.toggleMadeMode();
+    const madeSelect = document.getElementById('made-select');
+    const previewEl = document.getElementById('made-passage-preview');
+    if (!madeSelect || !previewEl) return;
+    
+    const selectedMade = madeSelect.value.trim();
+    if (!selectedMade) {
+        previewEl.innerHTML = '';
+        return;
+    }
+
+    const found = AppState.allQuizData.find(i => String(i.made).trim() === selectedMade && i.passage && i.passage.trim() !== '');
+    if (found) {
+        previewEl.innerHTML = `<div style="background: #f8f9fa; border: 1px solid #540606; padding: 10px; border-radius: 6px; margin-top: 5px; font-size: 0.9em;"><b style="color: #540606;">📄 Xem trước đoạn văn:</b><br>${escapeHTML(found.passage.substring(0, 150))}...</div>`;
+    } else {
+        previewEl.innerHTML = '';
+    }
 };
 
 window.toggleMadeMode = function() {
@@ -19,20 +34,6 @@ window.toggleMadeMode = function() {
     if (!toggleMade) return;
 
     let madeContainer = document.getElementById('made-container');
-    if (!madeContainer) {
-        madeContainer = document.createElement('div');
-        madeContainer.id = 'made-container';
-        madeContainer.style.cssText = 'display: none; margin-bottom: 15px;';
-        madeContainer.innerHTML = `
-            <label style="font-weight: bold; display: block; margin-bottom: 5px;">Chọn mã đề (MADE):</label>
-            <select id="made-select">
-                <option value="">-- Chọn mã đề --</option>
-            </select>
-        `;
-        const parentBlock = toggleMade.closest('div') || toggleMade.parentNode;
-        if (parentBlock) parentBlock.after(madeContainer);
-    }
-
     const topicContainer = document.getElementById('topic-container');
     const topicWrapper = topicContainer ? topicContainer.previousElementSibling : null;
     const selectAllBtn = document.querySelector('button[onclick*="toggleAllTopics"]') || Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Chọn/Bỏ chọn tất cả'));
@@ -102,7 +103,7 @@ function saveStoredWrongQuestions(maHS, mon, wrongs) {
         #topic-container { width: 100%; background: #ffffff; border: 1px solid #540606; border-radius: 8px; padding: 12px 15px; margin: 8px 0 15px 0; box-sizing: border-box; min-height: 50px; max-height: 200px; overflow-y: auto; }
         body.dark-mode { background-color: #121212 !important; color: #e0e0e0; }
         body.dark-mode .container { background: #1e1e1e; color: #e0e0e0; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        body.dark-mode .quiz-card, body.dark-mode .passage-box, body.dark-mode .leaderboard-container { background: #2d2d2d; border-color: #777; color: #e0e0e0; }
+        body.dark-mode .quiz-card, body.dark-mode .passage-box { background: #2d2d2d; border-color: #777; color: #e0e0e0; }
         body.dark-mode .option-box { background: #3a3a3a; border-color: #666; color: #e0e0e0; }
         body.dark-mode .option-box:hover { background: #4a4a4a; border-color: #888; }
         body.dark-mode input[type="text"], body.dark-mode select { background: #2d2d2d; color: #e0e0e0; border-color: #777; }
@@ -277,7 +278,6 @@ window.updateMadeList = function() {
         .map(i => String(i.made).trim())
     )].filter(Boolean);
 
-    // Giữ cho thẻ select luôn hoạt động bình thường, không bị khóa (disabled)
     madeSelect.innerHTML = `<option value="">-- Chọn mã đề --</option>` + mades.map(m => `<option value="${escapeHTML(m)}">Mã đề: ${escapeHTML(m)}</option>`).join('');
 };
 
