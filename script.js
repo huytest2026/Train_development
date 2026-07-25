@@ -1,4 +1,6 @@
-const AppState = {
+const API_URL = "https://script.google.com/macros/s/AKfycbwABOWdjRcG_rX9tVXjrLDsXFRMEbgUfn01QC6U5Z91qwdwq5askg7CrQHEDjf8np-H/exec";
+
+let AppState = {
     allQuizData: [],
     userPermissions: [],
     rankings: [],
@@ -7,6 +9,42 @@ const AppState = {
     correctCount: 0,
     wrongCount: 0,
     wrongQuestions: []
+};
+
+// 1. Lưu nhớ trạng thái môn và chủ đề đã chọn
+window.saveUserSelections = function() {
+    const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
+    const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : '';
+    const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
+    
+    if (maHS) localStorage.setItem('saved_maHS', maHS);
+    if (mon) localStorage.setItem('saved_mon', mon);
+    if (selectedTopics.length > 0) {
+        localStorage.setItem('saved_topics_' + maHS + '_' + mon, JSON.stringify(selectedTopics));
+    }
+};
+
+window.restoreUserSelections = function() {
+    const savedMon = localStorage.getItem('saved_mon');
+    const subjectSelect = document.getElementById('subject-select');
+    if (savedMon && subjectSelect) {
+        subjectSelect.value = savedMon;
+        window.handleSubjectChange();
+        
+        // Khôi phục lại các checkbox chủ đề đã chọn trước đó
+        const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : '';
+        const savedTopics = localStorage.getItem('saved_topics_' + maHS + '_' + savedMon);
+        if (savedTopics) {
+            try {
+                let topicsArray = JSON.parse(savedTopics);
+                setTimeout(() => {
+                    document.querySelectorAll('input[name="topic"]').forEach(cb => {
+                        cb.checked = topicsArray.includes(cb.value);
+                    });
+                }, 200);
+            } catch(e) {}
+        }
+    }
 };
 
 window.handleMadeChange = function() {
@@ -279,6 +317,7 @@ window.handleSubjectChange = function() {
     window.updateTopicList();
     window.updateMadeList();
     window.renderLeaderboard(mon);
+    window.saveUserSelections();
 };
 
 window.updateMadeList = function() {
@@ -324,7 +363,7 @@ window.updateTopicList = function() {
     }
 
     container.innerHTML = authorizedTopics.map(topic => {
-        return '<label style="display:block; margin:5px 0;"><input type="checkbox" name="topic" value="' + escapeHTML(topic) + '" checked> ' + escapeHTML(topic) + '</label>';
+        return '<label style="display:block; margin:5px 0;"><input type="checkbox" name="topic" value="' + escapeHTML(topic) + '" onchange="window.saveUserSelections()" checked> ' + escapeHTML(topic) + '</label>';
     }).join('');
 };
 
@@ -333,6 +372,7 @@ window.toggleAllTopics = function() {
     if (checkboxes.length === 0) return;
     const allChecked = Array.from(checkboxes).every(cb => cb.checked);
     checkboxes.forEach(cb => cb.checked = !allChecked);
+    window.saveUserSelections();
 };
 
 window.initInterface = function() {
@@ -344,11 +384,20 @@ window.initInterface = function() {
     window.renderLeaderboard();
     window.updateTopicList();
     window.updateMadeList();
+    
+    // Khôi phục lại môn học và chủ đề đã lưu trước đó nếu có
+    window.restoreUserSelections();
 };
 
 window.loadData = function() {
     const maHS = document.getElementById('student-code').value.trim();
     if (!maHS) return alert("Vui lòng nhập mã học sinh!");
+    
+    // Nếu đổi mã học sinh thì xóa bộ nhớ cũ của mã trước đó để load mới hoàn toàn
+    const oldMa = localStorage.getItem('saved_maHS');
+    if (oldMa !== maHS) {
+        localStorage.removeItem('saved_mon');
+    }
     localStorage.setItem('saved_maHS', maHS);
 
     const container = document.getElementById('topic-container');
@@ -406,49 +455,32 @@ window.handleQuizData = function(data) {
     window.initInterface();
 };
 
-window.renderLeaderboard = function(subjectFilter) {
-    const listEl = document.getElementById('ranking-list');
-    if (!listEl) return;
-
-    let filtered = AppState.rankings;
-    if (subjectFilter && subjectFilter !== 'all') {
-        filtered = filtered.filter(item => String(item.subject).trim().toLowerCase() === String(subjectFilter).trim().toLowerCase());
+window.renderLeaderboard = function(subjectFilter = null) {
+    const list = document.getElementById('ranking-list');
+    if (!list) return;
+    let data = AppState.rankings;
+    if (subjectFilter && subjectFilter !== "-- Chọn môn --") {
+        data = data.filter(item => cleanKey(item.subject || item.mon || '') === cleanKey(subjectFilter));
     }
-
-    // Lọc điểm >= 8 và sắp xếp giảm dần theo điểm
-    filtered = filtered.filter(item => Number(item.score) >= 8)
-                       .sort((a, b) => Number(b.score) - Number(a.score));
-
-    if (filtered.length === 0) {
-        listEl.innerHTML = '<p style="text-align: center; color: #666; padding: 10px;">Chưa có dữ liệu xếp hạng.</p>';
+    const qualifiedData = data.filter(item => item.score >= 8);
+    if (qualifiedData.length === 0) {
+        list.innerHTML = '<p style="color: #666; padding: 10px; text-align: center;">Chưa có dữ liệu xếp hạng (&gt;= 8).</p>';
         return;
     }
-
-    let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
-    
-    filtered.forEach((item, index) => {
-        let medal = index === 0 ? '🥇' : (index === 1 ? '🥈' : (index === 2 ? '🥉' : (index + 1)));
-        
-        // Hiển thị thêm thông tin Môn học và Thời gian vào dòng của từng học sinh
-        html += `<div style="display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 10px 12px; border-radius: 8px; border: 1px solid #ddd; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 1.2em; font-weight: bold; min-width: 25px;">${medal}</span>
-                <div>
-                    <div style="font-weight: bold; color: #333;">${item.name}</div>
-                    <div style="font-size: 0.85em; color: #666; margin-top: 2px;">
-                        📚 Môn: <span style="color: #007bff; font-weight: 500;">${item.subject || 'N/A'}</span> &nbsp;|&nbsp; 
-                        ⏰ ${item.date || ''}
-                    </div>
-                </div>
-            </div>
-            <div style="background: #e3f2fd; color: #0d6efd; font-weight: bold; padding: 4px 10px; border-radius: 20px; font-size: 0.9em;">
-                ${item.score} đ
-            </div>
-        </div>`;
-    });
-    
-    html += '</div>';
-    listEl.innerHTML = html;
+    const top3 = qualifiedData.sort((a, b) => b.score - a.score).slice(0, 3);
+    list.innerHTML = '<div style="display: flex; flex-direction: column; gap: 8px;">' + top3.map((item, index) => {
+        let medal = index === 0 ? "🥇" : (index === 1 ? "🥈" : "🥉");
+        return '<div style="display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 10px 12px; border-radius: 8px; border: 1px solid #ddd;">' +
+            '<div style="display: flex; align-items: center; gap: 10px;">' +
+                '<span style="font-size: 1.2em; font-weight: bold; min-width: 25px;">' + medal + '</span>' +
+                '<div>' +
+                    '<div style="font-weight: bold; color: #333;">' + escapeHTML(item.name) + '</div>' +
+                    '<div style="font-size: 0.85em; color: #666; margin-top: 2px;">📚 Môn: <span style="color: #007bff; font-weight: 500;">' + escapeHTML(item.subject || 'N/A') + '</span> &nbsp;|&nbsp; ⏰ ' + escapeHTML(item.date || '') + '</div>' +
+                '</div>' +
+            '</div>' +
+            '<div style="background: #e3f2fd; color: #0d6efd; font-weight: bold; padding: 4px 10px; border-radius: 20px; font-size: 0.9em;">' + item.score + ' đ</div>' +
+        '</div>';
+    }).join('') + '</div>';
 };
 
 function getCorrectKeys(item) {
@@ -476,6 +508,33 @@ window.startQuiz = function() {
     if (!mon) return alert("Vui lòng chọn môn học trước khi bắt đầu!");
 
     const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
+    
+    // KIỂM TRA ĐIỀU KIỆN LEVEL 1 (Yêu cầu 3)
+    const levelSelect = document.getElementById('level-select');
+    const selectedLevel = levelSelect ? levelSelect.value : '';
+    if (selectedLevel === 'Level 2' || selectedLevel === 'Level 3' || selectedLevel === '2' || selectedLevel === '3') {
+        // Kiểm tra xem học sinh đã đạt 10 điểm ở Level 1 chưa trong các lần làm trước (dựa vào AppState.rankings)
+        let hasPassedLevel1 = AppState.rankings.some(r => 
+            String(r.name).trim() === maHS && 
+            cleanKey(r.subject || '') === cleanKey(mon) && 
+            Number(r.score) === 10 && 
+            (String(r.level).includes('1'))
+        );
+        
+        // Hoặc kiểm tra xem số lần thi Level 1 chưa đủ 3 lần nhưng chưa đạt 10 điểm? (Hoặc quy tắc: không đạt 10 điểm trong 3 lần thì khóa)
+        let level1Attempts = AppState.rankings.filter(r => 
+            String(r.name).trim() === maHS && 
+            cleanKey(r.subject || '') === cleanKey(mon) && 
+            (String(r.level).includes('1'))
+        );
+        
+        if (level1Attempts.length >= 3 && !hasPassedLevel1) {
+            return alert("Bạn chưa đạt điểm 10 ở Level 1 sau 3 lần thử nên chưa được phép chuyển sang Level tiếp theo!");
+        }
+    }
+
+    window.saveUserSelections();
+
     const toggleMade = document.getElementById('toggle-made');
     const selectedMade = (toggleMade && toggleMade.checked && document.getElementById('made-select')) ? document.getElementById('made-select').value.trim() : '';
     
@@ -493,6 +552,12 @@ window.startQuiz = function() {
         const isIrregularVerbs = selectedTopics.some(t => 
             cleanKey(t).includes('dongtubatquytac') || 
             t.toLowerCase().includes('động từ bất quy tắc')
+        );
+
+        // KIỂM TRA CHỦ ĐỀ PREPOSITION (GIỚI TỪ) (Yêu cầu 2)
+        const isPreposition = selectedTopics.some(t => 
+            cleanKey(t).includes('preposition') || 
+            t.toLowerCase().includes('giới từ')
         );
 
         let storedWrongs = getStoredWrongQuestions(maHS, mon);
@@ -561,6 +626,18 @@ window.startQuiz = function() {
                 }
             }
             rawSelectedQuestions = finalSelected;
+        } else if (isPreposition) {
+            // Cấu hình riêng cho Preposition (Yêu cầu 2)
+            targetCount = 10;
+            totalSeconds = 5 * 60; // 5 phút
+
+            let wrongPool = uniquePool.filter(i => storedWrongs.some(w => w.question === i.question));
+            let normalPool = shuffleArray(uniquePool.filter(i => !storedWrongs.some(w => w.question === i.question)));
+
+            rawSelectedQuestions = [...wrongPool, ...normalPool];
+            if (rawSelectedQuestions.length > targetCount) {
+                rawSelectedQuestions = rawSelectedQuestions.slice(0, targetCount);
+            }
         } else {
             if (cleanM === 'Tiếng Anh') {
                 targetCount = 20;
@@ -869,14 +946,12 @@ window.submitQuiz = function() {
     let totalQuestions = AppState.currentQuizData.length;
     let score = Math.round((AppState.correctCount / totalQuestions) * 10 * 10) / 10;
     
-    // Lấy thông tin học sinh và môn học để gửi lên Google Sheets
     const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
     const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
     const levelSelect = document.getElementById('level-select');
     const level = levelSelect ? levelSelect.value : '';
 
-    // Gửi điểm tự động về Google Apps Script Web App
-    const API_URL = "https://script.google.com/macros/s/AKfycbwABOWdjRcG_rX9tVXjrLDsXFRMEbgUfn01QC6U5Z91qwdwq5askg7CrQHEDjf8np-H/exec"; // Giữ nguyên URL hiện tại của bạn
+    const API_URL = "https://script.google.com/macros/s/AKfycbwABOWdjRcG_rX9tVXjrLDsXFRMEbgUfn01QC6U5Z91qwdwq5askg7CrQHEDjf8np-H/exec";
     if (maHS && mon) {
         fetch(API_URL, {
             method: 'POST',
