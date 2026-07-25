@@ -11,6 +11,12 @@ let AppState = {
     wrongQuestions: []
 };
 
+// Hàm chặn tắt/đóng/load lại trang khi đang làm bài
+function handleBeforeUnload(e) {
+    e.preventDefault();
+    e.returnValue = '';
+}
+
 // 1. Lưu nhớ trạng thái môn và chủ đề đã chọn
 window.saveUserSelections = function() {
     const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
@@ -491,7 +497,6 @@ window.renderLeaderboard = function(subjectFilter = null) {
         let st = studentSubjects[key];
         if (activeSubject && cleanKey(st.subject) !== cleanKey(activeSubject)) continue;
         
-        // Kiểm tra điều kiện: trong 3 lần thi liên tiếp phải đạt 10 điểm
         if (hasThreeConsecutiveHighScores(AppState.rankings, st.name, st.subject)) {
             let attempts = AppState.rankings.filter(r => 
                 String(r.name).trim().toLowerCase() === st.name.toLowerCase() &&
@@ -723,6 +728,9 @@ window.startQuiz = function() {
     const quizScreen = document.getElementById('quiz-screen');
     if (quizScreen) quizScreen.style.display = 'block';
 
+    // Bắt đầu kích hoạt cơ chế chặn thoát trang/tắt chương trình khi đang làm bài
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     updateScoreDisplay();
     window.renderQuiz();
     window.startTimerTotal(totalSeconds);
@@ -765,6 +773,9 @@ window.startWrongQuiz = function() {
 
     const quizScreen = document.getElementById('quiz-screen');
     if (quizScreen) quizScreen.style.display = 'block';
+
+    // Bắt đầu kích hoạt cơ chế chặn thoát trang/tắt chương trình khi đang làm bài
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     updateScoreDisplay();
     window.renderQuiz();
@@ -986,6 +997,10 @@ window.startTimerTotal = function(durationSeconds) {
 
 window.submitQuiz = function() {
     clearInterval(AppState.timerInterval);
+    
+    // Gỡ bỏ cơ chế chặn thoát trang khi đã hoàn thành nộp bài
+    window.removeEventListener('beforeunload', handleBeforeUnload);
+
     let totalQuestions = AppState.currentQuizData.length;
     let score = Math.round((AppState.correctCount / totalQuestions) * 10 * 10) / 10;
     
@@ -1083,6 +1098,7 @@ window.backToHome = function() {
         if (typeof AppState !== 'undefined' && AppState.timerInterval) {
             clearInterval(AppState.timerInterval);
         }
+        window.removeEventListener('beforeunload', handleBeforeUnload);
         document.getElementById('quiz-screen').style.display = 'none';
         document.getElementById('start-screen').style.display = 'block';
         const resContainer = document.getElementById('result-container');
