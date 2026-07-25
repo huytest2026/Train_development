@@ -455,7 +455,7 @@ window.handleQuizData = function(data) {
     window.initInterface();
 };
 
-// Hàm kiểm tra 3 lần thi liên tiếp đạt đúng 10 điểm
+// Hàm kiểm tra 3 lần thi liên tiếp đạt đúng 10 điểm (Xếp hạng Kim Cương)
 function hasThreeConsecutiveHighScores(rankings, studentName, subject) {
     let studentAttempts = rankings.filter(r => 
         String(r.name).trim().toLowerCase() === String(studentName).trim().toLowerCase() &&
@@ -564,22 +564,37 @@ window.startQuiz = function() {
     
     const levelSelect = document.getElementById('level-select');
     const selectedLevel = levelSelect ? levelSelect.value : '';
-    if (selectedLevel === 'Level 2' || selectedLevel === 'Level 3' || selectedLevel === '2' || selectedLevel === '3') {
-        let hasPassedLevel1 = AppState.rankings.some(r => 
-            String(r.name).trim() === maHS && 
-            cleanKey(r.subject || '') === cleanKey(mon) && 
-            Number(r.score) === 10 && 
-            (String(r.level).includes('1'))
-        );
-        
-        let level1Attempts = AppState.rankings.filter(r => 
-            String(r.name).trim() === maHS && 
-            cleanKey(r.subject || '') === cleanKey(mon) && 
-            (String(r.level).includes('1'))
-        );
-        
-        if (level1Attempts.length >= 3 && !hasPassedLevel1) {
-            return alert("Bạn chưa đạt điểm 10 ở Level 1 sau 3 lần thử nên chưa được phép chuyển sang Level tiếp theo!");
+    const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
+
+    // Kiểm tra điều kiện Level 2, 3: Đối với mỗi chủ đề phải đạt 3 lần liên tiếp > 8 điểm ở Level 1
+    if (selectedLevel === 'Level 2' || selectedLevel === 'Level 3' || selectedLevel === '2' || selectedLevel === '3' || selectedLevel.includes('2') || selectedLevel.includes('3')) {
+        if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
+
+        for (let topic of selectedTopics) {
+            let topicAttempts = AppState.rankings.filter(r => 
+                String(r.name).trim().toLowerCase() === maHS.toLowerCase() && 
+                cleanKey(r.subject || r.mon || '') === cleanKey(mon) && 
+                (String(r.level || '').includes('1')) &&
+                (cleanKey(r.chuDe || r.topic || '') === cleanKey(topic) || !r.chuDe)
+            );
+
+            let hasThreeConsecutive = false;
+            if (topicAttempts.length >= 3) {
+                for (let i = 0; i <= topicAttempts.length - 3; i++) {
+                    let s1 = Number(topicAttempts[i].score);
+                    let s2 = Number(topicAttempts[i+1].score);
+                    let s3 = Number(topicAttempts[i+2].score);
+                    // Điều kiện: trên 8 điểm (>= 8.0)
+                    if (s1 >= 8 && s2 >= 8 && s3 >= 8) {
+                        hasThreeConsecutive = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!hasThreeConsecutive) {
+                return alert(`Bạn chưa đạt 3 lần liên tiếp từ 8 điểm trở lên ở Level 1 đối với chủ đề "${topic}" nên chưa được phép chọn mức 2, 3!`);
+            }
         }
     }
 
@@ -596,7 +611,6 @@ window.startQuiz = function() {
         rawSelectedQuestions = AppState.allQuizData.filter(i => cleanKey(i.mon) === cleanKey(mon) && String(i.made).trim() === selectedMade && i.question !== '');
         totalSeconds = 45 * 60;
     } else {
-        const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
         if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
 
         const isIrregularVerbs = selectedTopics.some(t => 
@@ -1008,6 +1022,7 @@ window.submitQuiz = function() {
     const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
     const levelSelect = document.getElementById('level-select');
     const level = levelSelect ? levelSelect.value : '';
+    const selectedTopicsStr = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value).join(', ');
 
     const API_URL = "https://script.google.com/macros/s/AKfycbwABOWdjRcG_rX9tVXjrLDsXFRMEbgUfn01QC6U5Z91qwdwq5askg7CrQHEDjf8np-H/exec";
     if (maHS && mon) {
@@ -1015,7 +1030,7 @@ window.submitQuiz = function() {
             method: 'POST',
             mode: 'no-cors',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ maHS: maHS, mon: mon, score: score, level: level })
+            body: JSON.stringify({ maHS: maHS, mon: mon, score: score, level: level, chuDe: selectedTopicsStr })
         }).catch(err => console.log(err));
     }
 
