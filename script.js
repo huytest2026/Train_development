@@ -1024,13 +1024,62 @@ window.submitQuiz = function() {
     const level = levelSelect ? levelSelect.value : '';
     const selectedTopicsStr = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value).join(', ');
 
-    const API_URL = "https://script.google.com/macros/s/AKfycbwABOWdjRcG_rX9tVXjrLDsXFRMEbgUfn01QC6U5Z91qwdwq5askg7CrQHEDjf8np-H/exec";
+    // Trích xuất chi tiết câu trả lời để gửi kèm email
+    let details = AppState.currentQuizData.map((item, index) => {
+        let hasOptions = item.a || item.b || item.c || item.d;
+        let userAnswerText = 'Chưa trả lời';
+        let correctAnswerText = '';
+        let isCorrect = false;
+        let correctKeys = item._correctKeys || [];
+        let isMultiChoice = correctKeys.length > 1;
+
+        if (hasOptions) {
+            if (isMultiChoice) {
+                correctAnswerText = correctKeys.map(k => k.toUpperCase() + '. ' + (typeof cleanOptionText === 'function' ? cleanOptionText(item[k]) : (item[k] || ''))).join('; ');
+                if (Array.isArray(item._userAnswer) && item._userAnswer.length > 0) {
+                    userAnswerText = item._userAnswer.map(k => k.toUpperCase() + '. ' + (typeof cleanOptionText === 'function' ? cleanOptionText(item[k]) : (item[k] || ''))).join('; ');
+                    isCorrect = item._userAnswer.length === correctKeys.length && item._userAnswer.every(k => correctKeys.includes(k));
+                }
+            } else {
+                let correctKey = correctKeys[0] || '';
+                correctAnswerText = correctKey ? correctKey.toUpperCase() + '. ' + (typeof cleanOptionText === 'function' ? cleanOptionText(item[correctKey]) : (item[correctKey] || '')) : (item.correct || '');
+                if (item._userAnswer && item._userAnswer.length > 0) {
+                    let userKey = item._userAnswer[0];
+                    userAnswerText = userKey.toUpperCase() + '. ' + (typeof cleanOptionText === 'function' ? cleanOptionText(item[userKey]) : (item[userKey] || ''));
+                    isCorrect = (String(userKey).toLowerCase() === String(correctKey).toLowerCase());
+                }
+            }
+        } else {
+            correctAnswerText = item.correct || '';
+            if (item._userAnswer && item._userAnswer.length > 0) {
+                userAnswerText = item._userAnswer[0];
+                isCorrect = (String(userAnswerText).trim().toLowerCase() === String(correctAnswerText).trim().toLowerCase());
+            }
+        }
+
+        return {
+            index: index + 1,
+            question: item.question || ('Câu ' + (index + 1)),
+            userAnswer: userAnswerText,
+            correctAnswer: correctAnswerText,
+            isCorrect: isCorrect
+        };
+    });
+
+    const API_URL = "https://script.google.com/macros/s/AKfycbwABoWdjRcg_r9tVXJrLDsXFRMEbgUfn01QC6U5Z9lqwdwq5askg7CrQHRDJf8np-H/exec";
     if (maHS && mon) {
         fetch(API_URL, {
             method: 'POST',
             mode: 'no-cors',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ maHS: maHS, mon: mon, score: score, level: level, chuDe: selectedTopicsStr })
+            body: JSON.stringify({ 
+                maHS: maHS, 
+                mon: mon, 
+                score: score, 
+                level: level, 
+                chuDe: selectedTopicsStr,
+                details: details // Bổ sung gói details vào đây
+            })
         }).catch(err => console.log(err));
     }
 
