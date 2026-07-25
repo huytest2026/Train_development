@@ -58,6 +58,7 @@ window.restoreUserSelections = function() {
     }
 };
 
+// 2. Chức năng xử lý Mã đề (Khôi phục đầy đủ)
 window.handleMadeChange = function() {
     const madeSelect = document.getElementById('made-select');
     const previewEl = document.getElementById('made-passage-preview');
@@ -460,7 +461,6 @@ window.handleQuizData = function(data) {
     window.initInterface();
 };
 
-// Hàm kiểm tra 3 lần thi liên tiếp đạt đúng 10 điểm (Xếp hạng Kim Cương)
 function hasThreeConsecutiveHighScores(rankings, studentName, subject) {
     let studentAttempts = rankings.filter(r => 
         String(r.name).trim().toLowerCase() === String(studentName).trim().toLowerCase() &&
@@ -480,7 +480,6 @@ function hasThreeConsecutiveHighScores(rankings, studentName, subject) {
     return false;
 }
 
-// Hàm render bảng xếp hạng phân chia theo các cấp độ Huy hiệu (Kim cương, Vàng, Bạc, Đồng)
 window.renderLeaderboard = function(subjectFilter = null) {
     const list = document.getElementById('ranking-list');
     if (!list) return;
