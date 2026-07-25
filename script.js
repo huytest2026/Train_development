@@ -1072,7 +1072,7 @@ function submitQuiz() {
     });
 
     // 3. Gửi gói dữ liệu qua phương thức POST lên Google Apps Script
-    const API_URL = "https://script.google.com/macros/s/AKfycbwABoWdjRcg_r9tVXJrLDsXFRMEbgUfn01QC6U5Z9lqwdwq5askg7CrQHRDJf8np-H/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbwABOWdjRcG_rX9tVXjrLDsXFRMEbgUfn01QC6U5Z91qwdwq5askg7CrQHEDjf8np-H/exec";
     if (maHS && mon) {
         fetch(API_URL, {
             method: 'POST',
