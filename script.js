@@ -560,8 +560,19 @@ window.renderLeaderboard = function(subjectFilter = null) {
 function getCorrectKeys(item) {
     const raw = String(item.correct || '').trim();
     if (!raw) return [];
-    let parts = raw.split(/[\s,;]+/);
+    
     let keys = [];
+    
+    // Ưu tiên kiểm tra nếu toàn bộ cụm đáp án đúng khớp hoàn toàn với một trong các đáp án A, B, C, D (hỗ trợ cụm từ có khoảng trắng như "instead of")
+    for (let k of ['a', 'b', 'c', 'd']) {
+        if (item[k] && cleanOptionText(String(item[k])).toLowerCase() === cleanOptionText(raw).toLowerCase()) {
+            keys.push(k);
+        }
+    }
+    if (keys.length > 0) return [...new Set(keys)];
+
+    // Nếu không khớp cả cụm, tiến hành tách từ theo khoảng trắng/dấu phẩy (dành cho các câu nhiều đáp án hoặc ký tự A, B, C, D)
+    let parts = raw.split(/[\s,;]+/);
     for (let p of parts) {
         let upper = p.toUpperCase();
         if (['A', 'B', 'C', 'D'].includes(upper)) {
