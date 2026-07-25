@@ -31,7 +31,6 @@ window.restoreUserSelections = function() {
         subjectSelect.value = savedMon;
         window.handleSubjectChange();
         
-        // Khôi phục lại các checkbox chủ đề đã chọn trước đó
         const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : '';
         const savedTopics = localStorage.getItem('saved_topics_' + maHS + '_' + savedMon);
         if (savedTopics) {
@@ -130,9 +129,6 @@ function saveStoredWrongQuestions(maHS, mon, wrongs) {
         .option-box:hover { background: #e9ecef; border-color: #adb5bd; }
         .explanation-box { margin-top: 15px; padding: 12px; background: #fff3cd; border-left: 5px solid #ffc107; border-radius: 4px; display: none; color: #856404; font-size: 0.95em; line-height: 1.4; }
         .leaderboard-container { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #eee; }
-        .leaderboard-item { padding: 10px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
-        .medal { font-size: 1.2em; margin-right: 10px; }
-        .score-badge { background: #eef2f3; padding: 4px 12px; border-radius: 20px; font-weight: bold; color: #4f46e5; }
         .speech-btn { background: #ffc107; border: none; border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 0.85em; font-weight: bold; color: #000; display: inline-flex; align-items: center; gap: 4px; }
         .speech-btn:hover { background: #e0a800; }
         .passage-box { background: #ffffff; border: 2px solid #540606; border-radius: 12px; padding: 20px; margin-bottom: 20px; font-size: 1.05em; line-height: 1.6; color: #333; }
@@ -385,7 +381,6 @@ window.initInterface = function() {
     window.updateTopicList();
     window.updateMadeList();
     
-    // Khôi phục lại môn học và chủ đề đã lưu trước đó nếu có
     window.restoreUserSelections();
 };
 
@@ -393,7 +388,6 @@ window.loadData = function() {
     const maHS = document.getElementById('student-code').value.trim();
     if (!maHS) return alert("Vui lòng nhập mã học sinh!");
     
-    // Nếu đổi mã học sinh thì xóa bộ nhớ cũ của mã trước đó để load mới hoàn toàn
     const oldMa = localStorage.getItem('saved_maHS');
     if (oldMa !== maHS) {
         localStorage.removeItem('saved_mon');
@@ -455,30 +449,84 @@ window.handleQuizData = function(data) {
     window.initInterface();
 };
 
+// Hàm kiểm tra 3 lần thi liên tiếp đạt đúng 10 điểm
+function hasThreeConsecutiveHighScores(rankings, studentName, subject) {
+    let studentAttempts = rankings.filter(r => 
+        String(r.name).trim().toLowerCase() === String(studentName).trim().toLowerCase() &&
+        cleanKey(r.subject || r.mon || '') === cleanKey(subject)
+    );
+    
+    if (studentAttempts.length < 3) return false;
+    
+    for (let i = 0; i <= studentAttempts.length - 3; i++) {
+        let s1 = Number(studentAttempts[i].score);
+        let s2 = Number(studentAttempts[i+1].score);
+        let s3 = Number(studentAttempts[i+2].score);
+        if (s1 === 10 && s2 === 10 && s3 === 10) {
+            return true;
+        }
+    }
+    return false;
+}
+
 window.renderLeaderboard = function(subjectFilter = null) {
     const list = document.getElementById('ranking-list');
     if (!list) return;
-    let data = AppState.rankings;
-    if (subjectFilter && subjectFilter !== "-- Chọn môn --") {
-        data = data.filter(item => cleanKey(item.subject || item.mon || '') === cleanKey(subjectFilter));
+    
+    let activeSubject = subjectFilter && subjectFilter !== "-- Chọn môn --" ? subjectFilter : null;
+    
+    let studentSubjects = {};
+    AppState.rankings.forEach(item => {
+        let name = String(item.name || '').trim();
+        let subj = String(item.subject || item.mon || '').trim();
+        if (!name || !subj) return;
+        let key = name + '___' + subj;
+        if (!studentSubjects[key]) {
+            studentSubjects[key] = { name: name, subject: subj };
+        }
+    });
+
+    let diamondRankings = [];
+    for (let key in studentSubjects) {
+        let st = studentSubjects[key];
+        if (activeSubject && cleanKey(st.subject) !== cleanKey(activeSubject)) continue;
+        
+        // Kiểm tra điều kiện: trong 3 lần thi liên tiếp phải đạt 10 điểm
+        if (hasThreeConsecutiveHighScores(AppState.rankings, st.name, st.subject)) {
+            let attempts = AppState.rankings.filter(r => 
+                String(r.name).trim().toLowerCase() === st.name.toLowerCase() &&
+                cleanKey(r.subject || r.mon || '') === cleanKey(st.subject)
+            );
+            let bestScore = Math.max(...attempts.map(a => Number(a.score)));
+            let latestAttempt = attempts[attempts.length - 1];
+            
+            diamondRankings.push({
+                name: st.name,
+                subject: st.subject,
+                score: bestScore,
+                date: latestAttempt.date || ''
+            });
+        }
     }
-    const qualifiedData = data.filter(item => item.score >= 8);
-    if (qualifiedData.length === 0) {
-        list.innerHTML = '<p style="color: #666; padding: 10px; text-align: center;">Chưa có dữ liệu xếp hạng (&gt;= 8).</p>';
+
+    if (diamondRankings.length === 0) {
+        list.innerHTML = '<p style="color: #666; padding: 10px; text-align: center;">Chưa có học sinh đạt chuẩn Kim Cương (3 lần thi liên tiếp đạt 10 điểm).</p>';
         return;
     }
-    const top3 = qualifiedData.sort((a, b) => b.score - a.score).slice(0, 3);
-    list.innerHTML = '<div style="display: flex; flex-direction: column; gap: 8px;">' + top3.map((item, index) => {
-        let medal = index === 0 ? "🥇" : (index === 1 ? "🥈" : "🥉");
-        return '<div style="display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 10px 12px; border-radius: 8px; border: 1px solid #ddd;">' +
+
+    diamondRankings.sort((a, b) => b.score - a.score);
+
+    list.innerHTML = '<div style="display: flex; flex-direction: column; gap: 8px;">' + diamondRankings.map((item, index) => {
+        let medal = index === 0 ? "💎🥇" : (index === 1 ? "💎🥈" : (index === 2 ? "💎🥉" : "💎"));
+        return '<div style="display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 10px 12px; border-radius: 8px; border: 1px solid #540606;">' +
             '<div style="display: flex; align-items: center; gap: 10px;">' +
-                '<span style="font-size: 1.2em; font-weight: bold; min-width: 25px;">' + medal + '</span>' +
+                '<span style="font-size: 1.2em; font-weight: bold; min-width: 35px;">' + medal + '</span>' +
                 '<div>' +
-                    '<div style="font-weight: bold; color: #333;">' + escapeHTML(item.name) + '</div>' +
+                    '<div style="font-weight: bold; color: #540606;">' + escapeHTML(item.name) + ' <span style="font-size:0.8em; background:#e0f7fa; color:#006064; padding:2px 6px; border-radius:4px; font-weight:bold;">Kim Cương</span></div>' +
                     '<div style="font-size: 0.85em; color: #666; margin-top: 2px;">📚 Môn: <span style="color: #007bff; font-weight: 500;">' + escapeHTML(item.subject || 'N/A') + '</span> &nbsp;|&nbsp; ⏰ ' + escapeHTML(item.date || '') + '</div>' +
                 '</div>' +
             '</div>' +
-            '<div style="background: #e3f2fd; color: #0d6efd; font-weight: bold; padding: 4px 10px; border-radius: 20px; font-size: 0.9em;">' + item.score + ' đ</div>' +
+            '<div style="background: #e0f7fa; color: #006064; font-weight: bold; padding: 4px 10px; border-radius: 20px; font-size: 0.9em;">' + item.score + ' đ</div>' +
         '</div>';
     }).join('') + '</div>';
 };
@@ -509,11 +557,9 @@ window.startQuiz = function() {
 
     const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
     
-    // KIỂM TRA ĐIỀU KIỆN LEVEL 1 (Yêu cầu 3)
     const levelSelect = document.getElementById('level-select');
     const selectedLevel = levelSelect ? levelSelect.value : '';
     if (selectedLevel === 'Level 2' || selectedLevel === 'Level 3' || selectedLevel === '2' || selectedLevel === '3') {
-        // Kiểm tra xem học sinh đã đạt 10 điểm ở Level 1 chưa trong các lần làm trước (dựa vào AppState.rankings)
         let hasPassedLevel1 = AppState.rankings.some(r => 
             String(r.name).trim() === maHS && 
             cleanKey(r.subject || '') === cleanKey(mon) && 
@@ -521,7 +567,6 @@ window.startQuiz = function() {
             (String(r.level).includes('1'))
         );
         
-        // Hoặc kiểm tra xem số lần thi Level 1 chưa đủ 3 lần nhưng chưa đạt 10 điểm? (Hoặc quy tắc: không đạt 10 điểm trong 3 lần thì khóa)
         let level1Attempts = AppState.rankings.filter(r => 
             String(r.name).trim() === maHS && 
             cleanKey(r.subject || '') === cleanKey(mon) && 
@@ -554,7 +599,6 @@ window.startQuiz = function() {
             t.toLowerCase().includes('động từ bất quy tắc')
         );
 
-        // KIỂM TRA CHỦ ĐỀ PREPOSITION (GIỚI TỪ) (Yêu cầu 2)
         const isPreposition = selectedTopics.some(t => 
             cleanKey(t).includes('preposition') || 
             t.toLowerCase().includes('giới từ')
@@ -627,9 +671,8 @@ window.startQuiz = function() {
             }
             rawSelectedQuestions = finalSelected;
         } else if (isPreposition) {
-            // Cấu hình riêng cho Preposition (Yêu cầu 2)
             targetCount = 10;
-            totalSeconds = 5 * 60; // 5 phút
+            totalSeconds = 5 * 60;
 
             let wrongPool = uniquePool.filter(i => storedWrongs.some(w => w.question === i.question));
             let normalPool = shuffleArray(uniquePool.filter(i => !storedWrongs.some(w => w.question === i.question)));
