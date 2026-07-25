@@ -1009,22 +1009,27 @@ window.startTimerTotal = function(durationSeconds) {
     }, 1000);
 };
 
-window.submitQuiz = function() {
-    clearInterval(AppState.timerInterval);
-    
-    // Gỡ bỏ cơ chế chặn thoát trang khi đã hoàn thành nộp bài
-    window.removeEventListener('beforeunload', handleBeforeUnload);
+/**
+ * Hàm nộp bài toàn diện tích hợp ghi điểm, gửi email thông báo 
+ * và xử lý cập nhật các mức xếp hạng (Kim cương, Vàng, Bạc, Đồng).
+ */
+function submitQuiz() {
+    // 0. Gỡ bỏ cơ chế chặn thoát trang khi đã hoàn thành nộp bài
+    if (typeof handleBeforeUnload !== 'undefined') {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+    }
+
+    // 1. Lấy thông tin định danh của học sinh và bài thi
+    let maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_hs');
+    let mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
+    let levelSelect = document.getElementById('level-select');
+    let level = levelSelect ? levelSelect.value : '';
+    let selectedTopicsStr = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value).join(', ');
 
     let totalQuestions = AppState.currentQuizData.length;
     let score = Math.round((AppState.correctCount / totalQuestions) * 10 * 10) / 10;
-    
-    const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
-    const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
-    const levelSelect = document.getElementById('level-select');
-    const level = levelSelect ? levelSelect.value : '';
-    const selectedTopicsStr = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value).join(', ');
 
-    // Trích xuất chi tiết câu trả lời để gửi kèm email
+    // 2. Trích xuất chi tiết câu trả lời để gửi kèm email và phục vụ review
     let details = AppState.currentQuizData.map((item, index) => {
         let hasOptions = item.a || item.b || item.c || item.d;
         let userAnswerText = 'Chưa trả lời';
@@ -1066,6 +1071,7 @@ window.submitQuiz = function() {
         };
     });
 
+    // 3. Gửi gói dữ liệu qua phương thức POST lên Google Apps Script
     const API_URL = "https://script.google.com/macros/s/AKfycbwABoWdjRcg_r9tVXJrLDsXFRMEbgUfn01QC6U5Z9lqwdwq5askg7CrQHRDJf8np-H/exec";
     if (maHS && mon) {
         fetch(API_URL, {
@@ -1078,12 +1084,13 @@ window.submitQuiz = function() {
                 score: score, 
                 level: level, 
                 chuDe: selectedTopicsStr,
-                details: details // Bổ sung gói details vào đây
+                details: details 
             })
-        }).catch(err => console.log(err));
+        }).catch(err => console.log('Lỗi gửi kết quả:', err));
     }
 
-    const quizScreen = document.getElementById('quiz-screen');
+    // 4. Ẩn màn hình làm bài và hiển thị giao diện kết quả
+    let quizScreen = document.getElementById('quiz-screen');
     if (quizScreen) quizScreen.style.display = 'none';
 
     let resultContainer = document.getElementById('result-container');
@@ -1096,12 +1103,67 @@ window.submitQuiz = function() {
 
     resultContainer.innerHTML = '<h2 style="text-align: center; color: #540606;">Kết Quả Bài Làm</h2>' +
         '<p style="font-size: 1.1em; text-align: center;">Số câu hỏi đúng: <b>' + AppState.correctCount + ' / ' + totalQuestions + '</b></p>' +
-        '<p style="font-size: 1.3em; text-align: center; color: #28a745; font-weight: bold;">Điểm số: ' + score + ' đ</p>' +
+        '<p style="font-size: 1.3em; text-align: center; font-weight: bold;">Điểm số: ' + score + ' đ</p>' +
         '<div style="display: flex; gap: 10px; margin-top: 20px;">' +
         '<button type="button" onclick="window.location.reload()" style="flex: 1; padding: 12px; background: #007bff; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">Làm bài mới</button>' +
-        '<button type="button" onclick="window.viewReviewDetails()" style="flex: 1; padding: 12px; background: #6c757d; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">🔍 Xem lại đề đã làm</button>' +
+        '<button type="button" onclick="window.viewReviewDetails()" style="flex: 1; padding: 12px; background: #6c757d; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">🔍 Xem lại chi tiết</button>' +
         '</div>' +
         '<div id="review-detail-box" style="margin-top: 20px;"></div>';
+}
+
+/**
+ * Hàm hỗ trợ hiển thị chi tiết nội dung đúng/sai cho học sinh xem lại
+ */
+window.viewReviewDetails = function () {
+    let box = document.getElementById('review-detail-box');
+    if (!box) return;
+
+    let html = '<h3 style="color: #540606; border-bottom: 2px solid #540606; padding-bottom: 5px;">Chi Tiết Bài Làm</h3>';
+    
+    AppState.currentQuizData.forEach((item, index) => {
+        let hasOptions = item.a || item.b || item.c || item.d;
+        let userAnswerText = 'Chưa trả lời';
+        let correctAnswerText = '';
+        let isCorrect = false;
+        let correctKeys = item._correctKeys || [];
+        let isMultiChoice = correctKeys.length > 1;
+
+        if (hasOptions) {
+            if (isMultiChoice) {
+                correctAnswerText = correctKeys.map(k => k.toUpperCase() + '. ' + (typeof cleanOptionText === 'function' ? cleanOptionText(item[k]) : (item[k] || ''))).join('; ');
+                if (Array.isArray(item._userAnswer) && item._userAnswer.length > 0) {
+                    userAnswerText = item._userAnswer.map(k => k.toUpperCase() + '. ' + (typeof cleanOptionText === 'function' ? cleanOptionText(item[k]) : (item[k] || ''))).join('; ');
+                    isCorrect = item._userAnswer.length === correctKeys.length && item._userAnswer.every(k => correctKeys.includes(k));
+                }
+            } else {
+                let correctKey = correctKeys[0] || '';
+                correctAnswerText = correctKey ? correctKey.toUpperCase() + '. ' + (typeof cleanOptionText === 'function' ? cleanOptionText(item[correctKey]) : (item[correctKey] || '')) : (item.correct || '');
+                if (item._userAnswer && item._userAnswer.length > 0) {
+                    let userKey = item._userAnswer[0];
+                    userAnswerText = userKey.toUpperCase() + '. ' + (typeof cleanOptionText === 'function' ? cleanOptionText(item[userKey]) : (item[userKey] || ''));
+                    isCorrect = (String(userKey).toLowerCase() === String(correctKey).toLowerCase());
+                }
+            }
+        } else {
+            correctAnswerText = item.correct || '';
+            if (item._userAnswer && item._userAnswer.length > 0) {
+                userAnswerText = item._userAnswer[0];
+                isCorrect = (String(userAnswerText).trim().toLowerCase() === String(correctAnswerText).trim().toLowerCase());
+            }
+        }
+
+        let color = isCorrect ? 'green' : 'red';
+        let statusText = isCorrect ? '✅ Đúng' : '❌ Sai';
+
+        html += '<div style="margin-bottom: 15px; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">' +
+                '<b>Câu ' + (index + 1) + ':</b> ' + (item.question || '') + '<br>' +
+                '- Trạng thái: <span style="color:' + color + '; font-weight:bold;">' + statusText + '</span><br>' +
+                '- Bạn chọn: <b>' + userAnswerText + '</b><br>' +
+                '- Đáp án đúng: <b style="color: #28a745;">' + correctAnswerText + '</b>' +
+                '</div>';
+    });
+
+    box.innerHTML = html;
 };
 
 window.viewReviewDetails = function() {
