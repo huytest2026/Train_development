@@ -157,6 +157,18 @@ if ('speechSynthesis' in window) {
     window.speechSynthesis.getVoices();
 }
 
+// Lắng nghe sự kiện click chọn đáp án để nhận diện học sinh đã trả lời câu hỏi
+document.addEventListener('click', function(e) {
+    const optionBox = e.target.closest('.option-box');
+    if (optionBox) {
+        const quizCard = optionBox.closest('.quiz-card');
+        if (quizCard) {
+            quizCard.querySelectorAll('.option-box').forEach(b => b.classList.remove('selected-option'));
+            optionBox.classList.add('selected-option');
+        }
+    }
+});
+
 window.speakQuestion = function(index) {
     const item = AppState.currentQuizData[index];
     if (!item) return;
@@ -165,6 +177,14 @@ window.speakQuestion = function(index) {
     const isIrregularVerbs = chuDeLower.includes('dongtubatquytac') || chuDeLower.includes('động từ bất quy tắc');
 
     let textToRead = '';
+    
+    // Kiểm tra xem học sinh đã chọn đáp án cho câu này chưa trên giao diện
+    let hasAnswered = false;
+    const quizCards = document.querySelectorAll('.quiz-card');
+    if (quizCards[index]) {
+        hasAnswered = quizCards[index].querySelector('.option-box.selected-option') !== null;
+    }
+
     if (isVietAnh) {
         textToRead = item.correct;
     } else if (isIrregularVerbs) {
@@ -184,10 +204,26 @@ window.speakQuestion = function(index) {
         }
     } else {
         textToRead = item.question;
+        
+        // Nếu ĐÃ chọn đáp án: tự động điền từ đúng vào chỗ trống
+        if (hasAnswered) {
+            let correctText = '';
+            const correctKeys = getCorrectKeys(item);
+            if (correctKeys.length > 0) {
+                correctText = cleanOptionText(item[correctKeys[0]]);
+            } else if (item.correct) {
+                correctText = cleanOptionText(item.correct);
+            }
+            
+            if (correctText) {
+                textToRead = textToRead.replace(/\.{3,}|_+/g, ' ' + correctText + ' ');
+            }
+        }
     }
 
-    if (textToRead) {
-        textToRead = textToRead.replace(/_+/g, ', ');
+    // Nếu CHƯA chọn đáp án: đọc với khoảng nghỉ (dấu phẩy)
+    if (!hasAnswered && textToRead) {
+        textToRead = textToRead.replace(/\.{3,}|_+/g, ', ');
     }
 
     if (textToRead && 'speechSynthesis' in window) {
@@ -454,7 +490,6 @@ window.handleQuizData = function(data) {
     window.initInterface();
 };
 
-// Hàm kiểm tra 3 lần thi liên tiếp đạt đúng 10 điểm (Xếp hạng Kim Cương)
 function hasThreeConsecutiveHighScores(rankings, studentName, subject) {
     let studentAttempts = rankings.filter(r => 
         String(r.name).trim().toLowerCase() === String(studentName).trim().toLowerCase() &&
@@ -474,7 +509,6 @@ function hasThreeConsecutiveHighScores(rankings, studentName, subject) {
     return false;
 }
 
-// Hàm render bảng xếp hạng phân chia theo các cấp độ Huy hiệu (Kim cương, Vàng, Bạc, Đồng)
 window.renderLeaderboard = function(subjectFilter = null) {
     const list = document.getElementById('ranking-list');
     if (!list) return;
@@ -510,25 +544,20 @@ window.renderLeaderboard = function(subjectFilter = null) {
         let bestScore = Math.max(...attempts.map(a => Number(a.score)));
         let latestAttempt = attempts[attempts.length - 1];
 
-        // Kiểm tra điều kiện Kim cương (3 lần liên tiếp 10 điểm)
         if (hasThreeConsecutiveHighScores(AppState.rankings, st.name, st.subject)) {
             kimCuongList.push({ name: st.name, subject: st.subject, score: bestScore, date: latestAttempt.date || '' });
         } 
-        // Kiểm tra Vàng (Có ít nhất 1 lần 10 điểm)
         else if (attempts.some(a => Number(a.score) === 10)) {
             vangList.push({ name: st.name, subject: st.subject, score: bestScore, date: latestAttempt.date || '' });
         }
-        // Kiểm tra Bạc (Có ít nhất 2 lần 9 điểm)
         else if (attempts.filter(a => Number(a.score) >= 9).length >= 2) {
             bacList.push({ name: st.name, subject: st.subject, score: bestScore, date: latestAttempt.date || '' });
         }
-        // Kiểm tra Đồng (Có ít nhất 2 lần 8 điểm)
         else if (attempts.filter(a => Number(a.score) >= 8).length >= 2) {
             dongList.push({ name: st.name, subject: st.subject, score: bestScore, date: latestAttempt.date || '' });
         }
     }
 
-    // Sắp xếp các danh sách theo điểm số giảm dần
     kimCuongList.sort((a, b) => b.score - a.score);
     vangList.sort((a, b) => b.score - a.score);
     bacList.sort((a, b) => b.score - a.score);
@@ -563,7 +592,6 @@ function getCorrectKeys(item) {
     
     let keys = [];
     
-    // Ưu tiên kiểm tra nếu toàn bộ cụm đáp án đúng khớp hoàn toàn với một trong các đáp án A, B, C, D (hỗ trợ cụm từ có khoảng trắng như "instead of")
     for (let k of ['a', 'b', 'c', 'd']) {
         if (item[k] && cleanOptionText(String(item[k])).toLowerCase() === cleanOptionText(raw).toLowerCase()) {
             keys.push(k);
@@ -571,7 +599,6 @@ function getCorrectKeys(item) {
     }
     if (keys.length > 0) return [...new Set(keys)];
 
-    // Nếu không khớp cả cụm, tiến hành tách từ theo khoảng trắng/dấu phẩy (dành cho các câu nhiều đáp án hoặc ký tự A, B, C, D)
     let parts = raw.split(/[\s,;]+/);
     for (let p of parts) {
         let upper = p.toUpperCase();
@@ -598,7 +625,6 @@ window.startQuiz = function() {
     const selectedLevel = levelSelect ? levelSelect.value : '';
     const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
 
-    // Kiểm tra điều kiện Level 2, 3: Đối với mỗi chủ đề phải đạt 3 lần liên tiếp > 8 điểm ở Level 1
     if (selectedLevel === 'Level 2' || selectedLevel === 'Level 3' || selectedLevel === '2' || selectedLevel === '3' || selectedLevel.includes('2') || selectedLevel.includes('3')) {
         if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
 
