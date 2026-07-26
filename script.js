@@ -537,28 +537,30 @@ function parseCustomDate(dateStr) {
 }
 
 function hasThreeConsecutiveHighScores(rankings, studentName, subjectName) {
-    // 1. Lọc các lượt thi của học sinh đúng môn, đã được chuẩn hóa tên và môn
+    // 1. Lọc các lượt thi của học sinh (nếu tính theo từng môn thì giữ subjectName, nếu tính chung tất cả các môn thì bỏ điều kiện lọc subject)
     let studentAttempts = rankings.filter(r => 
         String(r.name).trim().toLowerCase() === String(studentName).trim().toLowerCase() &&
         cleanKey(r.subject || '') === cleanKey(subjectName)
     );
 
-    // 2. Sắp xếp theo thời gian tăng dần (cũ nhất -> mới nhất)
-    // Đảm bảo trường chứa ngày tháng của bạn là 'date' hoặc thay bằng 'timestamp'/'time' tương ứng
-    studentAttempts.sort((a, b) => new Date(a.date) - new Date(b.date));
+    // 2. Sắp xếp theo thời gian tăng dần an toàn (dùng helper parse ngày nếu có, tránh lỗi NaN của new Date)
+    studentAttempts.sort((a, b) => {
+        let timeA = new Date(a.date).getTime();
+        let timeB = new Date(b.date).getTime();
+        return (isNaN(timeA) ? 0 : timeA) - (isNaN(timeB) ? 0 : timeB);
+    });
 
-    // Nếu số lần thi chưa đủ 3 thì chắc chắn không đạt
     if (studentAttempts.length < 3) return false;
 
-    // 3. Kiểm tra xem có 3 lần liên tiếp nào đạt điểm cao không (ví dụ điểm >= 8 hoặc mốc điểm quy định)
+    // 3. Kiểm tra 3 lần liên tiếp PHẢI ĐẠT ĐÚNG 10 ĐIỂM
     for (let i = 0; i <= studentAttempts.length - 3; i++) {
-        let a1 = Number(studentAttempts[i].score);
-        let a2 = Number(studentAttempts[i+1].score);
-        let a3 = Number(studentAttempts[i+2].score);
+        let s1 = Number(studentAttempts[i].score);
+        let s2 = Number(studentAttempts[i+1].score);
+        let s3 = Number(studentAttempts[i+2].score);
 
-        // Định nghĩa thế nào là "High score" (Ví dụ: >= 8 điểm hoặc tùy theo logic của bạn)
-        if (a1 >= 8 && a2 >= 8 && a3 >= 8) {
-            return true; // Tìm thấy 3 lần liên tiếp đạt điểm cao
+        // Bắt buộc phải là 10 điểm tuyệt đối
+        if (s1 === 10 && s2 === 10 && s3 === 10) {
+            return true; 
         }
     }
 
