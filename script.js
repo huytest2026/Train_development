@@ -17,6 +17,74 @@ function handleBeforeUnload(e) {
     e.returnValue = '';
 }
 
+// 1. Quản lý Tra từ điển
+window.openDictionaryModal = function() {
+    const modal = document.getElementById('dict-modal');
+    if (modal) modal.style.display = 'flex';
+    const input = document.getElementById('dict-input');
+    if (input) {
+        input.focus();
+        let selectedText = window.getSelection().toString().trim();
+        if (selectedText && selectedText.split(' ').length === 1) {
+            input.value = selectedText;
+            window.lookupWord();
+        }
+    }
+};
+
+window.closeDictionaryModal = function() {
+    const modal = document.getElementById('dict-modal');
+    if (modal) modal.style.display = 'none';
+};
+
+window.lookupWord = async function() {
+    const input = document.getElementById('dict-input');
+    const resultBox = document.getElementById('dict-result');
+    if (!input || !resultBox) return;
+
+    let word = input.value.trim().toLowerCase();
+    if (!word) {
+        resultBox.innerHTML = '<span style="color: red;">Vui lòng nhập từ cần tra!</span>';
+        return;
+    }
+
+    resultBox.innerHTML = 'Đang tra từ...';
+    try {
+        let response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+        if (!response.ok) {
+            resultBox.innerHTML = `<span style="color: red;">Không tìm thấy từ "${escapeHTML(word)}" trong từ điển.</span>`;
+            return;
+        }
+        let data = await response.json();
+        if (data && data.length > 0) {
+            let entry = data[0];
+            let phonetic = entry.phonetic || (entry.phonetics && entry.phonetics.find(p => p.text)?.text) || '';
+            let audioUrl = entry.phonetics && entry.phonetics.find(p => p.audio)?.audio || '';
+
+            let html = `<div style="margin-bottom: 8px;"><b style="font-size: 1.2em; color: #540606;">${escapeHTML(entry.word)}</b> <span style="color: #666; font-style: italic;">${escapeHTML(phonetic)}</span>`;
+            if (audioUrl) {
+                html += ` <button type="button" onclick="new Audio('${audioUrl}').play()" style="background:#ffc107; border:none; border-radius:4px; padding:2px 8px; cursor:pointer; font-weight:bold;">🔊 Nghe</button>`;
+            }
+            html += `</div>`;
+
+            entry.meanings.forEach(meaning => {
+                html += `<div style="margin-top: 8px;"><b style="color: #007bff;">(${escapeHTML(meaning.partOfSpeech)})</b>`;
+                meaning.definitions.slice(0, 2).forEach((def, idx) => {
+                    html += `<div style="margin-left: 10px; margin-top: 4px;">• ${escapeHTML(def.definition)}`;
+                    if (def.example) {
+                        html += `<br><span style="color: #555; font-size: 0.95em; font-style: italic;">Ví dụ: "${escapeHTML(def.example)}"</span>`;
+                    }
+                    html += `</div>`;
+                });
+                html += `</div>`;
+            });
+            resultBox.innerHTML = html;
+        }
+    } catch(e) {
+        resultBox.innerHTML = '<span style="color: red;">Lỗi kết nối khi tra từ. Vui lòng thử lại sau!</span>';
+    }
+};
+
 // 1. Lưu nhớ trạng thái môn và chủ đề đã chọn
 window.saveUserSelections = function() {
     const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
