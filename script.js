@@ -640,8 +640,8 @@ window.renderLeaderboard = function(subjectFilter = null) {
         let count9 = attempts.filter(a => Number(a.score) >= 9).length;
         let count8 = attempts.filter(a => Number(a.score) >= 8).length;
         
-        // Số lần đạt chuẩn Kim Cương
-        let kcCount = countKimCuongSets(AppState.rankings, st.name, st.subject);
+        // Gọi hàm đếm số bộ Kim Cương
+        let kcCount = countKimCuongSets(attempts);
 
         if (kcCount > 0) {
             kimCuongList.push({ name: st.name, subject: st.subject, score: bestScore, count: kcCount, date: latestAttempt.date || '' });
@@ -688,50 +688,49 @@ window.renderLeaderboard = function(subjectFilter = null) {
     list.innerHTML = html;
 };
 
-// Hàm lấy tên chủ đề linh hoạt từ mọi trường dữ liệu có thể
-function getAttemptTopic(att) {
-    return cleanKey(
-        att.chuDe || 
-        att['Chủ đề'] || 
-        att.topic || 
-        att.tieuDe || 
-        att.baiHoc || 
-        att.chapter || 
-        att.lesson || ''
-    );
+// Hàm trích xuất tên chủ đề quét qua mọi tên trường có thể có (chuDe, topic, v.v. hoặc cột E trong dữ liệu của bạn)
+function extractTopic(att) {
+    // Thử tìm trong các tên property phổ biến hoặc quét qua mọi key có chứa chữ liên quan đến chủ đề/bài học
+    if (att.chuDe) return cleanKey(att.chuDe);
+    if (att['Chủ đề']) return cleanKey(att['Chủ đề']);
+    if (att.topic) return cleanKey(att.topic);
+    if (att.tieuDe) return cleanKey(att.tieuDe);
+    
+    // Quét toàn bộ keys của object dòng dữ liệu xem có key nào chứa giá trị chuỗi dài (thường là tên chủ đề như ảnh)
+    for (let key in att) {
+        let val = att[key];
+        if (typeof val === 'string' && val.length > 3 && key !== 'name' && key !== 'subject' && key !== 'date' && key !== 'score') {
+            return cleanKey(val);
+        }
+    }
+    return '';
 }
 
-// Hàm đếm số bộ Kim Cương an toàn và chính xác
-function countKimCuongSets(rankings, studentName, subjectName) {
-    let studentAttempts = rankings.filter(r => 
-        String(r.name).trim().toLowerCase() === String(studentName).trim().toLowerCase() &&
-        cleanKey(r.subject || '') === cleanKey(subjectName)
-    );
-    studentAttempts.sort((a, b) => parseCustomDate(a.date) - parseCustomDate(b.date));
+// Hàm đếm số chuỗi 3 lần 10 điểm khác chủ đề cực kỳ linh hoạt
+function countKimCuongSets(attempts) {
+    // Sắp xếp các lần làm theo thời gian tăng dần
+    let sortedAttempts = [...attempts].sort((a, b) => parseCustomDate(a.date) - parseCustomDate(b.date));
     
+    if (sortedAttempts.length < 3) return 0;
+
     let setsCount = 0;
-    if (studentAttempts.length < 3) return 0;
-
     let i = 0;
-    while (i <= studentAttempts.length - 3) {
-        let s1 = Number(studentAttempts[i].score);
-        let s2 = Number(studentAttempts[i+1].score);
-        let s3 = Number(studentAttempts[i+2].score);
+    while (i <= sortedAttempts.length - 3) {
+        let s1 = Number(sortedAttempts[i].score);
+        let s2 = Number(sortedAttempts[i+1].score);
+        let s3 = Number(sortedAttempts[i+2].score);
 
-        let t1 = getAttemptTopic(studentAttempts[i]);
-        let t2 = getAttemptTopic(studentAttempts[i+1]);
-        let t3 = getAttemptTopic(studentAttempts[i+2]);
+        let t1 = extractTopic(sortedAttempts[i]);
+        let t2 = extractTopic(sortedAttempts[i+1]);
+        let t3 = extractTopic(sortedAttempts[i+2]);
 
         if (s1 === 10 && s2 === 10 && s3 === 10) {
-            // Nếu dữ liệu không có thông tin chủ đề hoặc các chủ đề khác nhau thì vẫn tính là 1 bộ Kim Cương
-            if (!t1 && !t2 && !t3) {
+            // Nếu các chủ đề khác nhau (hoặc hệ thống không lấy được chủ đề thì mặc định vẫn chấp nhận chuỗi 3 điểm 10)
+            if (!t1 || !t2 || !t3 || (t1 !== t2 && t2 !== t3 && t1 !== t3)) {
                 setsCount++;
-                i += 3;
-            } else if (t1 !== t2 && t2 !== t3 && t1 !== t3) {
-                setsCount++;
-                i += 3;
+                i += 3; // Nhảy cóc qua 3 bài để tính chuỗi tiếp theo
             } else {
-                // Nếu trùng chủ đề mà vẫn muốn linh hoạt, hoặc chuyển sang xét tiếp
+                // Nếu bị trùng chủ đề liên tiếp trong cụm 3 bài này, dịch chuyển 1 bước để tìm cụm khác thỏa mãn
                 i++;
             }
         } else {
