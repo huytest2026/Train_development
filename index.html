@@ -1,101 +1,209 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" class="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bài Kiểm Tra Toán Anh</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #e8eded; }
-        .container { background-color: #bbe9f0; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 600px; margin: auto; }
-        .quiz-card { background: #ffffff; border: 2px solid #540606; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
-        .option-box { background: #f8f9fa; border: 1px solid #540606; border-radius: 8px; padding: 12px 15px; margin: 8px 0; cursor: pointer; }
-        #topic-container { margin: 10px 0; padding: 10px; border: 1px solid #ddd; max-height: 150px; overflow-y: auto; background: #fff; }
-        
-        /* Thanh trạng thái cố định khi cuộn */
-        .quiz-sticky-header {
-            position: sticky;
-            top: 0;
-            background-color: #bbe9f0;
-            padding: 12px 15px;
-            margin: -20px -20px 15px -20px;
-            border-bottom: 2px solid #540606;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-weight: bold;
-            z-index: 100;
-            border-top-left-radius: 8px;
-            border-top-right-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    <title>Hệ Thống Trắc Nghiệm Thông Minh</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                    }
+                }
+            }
         }
-    </style>
+    </script>
 </head>
-<body>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-300">
 
-<div class="container" id="start-screen">
-    <h1>Bài Kiểm Tra Toán Anh</h1>
-    
-    <input type="text" id="student-code" value="Huy" placeholder="Nhập MÃ HỌC SINH..." style="width: 100%; padding: 12px; margin-bottom: 10px; box-sizing: border-box;">
-    
-    <button type="button" id="load-data-btn" onclick="window.loadData()" style="width: 100%; padding: 10px; background: #7e38e0; color: white; border: none; border-radius: 5px; cursor: pointer;">Xác nhận Mã & Tải đề</button>
-
-    <label style="display:block; margin-top:10px;">Chọn môn học:</label>
-    <select id="subject-select" onchange="window.handleSubjectChange()" style="width: 100%; padding: 10px; margin: 10px 0;">
-        <option value="">-- Chọn môn --</option>
-    </select>
-
-    <div id="level-container" style="display: none;">
-        <label style="display:block; margin-top:10px;">Chọn cấp độ:</label>
-        <select id="level-select" style="width: 100%; padding: 10px; margin: 10px 0;">
-            <option value="1">Level 1</option>
-            <option value="2">Level 2</option>
-            <option value="3">Level 3</option>
-        </select>
-    </div>
-
-    <!-- NÚT BẬT/TẮT VÀ KHUNG CHỌN MÃ ĐỀ (Mặc định ẩn) -->
-    <div style="margin-top: 15px; margin-bottom: 10px; background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #540606;">
-        <label style="cursor: pointer; font-weight: bold; color: #540606; display: flex; align-items: center; gap: 8px;">
-            <input type="checkbox" id="toggle-made" onchange="window.toggleMadeMode()" style="width: 18px; height: 18px; cursor: pointer;"> 
-            Làm bài theo Mã đề (MADE) riêng
-        </label>
-
-        <!-- Khung chứa ô chọn mã đề, mặc định display: none để ẩn đi -->
-        <div id="made-container" style="display: none; margin-top: 10px;">
-            <select id="made-select" onchange="window.handleMadeChange()" style="width: 100%; padding: 10px; margin: 5px 0;">
-                <option value="">-- Chọn mã đề --</option>
-            </select>
-            <div id="made-passage-preview"></div>
+    <!-- Header -->
+    <header class="bg-white dark:bg-slate-800 shadow-sm py-4 px-6 flex justify-between items-center">
+        <h1 class="text-xl font-bold text-primary flex items-center gap-2">
+            <span>📚</span> Hệ Thống Trắc Nghiệm
+        </h1>
+        <div class="flex items-center gap-4">
+            <button id="darkModeToggle" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition">
+                🌙
+            </button>
         </div>
-    </div>
+    </header>
 
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
-        <label style="margin: 0;">Chọn chủ đề:</label>
-        <button type="button" onclick="window.toggleAllTopics()" style="padding: 3px 8px; font-size: 0.85em; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">Chọn/Bỏ chọn tất cả</button>
-    </div>
-    <div id="topic-container">Chưa tải dữ liệu...</div>
+    <!-- Main Container -->
+    <main class="flex-grow container mx-auto px-4 py-8 max-w-4xl">
+        
+        <!-- Màn hình đăng nhập / Chọn thông tin -->
+        <div id="setupScreen" class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-md">
+            <h2 class="text-2xl font-bold mb-6 text-center">Thiết Lập Luyện Tập</h2>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block font-medium mb-1">Mã Học Sinh / Họ Tên:</label>
+                    <input type="text" id="studentId" class="w-full p-3 rounded-lg border dark:bg-slate-700 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Nhập mã học sinh của bạn...">
+                </div>
 
-    <button type="button" id="start-btn" onclick="window.startQuiz()" style="width: 100%; padding: 15px; background: #007bff; color: white; border: none; cursor: pointer; margin-top: 10px;">Bắt Đầu Làm Bài</button>
+                <div>
+                    <label class="block font-medium mb-1">Chọn Môn Học:</label>
+                    <select id="subjectSelect" class="w-full p-3 rounded-lg border dark:bg-slate-700 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary">
+                        <option value="">-- Chọn môn học --</option>
+                    </select>
+                </div>
 
-    <div id="leaderboard" style="margin-top: 20px; padding: 15px; border: 2px solid red; border-radius: 10px;">
-        <h3 style="color: red; margin-top: 0;">🏆 Bảng xếp hạng:</h3>
-        <div id="ranking-list"><p style="color: #666;">Chưa có dữ liệu xếp hạng.</p></div>
-    </div>
-</div>
+                <div>
+                    <label class="block font-medium mb-1">Chọn Cấp Độ (Level):</label>
+                    <select id="levelSelect" class="w-full p-3 rounded-lg border dark:bg-slate-700 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary">
+                        <option value="1">Level 1 (Cơ bản)</option>
+                        <option value="2">Level 2 (Nâng cao)</option>
+                        <option value="3">Level 3 (Chuyên sâu)</option>
+                    </select>
+                </div>
 
-<div class="container" id="quiz-screen" style="display:none;">
-    <div class="quiz-sticky-header">
-        <div>⏱️ <span id="timer-display" style="color: red;">--:--</span></div>
-        <div>
-            <button type="button" onclick="window.backToHome()" style="background: #6c757d; color: white; border: none; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: bold;">🏠 Trang chủ</button>
+                <div id="topicContainer" class="hidden">
+                    <label class="block font-medium mb-1">Chọn Chủ Đề:</label>
+                    <div id="topicList" class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border rounded-lg dark:border-slate-600">
+                        <!-- Danh sách chủ đề được sinh động -->
+                    </div>
+                </div>
+
+                <button onclick="startQuiz()" class="w-full bg-primary text-white font-bold py-3 rounded-lg hover:bg-blue-600 transition shadow-lg">
+                    Bắt Đầu Làm Bài
+                </button>
+            </div>
         </div>
-        <div>Đúng: <span id="correct-count-display" style="color: green;">0</span> | Sai: <span id="wrong-count-display" style="color: red;">0</span></div>
-    </div>
-    
-    <div id="quiz" style="margin-top: 15px;"></div>
-    <button type="button" id="submit-btn" onclick="window.submitQuiz()" style="width: 100%; padding: 15px; background: #28a745; color: white; border: none; cursor: pointer; border-radius: 8px;">Nộp bài</button>
-</div>
 
-<script src="script.js"></script>
+        <!-- Màn hình làm bài (Ẩn mặc định) -->
+        <div id="quizScreen" class="hidden bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-md">
+            <div class="flex justify-between items-center mb-6 border-b pb-4 dark:border-slate-700">
+                <span id="quizProgress" class="font-semibold text-slate-500">Câu 1/10</span>
+                <span id="quizTimer" class="font-bold text-red-500">⏱ 00:00</span>
+            </div>
+
+            <div id="questionContainer" class="mb-6">
+                <!-- Nội dung câu hỏi và các đáp án -->
+            </div>
+
+            <div class="flex justify-between">
+                <button onclick="prevQuestion()" class="px-5 py-2 bg-slate-200 dark:bg-slate-700 rounded-lg hover:bg-slate-300 transition">Quay lại</button>
+                <button onclick="nextQuestion()" class="px-5 py-2 bg-primary text-white rounded-lg hover:bg-blue-600 transition">Tiếp theo</button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- JavaScript Logic -->
+    <script>
+        const API_URL = "https://script.google.com/macros/s/AKfycbzlTZJzkxlujhYx5TkVWJYq6XHw0s8yZ6YFBF4VztundlIEEHvz1ZE6ZZC1aPCigl9y/exec"; // Thay thế bằng URL GAS của bạn
+
+        const AppState = {
+            allQuizData: [],
+            currentQuestions: [],
+            currentIndex: 0,
+            userAnswers: {},
+            studentId: '',
+            selectedMon: '',
+            selectedLevel: '1',
+            selectedTopics: []
+        };
+
+        // Tiện ích làm sạch chuỗi
+        function cleanKey(str) {
+            if (!str) return '';
+            return String(str).trim().toLowerCase();
+        }
+
+        // Xử lý Dark Mode Toggle
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        darkModeToggle.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            darkModeToggle.textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
+        });
+
+        // Hàm bắt đầu bài quiz (Đã tích hợp lọc theo Level chính xác)
+        function startQuiz() {
+            const studentIdInput = document.getElementById('studentId').value.trim();
+            const mon = document.getElementById('subjectSelect').value;
+            const level = document.getElementById('levelSelect').value;
+
+            if (!studentIdInput) {
+                alert('Vui lòng nhập mã học sinh!');
+                return;
+            }
+            if (!mon) {
+                alert('Vui lòng chọn môn học!');
+                return;
+            }
+
+            AppState.studentId = studentIdInput;
+            AppState.selectedMon = mon;
+            AppState.selectedLevel = level;
+
+            // Lọc danh sách câu hỏi theo môn và cấp độ (Đã sửa lỗi không lọc level)
+            let topicPool = AppState.allQuizData.filter(i => {
+                let matchMon = cleanKey(i.mon) === cleanKey(mon);
+                let matchContent = i.question !== '';
+                
+                let matchLevel = true;
+                if (i.level && String(i.level).trim() !== '') {
+                    matchLevel = String(i.level).trim() === String(level).trim() || cleanKey(i.level).includes(level);
+                }
+                return matchMon && matchContent && matchLevel;
+            });
+
+            if (topicPool.length === 0) {
+                alert('Không tìm thấy câu hỏi phù hợp với môn và cấp độ này!');
+                return;
+            }
+
+            // Chuyển màn hình
+            document.getElementById('setupScreen').classList.add('hidden');
+            document.getElementById('quizScreen').classList.remove('hidden');
+
+            AppState.currentQuestions = topicPool;
+            AppState.currentIndex = 0;
+            renderQuestion();
+        }
+
+        function renderQuestion() {
+            const q = AppState.currentQuestions[AppState.currentIndex];
+            const container = document.getElementById('questionContainer');
+            document.getElementById('quizProgress').textContent = `Câu ${AppState.currentIndex + 1}/${AppState.currentQuestions.length}`;
+
+            container.innerHTML = `
+                <h3 class="text-lg font-semibold mb-4">${q.question}</h3>
+                <div class="space-y-3">
+                    ${['a', 'b', 'c', 'd'].map(opt => q[opt] ? `
+                        <label class="flex items-center gap-3 p-3 rounded-lg border dark:border-slate-700 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+                            <input type="radio" name="answer" value="${opt}" ${AppState.userAnswers[AppState.currentIndex] === opt ? 'checked' : ''} onclick="saveAnswer('${opt}')" class="w-4 h-4 text-primary">
+                            <span><strong>${opt.toUpperCase()}.</strong> ${q[opt]}</span>
+                        </label>
+                    ` : '').join('')}
+                </div>
+            `;
+        }
+
+        function saveAnswer(opt) {
+            AppState.userAnswers[AppState.currentIndex] = opt;
+        }
+
+        function nextQuestion() {
+            if (AppState.currentIndex < AppState.currentQuestions.length - 1) {
+                AppState.currentIndex++;
+                renderQuestion();
+            } else {
+                alert('Đã hoàn thành bài làm!');
+            }
+        }
+
+        function prevQuestion() {
+            if (AppState.currentIndex > 0) {
+                AppState.currentIndex--;
+                renderQuestion();
+            }
+        }
+    </script>
 </body>
 </html>
