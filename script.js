@@ -1255,3 +1255,80 @@ window.backToHome = function() {
         if (resContainer) resContainer.remove();
     }
 };
+// Hàm xác định cấp bậc dựa trên điểm số hoặc tỷ lệ phần trăm chính xác
+function calculateRank(score, totalQuestions) {
+    const percentage = (score / totalQuestions) * 100;
+    
+    // Định mức phân loại (Bạn có thể điều chỉnh tỷ lệ này theo ý muốn)
+    if (percentage >= 90) {
+        return { rank: 'Kim Cương', badge: '💎', color: 'text-cyan-500', message: 'Xuất sắc! Đạt hạng Kim Cương!' };
+    } else if (percentage >= 75) {
+        return { rank: 'Vàng', badge: '🥇', color: 'text-amber-500', message: 'Rất tốt! Đạt hạng Vàng!' };
+    } else if (percentage >= 50) {
+        return { rank: 'Bạc', badge: '🥈', color: 'text-slate-400', message: 'Khá tốt! Đạt hạng Bạc.' };
+    } else {
+        return { rank: 'Đồng', badge: '🥉', color: 'text-amber-700', message: 'Cố gắng luyện tập thêm nhé!' };
+    }
+}
+
+// Hàm xử lý khi hoàn thành bài quiz và cập nhật xếp hạng
+function handleQuizComplete(score, total) {
+    const studentId = AppState.studentId;
+    const currentRankData = calculateRank(score, total);
+
+    // Lấy lịch sử xếp hạng cũ từ localStorage của học sinh này
+    let historyKey = `quiz_rank_${studentId}`;
+    let savedData = JSON.parse(localStorage.getItem(historyKey)) || { maxScore: 0, rank: 'Đồng' };
+
+    // Cập nhật nếu điểm số mới cao hơn hoặc đạt Kim Cương
+    if (score > savedData.maxScore) {
+        savedData.maxScore = score;
+        savedData.rank = currentRankData.rank;
+        savedData.badge = currentRankData.badge;
+        localStorage.setItem(historyKey, JSON.stringify(savedData));
+    }
+
+    // Hiển thị kết quả lên giao diện
+    showResultScreen(score, total, currentRankData);
+    
+    // Nếu đạt Kim Cương, có thể kích hoạt các phần thưởng hoặc mở khóa đặc biệt
+    if (currentRankData.rank === 'Kim Cương') {
+        triggerDiamondUnlockEffects();
+    }
+}
+
+// Hiển thị màn hình kết quả kèm huy hiệu
+function showResultScreen(score, total, rankData) {
+    const quizScreen = document.getElementById('quizScreen');
+    
+    // Tạo hoặc tái sử dụng màn hình kết quả
+    let resultContainer = document.getElementById('resultScreen');
+    if (!resultContainer) {
+        resultContainer = document.createElement('div');
+        resultContainer.id = 'resultScreen';
+        quizScreen.parentNode.appendChild(resultContainer);
+    }
+    quizScreen.classList.add('hidden');
+
+    resultContainer.className = "bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl text-center max-w-lg mx-auto mt-10 animate-fade-in";
+    resultContainer.innerHTML = `
+        <div class="text-6xl mb-4">${rankData.badge}</div>
+        <h2 class="text-2xl font-bold mb-2">Hoàn Thành Bài Làm!</h2>
+        <p class="text-lg text-slate-600 dark:text-slate-300 mb-4">Điểm số: <strong class="text-primary">${score}/${total}</strong></p>
+        
+        <div class="p-4 rounded-xl bg-slate-100 dark:bg-slate-700 mb-6">
+            <span class="block text-sm text-slate-500 dark:text-slate-400">Danh hiệu của bạn:</span>
+            <span class="text-xl font-extrabold ${rankData.color}">${rankData.rank}</span>
+            <p class="text-sm mt-1">${rankData.message}</p>
+        </div>
+
+        <button onclick="location.reload()" class="w-full bg-primary text-white font-bold py-3 rounded-xl hover:bg-blue-600 transition shadow-md">
+            Luyện Tập Lại
+        </button>
+    `;
+}
+
+function triggerDiamondUnlockEffects() {
+    console.log("Chúc mừng học sinh đã chạm mốc Kim Cương!");
+    // Bạn có thể gọi hiệu ứng pháo hoa hoặc lưu trạng thái mở khóa Level cao nhất tại đây
+}
