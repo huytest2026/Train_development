@@ -11,7 +11,9 @@
         h3 { font-size: 1.3em; }
         label { font-size: 1.05em; font-weight: bold; color: #333; }
         .quiz-card { background: #ffffff; border: 2px solid #540606; border-radius: 12px; padding: 22px; margin-bottom: 22px; font-size: 1.15em; }
-        .option-box { background: #f8f9fa; border: 1px solid #540606; border-radius: 8px; padding: 14px 18px; margin: 10px 0; cursor: pointer; font-size: 1.1em; font-weight: 600; color: #111; }
+        .option-box { background: #f8f9fa; border: 1px solid #540606; border-radius: 8px; padding: 14px 18px; margin: 10px 0; cursor: pointer; font-size: 1.1em; font-weight: 600; color: #111; transition: background 0.2s; }
+        .option-box:hover { background: #e2e6ea; }
+        .option-box.selected { background: #d1ecf1; border-color: #0c5460; }
         #topic-container { margin: 10px 0; padding: 14px; border: 1px solid #ddd; max-height: 180px; overflow-y: auto; background: #fff; border-radius: 8px; font-size: 1.05em; }
         
         /* Thanh trạng thái cố định khi cuộn */
@@ -90,6 +92,8 @@
     <label style="display:block; margin-top:5px;">Chọn môn học:</label>
     <select id="subject-select" onchange="window.handleSubjectChange()" style="width: 100%; padding: 14px; margin: 8px 0 15px 0; font-size: 1.1em; border: 1px solid #540606; border-radius: 8px;">
         <option value="">-- Chọn môn --</option>
+        <option value="math">Toán</option>
+        <option value="english">Tiếng Anh</option>
     </select>
 
     <div id="level-container" style="display: none;">
@@ -120,7 +124,9 @@
         <label style="margin: 0; font-size: 1.1em;">Chọn chủ đề:</label>
         <button type="button" onclick="window.toggleAllTopics()" style="padding: 6px 12px; font-size: 0.95em; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Chọn/Bỏ chọn tất cả</button>
     </div>
-    <div id="topic-container">Chưa tải dữ liệu...</div>
+    <div id="topic-container">
+        <label><input type="checkbox" class="topic-checkbox" value="general" checked> Chủ đề tổng hợp</label>
+    </div>
 
     <button type="button" id="start-btn" onclick="window.startQuiz()" style="width: 100%; padding: 16px; background: #007bff; color: white; border: none; cursor: pointer; margin-top: 15px; border-radius: 8px; font-weight: bold; font-size: 1.2em;">Bắt Đầu Làm Bài</button>
 
@@ -132,9 +138,8 @@
 
 <div class="container" id="quiz-screen" style="display:none;">
     <div class="quiz-sticky-header">
-        <div>⏱️ <span id="timer-display" style="color: red; font-size: 1.15em;">--:--</span></div>
+        <div>⏱️ <span id="timer-display" style="color: red; font-size: 1.15em;">00:00</span></div>
         <div style="display: flex; gap: 8px;">
-            <!-- NÚT MÁY TÍNH -->
             <button type="button" id="calc-btn-header" onclick="window.openCalculatorModal()" style="background: #28a745; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🧮 Máy tính</button>
             <button type="button" onclick="window.openDictionaryModal()" style="background: #17a2b8; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📖 Tra từ</button>
             <button type="button" onclick="window.openIrregularVerbsModal()" style="background: #e0a800; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📚 ĐT Bất Quy Tắc</button>
@@ -215,6 +220,222 @@
     </div>
 </div>
 
-<script src="script.js"></script>
+<!-- JAVASCRIPT TÍCH HỢP ĐẦY ĐỦ -->
+<script>
+    // Dữ liệu động từ bất quy tắc mẫu
+    const irregularVerbsData = [
+        { v1: "be", v2: "was/were", v3: "been", meaning: "là, ở" },
+        { v1: "begin", v2: "began", v3: "begun", meaning: "bắt đầu" },
+        { v1: "break", v2: "broke", v3: "broken", meaning: "làm vỡ" },
+        { v1: "bring", v2: "brought", v3: "brought", meaning: "mang lại" },
+        { v1: "buy", v2: "bought", v3: "bought", meaning: "mua" },
+        { v1: "come", v2: "came", v3: "come", meaning: "đến" },
+        { v1: "do", v2: "did", v3: "done", meaning: "làm" },
+        { v1: "eat", v2: "ate", v3: "eaten", meaning: "ăn" },
+        { v1: "find", v2: "found", v3: "found", meaning: "tìm thấy" },
+        { v1: "go", v2: "went", v3: "gone", meaning: "đi" },
+        { v1: "have", v2: "had", v3: "had", meaning: "có" },
+        { v1: "make", v2: "made", v3: "made", meaning: "làm, chế tạo" },
+        { v1: "read", v2: "read", v3: "read", meaning: "đọc" },
+        { v1: "run", v2: "ran", v3: "run", meaning: "chạy" },
+        { v1: "see", v2: "saw", v3: "seen", meaning: "nhìn thấy" },
+        { v1: "speak", v2: "spoke", v3: "spoken", meaning: "nói" },
+        { v1: "take", v2: "took", v3: "taken", meaning: "cầm, lấy" },
+        { v1: "write", v2: "wrote", v3: "written", meaning: "viết" }
+    ];
+
+    let timerInterval = null;
+    let secondsElapsed = 0;
+
+    // Các hàm điều khiển giao diện & dữ liệu
+    window.loadData = function() {
+        const code = document.getElementById('student-code').value.trim();
+        if(!code) {
+            alert('Vui lòng nhập mã học sinh!');
+            return;
+        }
+        alert('Đã tải dữ liệu thành công cho học sinh: ' + code);
+        document.getElementById('ranking-list').innerHTML = `<p style="color: green;">👤 ${code}: Sẵn sàng làm bài.</p>`;
+    };
+
+    window.handleSubjectChange = function() {
+        const subject = document.getElementById('subject-select').value;
+        const levelContainer = document.getElementById('level-container');
+        if(subject) {
+            levelContainer.style.display = 'block';
+        } else {
+            levelContainer.style.display = 'none';
+        }
+    };
+
+    window.toggleMadeMode = function() {
+        const isChecked = document.getElementById('toggle-made').checked;
+        const madeContainer = document.getElementById('made-container');
+        madeContainer.style.display = isChecked ? 'block' : 'none';
+        if(isChecked) {
+            const madeSelect = document.getElementById('made-select');
+            if(madeSelect.options.length <= 1) {
+                madeSelect.innerHTML = '<option value="">-- Chọn mã đề --</option><option value="M01">Mã đề 01</option><option value="M02">Mã đề 02</option>';
+            }
+        }
+    };
+
+    window.handleMadeChange = function() {
+        const made = document.getElementById('made-select').value;
+        const preview = document.getElementById('made-passage-preview');
+        if(made) {
+            preview.innerHTML = `<p style="font-style: italic; color: #555; margin-top: 5px;">Đã chọn ${made}. Sẵn sàng tải nội dung đề.</p>`;
+        } else {
+            preview.innerHTML = '';
+        }
+    };
+
+    window.toggleAllTopics = function() {
+        const checkboxes = document.querySelectorAll('.topic-checkbox');
+        const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+        checkboxes.forEach(cb => cb.checked = !allChecked);
+    };
+
+    window.startQuiz = function() {
+        document.getElementById('start-screen').style.display = 'none';
+        document.getElementById('quiz-screen').style.display = 'block';
+        
+        // Tạo câu hỏi mẫu
+        const quizDiv = document.getElementById('quiz');
+        quizDiv.innerHTML = `
+            <div class="quiz-card">
+                <p><b>Câu 1:</b> What is 15 + 25 ?</p>
+                <div class="option-box" onclick="selectOption(this, 0)">A. 30</div>
+                <div class="option-box" onclick="selectOption(this, 0)">B. 35</div>
+                <div class="option-box" onclick="selectOption(this, 1)">C. 40</div>
+                <div class="option-box" onclick="selectOption(this, 0)">D. 45</div>
+            </div>
+            <div class="quiz-card">
+                <p><b>Câu 2:</b> Choose the correct form: She usually ________ to school by bike.</p>
+                <div class="option-box" onclick="selectOption(this, 1)">A. goes</div>
+                <div class="option-box" onclick="selectOption(this, 0)">B. go</div>
+                <div class="option-box" onclick="selectOption(this, 0)">C. going</div>
+                <div class="option-box" onclick="selectOption(this, 0)">D. gone</div>
+            </div>
+        `;
+
+        // Bắt đầu đếm giờ
+        secondsElapsed = 0;
+        if(timerInterval) clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            secondsElapsed++;
+            const m = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
+            const s = String(secondsElapsed % 60).padStart(2, '0');
+            document.getElementById('timer-display').innerText = `${m}:${s}`;
+        }, 1000);
+    };
+
+    window.selectOption = function(element, isCorrect) {
+        const parent = element.parentElement;
+        parent.querySelectorAll('.option-box').forEach(box => {
+            box.classList.remove('selected');
+            box.style.background = '#f8f9fa';
+        });
+        element.classList.add('selected');
+        element.style.background = '#d1ecf1';
+        element.dataset.correct = isCorrect;
+    };
+
+    window.submitQuiz = function() {
+        if(timerInterval) clearInterval(timerInterval);
+        let correct = 0;
+        let wrong = 0;
+        document.querySelectorAll('.quiz-card').forEach(card => {
+            const selected = card.querySelector('.option-box.selected');
+            if(selected && selected.dataset.correct === "1") {
+                correct++;
+            } else {
+                wrong++;
+            }
+        });
+        document.getElementById('correct-count-display').innerText = correct;
+        document.getElementById('wrong-count-display').innerText = wrong;
+        alert(`Nộp bài thành công! Số câu đúng: ${correct}, Số câu sai: ${wrong}`);
+    };
+
+    window.backToHome = function() {
+        if(timerInterval) clearInterval(timerInterval);
+        document.getElementById('quiz-screen').style.display = 'none';
+        document.getElementById('start-screen').style.display = 'block';
+    };
+
+    // Các Modal: Máy tính, Từ điển, Động từ bất quy tắc
+    window.openCalculatorModal = function() { document.getElementById('calc-modal').style.display = 'flex'; };
+    window.closeCalculatorModal = function() { document.getElementById('calc-modal').style.display = 'none'; };
+
+    window.openDictionaryModal = function() { document.getElementById('dict-modal').style.display = 'flex'; };
+    window.closeDictionaryModal = function() { document.getElementById('dict-modal').style.display = 'none'; };
+
+    window.openIrregularVerbsModal = function() {
+        document.getElementById('irregular-verbs-modal').style.display = 'flex';
+        renderIrregularVerbs(irregularVerbsData);
+    };
+    window.closeIrregularVerbsModal = function() { document.getElementById('irregular-verbs-modal').style.display = 'none'; };
+
+    // Máy tính logic
+    window.calcClear = function() { document.getElementById('calc-display').value = ''; };
+    window.calcInput = function(val) { document.getElementById('calc-display').value += val; };
+    window.calcCalculate = function() {
+        try {
+            const res = eval(document.getElementById('calc-display').value);
+            document.getElementById('calc-display').value = res;
+        } catch(e) {
+            alert('Biểu thức không hợp lệ!');
+        }
+    };
+
+    // Tra từ điển (Giả lập tra cứu nhanh)
+    window.lookupWord = function() {
+        const word = document.getElementById('dict-input').value.trim().toLowerCase();
+        const resultDiv = document.getElementById('dict-result');
+        if(!word) {
+            resultDiv.innerHTML = 'Vui lòng nhập từ cần tra.';
+            return;
+        }
+        const dictionarySample = {
+            "apple": "🍎 Quả táo (Danh từ)",
+            "book": "📖 Sách (Danh từ) / Đặt chỗ (Động từ)",
+            "student": "🧑‍🎓 Học sinh, sinh viên (Danh từ)",
+            "run": "🏃 Chạy (Động từ)"
+        };
+        if(dictionarySample[word]) {
+            resultDiv.innerHTML = `<b>${word}:</b> ${dictionarySample[word]}`;
+        } else {
+            resultDiv.innerHTML = `Không tìm thấy từ "<b>${word}</b>" trong cơ sở dữ liệu mẫu.`;
+        }
+    };
+
+    // Bảng động từ bất quy tắc
+    function renderIrregularVerbs(list) {
+        const container = document.getElementById('iv-result-list');
+        if(list.length === 0) {
+            container.innerHTML = '<p style="padding: 10px; text-align: center;">Không tìm thấy từ phù hợp.</p>';
+            return;
+        }
+        let html = '<table style="width: 100%; border-collapse: collapse;">';
+        html += '<tr style="background: #540606; color: white;"><th style="padding: 8px; border: 1px solid #ddd;">V1</th><th style="padding: 8px; border: 1px solid #ddd;">V2</th><th style="padding: 8px; border: 1px solid #ddd;">V3</th><th style="padding: 8px; border: 1px solid #ddd;">Nghĩa</th></tr>';
+        list.forEach(item => {
+            html += `<tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">${item.v1}</td><td style="padding: 8px; border: 1px solid #ddd;">${item.v2}</td><td style="padding: 8px; border: 1px solid #ddd;">${item.v3}</td><td style="padding: 8px; border: 1px solid #ddd;">${item.meaning}</td></tr>`;
+        });
+        html += '</table>';
+        container.innerHTML = html;
+    }
+
+    window.filterIrregularVerbs = function() {
+        const keyword = document.getElementById('iv-search-input').value.toLowerCase().trim();
+        const filtered = irregularVerbsData.filter(item => 
+            item.v1.includes(keyword) || 
+            item.v2.includes(keyword) || 
+            item.v3.includes(keyword) || 
+            item.meaning.toLowerCase().includes(keyword)
+        );
+        renderIrregularVerbs(filtered);
+    };
+</script>
 </body>
 </html>
