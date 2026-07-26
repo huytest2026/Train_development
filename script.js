@@ -1640,3 +1640,50 @@ window.filterIrregularVerbs = function() {
 
     window.renderIrregularVerbsTable(filtered);
 };
+// ==========================================
+// QUẢN LÝ MÁY TÍNH BỎ TÚI (CALCULATOR)
+// ==========================================
+
+window.openCalculatorModal = function() {
+    const modal = document.getElementById('calc-modal');
+    if (modal) modal.style.display = 'flex';
+};
+
+window.closeCalculatorModal = function() {
+    const modal = document.getElementById('calc-modal');
+    if (modal) modal.style.display = 'none';
+};
+
+function calcInput(value) {
+    const display = document.getElementById('calc-display');
+    if (display) {
+        display.value += value;
+    }
+}
+
+function calcClear() {
+    const display = document.getElementById('calc-display');
+    if (display) {
+        display.value = '';
+    }
+}
+
+function calcCalculate() {
+    const display = document.getElementById('calc-display');
+    if (!display || !display.value.trim()) return;
+
+    try {
+        // Thay thế biểu thức để tính toán an toàn
+        let expression = display.value.replace(/×/g, '*').replace(/÷/g, '/');
+        // Sử dụng Function thay vì eval để tăng tính bảo mật
+        let result = new Function(`return ${expression}`)();
+        
+        if (result !== undefined && !isNaN(result)) {
+            display.value = result;
+        } else {
+            display.value = 'Lỗi';
+        }
+    } catch (e) {
+        display.value = 'Lỗi';
+    }
+}
