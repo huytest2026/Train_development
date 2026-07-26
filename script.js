@@ -18,6 +18,7 @@ function handleBeforeUnload(e) {
 }
 
 // 1. Quản lý Tra từ điển
+// 1. Quản lý Tra từ điển (Đã tích hợp Anh - Việt)
 window.openDictionaryModal = function() {
     const modal = document.getElementById('dict-modal');
     if (modal) modal.style.display = 'flex';
@@ -48,14 +49,35 @@ window.lookupWord = async function() {
         return;
     }
 
-    resultBox.innerHTML = 'Đang tra từ...';
+    resultBox.innerHTML = 'Đang tra từ Anh - Việt...';
     try {
-        let response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
-        if (!response.ok) {
+        // Gọi song song API từ điển Anh-Anh và API dịch nghĩa Anh-Việt
+        let [dictResponse, transResponse] = await Promise.all([
+            fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`).catch(() => null),
+            fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|vi`).catch(() => null)
+        ]);
+
+        let vietnameseMeaning = '';
+        if (transResponse && transResponse.ok) {
+            let transData = await transResponse.json();
+            if (transData && transData.responseData && transData.responseData.translatedText) {
+                vietnameseMeaning = transData.responseData.translatedText;
+            }
+        }
+
+        if (!dictResponse || !dictResponse.ok) {
+            if (vietnameseMeaning && vietnameseMeaning.toLowerCase() !== word) {
+                resultBox.innerHTML = `<div style="margin-bottom: 8px;"><b style="font-size: 1.2em; color: #540606;">${escapeHTML(word)}</b></div>` +
+                                      `<div style="margin-top: 8px; padding: 10px; background: #e8f5e9; border-radius: 6px; border: 1px solid #c8e6c9;">` +
+                                      `<b style="color: #2e7d32;">🇻🇳 Nghĩa tiếng Việt:</b> <span style="color: #1b5e20; font-weight: bold; font-size: 1.1em;">${escapeHTML(vietnameseMeaning)}</span>` +
+                                      `</div>`;
+                return;
+            }
             resultBox.innerHTML = `<span style="color: red;">Không tìm thấy từ "${escapeHTML(word)}" trong từ điển.</span>`;
             return;
         }
-        let data = await response.json();
+
+        let data = await dictResponse.json();
         if (data && data.length > 0) {
             let entry = data[0];
             let phonetic = entry.phonetic || (entry.phonetics && entry.phonetics.find(p => p.text)?.text) || '';
@@ -67,8 +89,15 @@ window.lookupWord = async function() {
             }
             html += `</div>`;
 
+            // Hiển thị khung nghĩa tiếng Việt nổi bật lên đầu
+            if (vietnameseMeaning && vietnameseMeaning.toLowerCase() !== word) {
+                html += `<div style="margin-top: 8px; padding: 10px; background: #e8f5e9; border-radius: 6px; border: 1px solid #c8e6c9;">` +
+                        `<b style="color: #2e7d32;">🇻🇳 Nghĩa tiếng Việt:</b> <span style="color: #1b5e20; font-weight: bold; font-size: 1.1em;">${escapeHTML(vietnameseMeaning)}</span>` +
+                        `</div>`;
+            }
+
             entry.meanings.forEach(meaning => {
-                html += `<div style="margin-top: 8px;"><b style="color: #007bff;">(${escapeHTML(meaning.partOfSpeech)})</b>`;
+                html += `<div style="margin-top: 10px;"><b style="color: #007bff;">(${escapeHTML(meaning.partOfSpeech)})</b>`;
                 meaning.definitions.slice(0, 2).forEach((def, idx) => {
                     html += `<div style="margin-left: 10px; margin-top: 4px;">• ${escapeHTML(def.definition)}`;
                     if (def.example) {
