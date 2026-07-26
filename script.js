@@ -157,7 +157,6 @@ if ('speechSynthesis' in window) {
     window.speechSynthesis.getVoices();
 }
 
-// Lắng nghe sự kiện click chọn đáp án để nhận diện học sinh đã trả lời câu hỏi
 document.addEventListener('click', function(e) {
     const optionBox = e.target.closest('.option-box');
     if (optionBox) {
@@ -177,8 +176,6 @@ window.speakQuestion = function(index) {
     const isIrregularVerbs = chuDeLower.includes('dongtubatquytac') || chuDeLower.includes('động từ bất quy tắc');
 
     let textToRead = '';
-    
-    // Kiểm tra xem học sinh đã chọn đáp án cho câu này chưa trên giao diện
     let hasAnswered = false;
     const quizCards = document.querySelectorAll('.quiz-card');
     if (quizCards[index]) {
@@ -204,8 +201,6 @@ window.speakQuestion = function(index) {
         }
     } else {
         textToRead = item.question;
-        
-        // Nếu ĐÃ chọn đáp án: tự động điền từ đúng vào chỗ trống
         if (hasAnswered) {
             let correctText = '';
             const correctKeys = getCorrectKeys(item);
@@ -214,14 +209,12 @@ window.speakQuestion = function(index) {
             } else if (item.correct) {
                 correctText = cleanOptionText(item.correct);
             }
-            
             if (correctText) {
                 textToRead = textToRead.replace(/\.{3,}|_+/g, ' ' + correctText + ' ');
             }
         }
     }
 
-    // Nếu CHƯA chọn đáp án: đọc với khoảng nghỉ (dấu phẩy)
     if (!hasAnswered && textToRead) {
         textToRead = textToRead.replace(/\.{3,}|_+/g, ', ');
     }
@@ -490,6 +483,7 @@ window.handleQuizData = function(data) {
     window.initInterface();
 };
 
+// CẬP NHẬT: Kiểm tra Kim Cương (3 lần liên tiếp đạt 10 điểm nhưng KHÔNG được trùng hoàn toàn một chủ đề)
 function hasThreeConsecutiveHighScores(rankings, studentName, subject) {
     let studentAttempts = rankings.filter(r => 
         String(r.name).trim().toLowerCase() === String(studentName).trim().toLowerCase() &&
@@ -502,8 +496,16 @@ function hasThreeConsecutiveHighScores(rankings, studentName, subject) {
         let s1 = Number(studentAttempts[i].score);
         let s2 = Number(studentAttempts[i+1].score);
         let s3 = Number(studentAttempts[i+2].score);
+        
         if (s1 === 10 && s2 === 10 && s3 === 10) {
-            return true;
+            let t1 = cleanKey(studentAttempts[i].chuDe || studentAttempts[i].topic || '');
+            let t2 = cleanKey(studentAttempts[i+1].chuDe || studentAttempts[i+1].topic || '');
+            let t3 = cleanKey(studentAttempts[i+2].chuDe || studentAttempts[i+2].topic || '');
+            
+            // Yêu cầu 3 lần liên tiếp đạt 10 điểm phải qua các chủ đề khác nhau (t1, t2, t3 không giống nhau y hệt)
+            if (!(t1 === t2 && t2 === t3)) {
+                return true;
+            }
         }
     }
     return false;
@@ -577,7 +579,7 @@ window.renderLeaderboard = function(subjectFilter = null) {
     }
 
     let html = '<div style="display: flex; flex-direction: column; gap: 5px;">';
-    html += buildGroupHtml('💎 Kim Cương (3 lần liên tiếp đạt 10 điểm)', '#007bff', kimCuongList);
+    html += buildGroupHtml('💎 Kim Cương (3 lần liên tiếp đạt 10 điểm, khác chủ đề)', '#007bff', kimCuongList);
     html += buildGroupHtml('🥇 Vàng (Có ít nhất 1 lần đạt 10 điểm)', '#d9822b', vangList);
     html += buildGroupHtml('🥈 Bạc (Có ít nhất 2 lần đạt 9 điểm trở lên)', '#6c757d', bacList);
     html += buildGroupHtml('🥉 Đồng (Có ít nhất 2 lần đạt 8 điểm trở lên)', '#cd7f32', dongList);
@@ -621,6 +623,23 @@ window.startQuiz = function() {
 
     const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
     
+    // CẬP NHẬT: Kiểm tra điều kiện khi chọn MADE (Đã đạt 10 điểm và chưa qua 6 tiếng)
+    const toggleMade = document.getElementById('toggle-made');
+    const selectedMade = (toggleMade && toggleMade.checked && document.getElementById('made-select')) ? document.getElementById('made-select').value.trim() : '';
+    
+    if (selectedMade) {
+        const tenPointTimeKey = 'made_10_time_' + maHS + '_' + mon + '_' + selectedMade;
+        const lastTenPointTime = localStorage.getItem(tenPointTimeKey);
+        
+        if (lastTenPointTime) {
+            const elapsedHours = (Date.now() - Number(lastTenPointTime)) / (1000 * 60 * 60);
+            if (elapsedHours < 6) {
+                const remainingHours = Math.ceil(6 - elapsedHours);
+                return alert(`Bạn đã đạt điểm tuyệt đối (10 điểm) cho mã đề "${selectedMade}". Xin chọn nội dung khác hoặc có thể làm lại sau khoảng ${remainingHours} tiếng nữa!`);
+            }
+        }
+    }
+
     const levelSelect = document.getElementById('level-select');
     const selectedLevel = levelSelect ? levelSelect.value : '';
     const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
@@ -657,9 +676,6 @@ window.startQuiz = function() {
 
     window.saveUserSelections();
 
-    const toggleMade = document.getElementById('toggle-made');
-    const selectedMade = (toggleMade && toggleMade.checked && document.getElementById('made-select')) ? document.getElementById('made-select').value.trim() : '';
-    
     let rawSelectedQuestions = [];
     let totalSeconds = 10 * 60;
     const cleanM = standardizeSubject(mon);
@@ -1075,8 +1091,16 @@ window.submitQuiz = function() {
     let level = levelSelect ? levelSelect.value : '';
     let selectedTopicsStr = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value).join(', ');
 
+    const toggleMade = document.getElementById('toggle-made');
+    let selectedMade = (toggleMade && toggleMade.checked && document.getElementById('made-select')) ? document.getElementById('made-select').value.trim() : '';
+
     let totalQuestions = AppState.currentQuizData.length;
     let score = Math.round((AppState.correctCount / totalQuestions) * 10 * 10) / 10;
+
+    // CẬP NHẬT: Nếu làm theo Mã đề và đạt điểm 10, ghi nhận mốc thời gian để chặn hoặc mở lại sau 6 tiếng
+    if (selectedMade && score === 10) {
+        localStorage.setItem('made_10_time_' + maHS + '_' + mon + '_' + selectedMade, Date.now());
+    }
 
     let details = AppState.currentQuizData.map((item, index) => {
         let hasOptions = item.a || item.b || item.c || item.d;
@@ -1130,6 +1154,7 @@ window.submitQuiz = function() {
                 score: score, 
                 level: level, 
                 chuDe: selectedTopicsStr,
+                made: selectedMade,
                 details: details 
             })
         }).catch(err => console.log('Lỗi gửi kết quả:', err));
