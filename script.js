@@ -636,15 +636,13 @@ window.renderLeaderboard = function(subjectFilter = null) {
         let bestScore = Math.max(...attempts.map(a => Number(a.score)));
         let latestAttempt = attempts[attempts.length - 1];
 
-        // Tính toán các chỉ số độc lập cho từng huy chương
         let count10 = attempts.filter(a => Number(a.score) === 10).length;
         let count9 = attempts.filter(a => Number(a.score) >= 9).length;
         let count8 = attempts.filter(a => Number(a.score) >= 8).length;
         
-        // Số lần đạt chuẩn Kim Cương (mỗi chuỗi 3 lần 10 điểm khác chủ đề tính là 1 lần)
+        // Số lần đạt chuẩn Kim Cương
         let kcCount = countKimCuongSets(AppState.rankings, st.name, st.subject);
 
-        // Đánh giá độc lập từng bậc (không dùng else if để học sinh có thể xuất hiện ở nhiều bậc)
         if (kcCount > 0) {
             kimCuongList.push({ name: st.name, subject: st.subject, score: bestScore, count: kcCount, date: latestAttempt.date || '' });
         }
@@ -662,7 +660,6 @@ window.renderLeaderboard = function(subjectFilter = null) {
         }
     }
 
-    // Sắp xếp danh sách theo điểm số giảm dần
     kimCuongList.sort((a, b) => b.score - a.score);
     vangList.sort((a, b) => b.score - a.score);
     bacList.sort((a, b) => b.score - a.score);
@@ -691,7 +688,20 @@ window.renderLeaderboard = function(subjectFilter = null) {
     list.innerHTML = html;
 };
 
-// Hàm đếm số bộ 3 lần 10 điểm khác chủ đề (không bị đè lặp các bài trùng nhau)
+// Hàm lấy tên chủ đề linh hoạt từ mọi trường dữ liệu có thể
+function getAttemptTopic(att) {
+    return cleanKey(
+        att.chuDe || 
+        att['Chủ đề'] || 
+        att.topic || 
+        att.tieuDe || 
+        att.baiHoc || 
+        att.chapter || 
+        att.lesson || ''
+    );
+}
+
+// Hàm đếm số bộ Kim Cương an toàn và chính xác
 function countKimCuongSets(rankings, studentName, subjectName) {
     let studentAttempts = rankings.filter(r => 
         String(r.name).trim().toLowerCase() === String(studentName).trim().toLowerCase() &&
@@ -708,13 +718,22 @@ function countKimCuongSets(rankings, studentName, subjectName) {
         let s2 = Number(studentAttempts[i+1].score);
         let s3 = Number(studentAttempts[i+2].score);
 
-        let t1 = cleanKey(studentAttempts[i].chuDe || studentAttempts[i]['Chủ đề'] || studentAttempts[i].topic || '');
-        let t2 = cleanKey(studentAttempts[i+1].chuDe || studentAttempts[i+1]['Chủ đề'] || studentAttempts[i+1].topic || '');
-        let t3 = cleanKey(studentAttempts[i+2].chuDe || studentAttempts[i+2]['Chủ đề'] || studentAttempts[i+2].topic || '');
+        let t1 = getAttemptTopic(studentAttempts[i]);
+        let t2 = getAttemptTopic(studentAttempts[i+1]);
+        let t3 = getAttemptTopic(studentAttempts[i+2]);
 
-        if (s1 === 10 && s2 === 10 && s3 === 10 && t1 !== t2 && t2 !== t3 && t1 !== t3) {
-            setsCount++;
-            i += 3; // Nhảy cóc qua 3 bài tiếp theo để tính chuỗi mới chính xác
+        if (s1 === 10 && s2 === 10 && s3 === 10) {
+            // Nếu dữ liệu không có thông tin chủ đề hoặc các chủ đề khác nhau thì vẫn tính là 1 bộ Kim Cương
+            if (!t1 && !t2 && !t3) {
+                setsCount++;
+                i += 3;
+            } else if (t1 !== t2 && t2 !== t3 && t1 !== t3) {
+                setsCount++;
+                i += 3;
+            } else {
+                // Nếu trùng chủ đề mà vẫn muốn linh hoạt, hoặc chuyển sang xét tiếp
+                i++;
+            }
         } else {
             i++;
         }
