@@ -1417,3 +1417,38 @@ window.backToHome = function() {
         if (resContainer) resContainer.remove();
     }
 };
+// TỰ ĐỘNG TRA TỪ KHI BÔI ĐEN HOẶC CHỌN TỪ TRÊN MÀN HÌNH
+document.addEventListener('mouseup', function() {
+    setTimeout(() => {
+        let selectedText = window.getSelection().toString().trim();
+        // Kiểm tra nếu là một từ đơn tiếng Anh (chỉ chứa chữ cái, không có khoảng trắng dài)
+        if (selectedText && selectedText.split(/\s+/).length === 1 && /^[a-zA-ZÀ-ỹ]+$/.test(selectedText)) {
+            const modal = document.getElementById('dict-modal');
+            const input = document.getElementById('dict-input');
+            if (modal && input) {
+                // Chỉ tự động tra nếu modal chưa mở hoặc từ được chọn khác với từ đang tra
+                if (modal.style.display !== 'flex' || input.value.trim().toLowerCase() !== selectedText.toLowerCase()) {
+                    modal.style.display = 'flex';
+                    input.value = selectedText;
+                    window.lookupWord();
+                }
+            }
+        }
+    }, 100);
+});
+
+// Hỗ trợ thêm cho thiết bị cảm ứng (Mobile/Tablet): Chạm nhấc tay sau khi bôi đen
+document.addEventListener('touchend', function() {
+    setTimeout(() => {
+        let selectedText = window.getSelection().toString().trim();
+        if (selectedText && selectedText.split(/\s+/).length === 1 && /^[a-zA-ZÀ-ỹ]+$/.test(selectedText)) {
+            const modal = document.getElementById('dict-modal');
+            const input = document.getElementById('dict-input');
+            if (modal && input) {
+                modal.style.display = 'flex';
+                input.value = selectedText;
+                window.lookupWord();
+            }
+        }
+    }, 200);
+});
