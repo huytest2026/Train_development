@@ -489,7 +489,6 @@ if (data.rankings && Array.isArray(data.rankings)) {
         
         let item = null;
         if (Array.isArray(raw)) {
-            // Trường hợp dữ liệu là mảng theo thứ tự cột Excel [Họ tên, Điểm, Môn, Level, Chủ đề, Ngày]
             item = {
                 name: String(raw[0] || '').trim(),
                 score: Number(raw[1] || 0),
@@ -499,7 +498,6 @@ if (data.rankings && Array.isArray(data.rankings)) {
                 date: String(raw[5] || '').trim()
             };
         } else if (typeof raw === 'object') {
-            // Trường hợp dữ liệu là object từ Google Sheets / JSON
             const getVal = (keys) => {
                 for (let k of keys) {
                     for (let rk of Object.keys(raw)) {
@@ -520,100 +518,18 @@ if (data.rankings && Array.isArray(data.rankings)) {
             };
         }
 
-        // Chỉ đẩy vào nếu có tên học sinh hợp lệ
         if (item && item.name !== '') {
             AppState.rankings.push(item);
         }
     });
 }
 
-// Kiểm tra ngay sau khi nạp dữ liệu xem đã nhận đủ số dòng chưa
 console.log("Đã nạp thành công tổng số dòng vào AppState.rankings:", AppState.rankings.length);
 
 window.initInterface();
 
-function parseCustomDate(dateStr) {
-    if (!dateStr) return 0;
-    let cleanStr = String(dateStr).trim();
-    
-    // Thử parse trực tiếp nếu là định dạng chuẩn
-    let parsed = Date.parse(cleanStr);
-    if (!isNaN(parsed)) return parsed;
 
-    // Xử lý tách chuỗi theo các ký tự phân cách (/, -, khoảng trắng, dấu hai chấm)
-    let parts = cleanStr.split(/[\/\s:\-]+/);
-    if (parts.length >= 3) {
-        let p0 = Number(parts[0]);
-        let p1 = Number(parts[1]);
-        let p2 = Number(parts[2]);
-        
-        let year, month, day;
-        
-        // Nếu số đầu tiên lớn hơn 31, chắc chắn là định dạng Năm trước (YYYY-MM-DD)
-        if (p0 > 31) {
-            year = p0;
-            month = p1 - 1;
-            day = p2;
-        } 
-        // Nếu số thứ hai lớn hơn 12, chắc chắn là định dạng Tháng trước (MM/DD/YYYY - chuẩn Mỹ)
-        else if (p1 > 12) {
-            month = p0 - 1;
-            day = p1;
-            year = p2 < 100 ? 2000 + p2 : p2;
-        } 
-        // Mặc định theo kiểu Ngày trước (DD/MM/YYYY)
-        else {
-            day = p0;
-            month = p1 - 1;
-            year = p2 < 100 ? 2000 + p2 : p2;
-        }
-
-        let hour = parts[3] ? Number(parts[3]) : 0;
-        let minute = parts[4] ? Number(parts[4]) : 0;
-        let second = parts[5] ? Number(parts[5]) : 0;
-
-        let d = new Date(year, month, day, hour, minute, second);
-        if (!isNaN(d.getTime())) return d.getTime();
-    }
-    
-    return 0;
-}
-
-function hasThreeConsecutiveHighScores(rankings, studentName, subjectName) {
-    // 1. Lọc các lượt thi của học sinh đúng môn
-    let studentAttempts = rankings.filter(r => 
-        String(r.name).trim().toLowerCase() === String(studentName).trim().toLowerCase() &&
-        cleanKey(r.subject || '') === cleanKey(subjectName)
-    );
-
-    // 2. Sắp xếp theo thời gian tăng dần (cũ nhất -> mới nhất)
-    studentAttempts.sort((a, b) => {
-        let timeA = parseCustomDate(a.date);
-        let timeB = parseCustomDate(b.date);
-        return timeA - timeB;
-    });
-
-    if (studentAttempts.length < 3) return false;
-
-    // 3. Kiểm tra 3 lần liên tiếp đạt 10 điểm VÀ khác chủ đề
-    for (let i = 0; i <= studentAttempts.length - 3; i++) {
-        let s1 = Number(studentAttempts[i].score);
-        let s2 = Number(studentAttempts[i+1].score);
-        let s3 = Number(studentAttempts[i+2].score);
-
-        // Lấy thông tin chủ đề từ nhiều khả năng tên trường dữ liệu có thể xảy ra
-        let t1 = cleanKey(studentAttempts[i].chuDe || studentAttempts[i]['Chủ đề'] || studentAttempts[i].topic || '');
-        let t2 = cleanKey(studentAttempts[i+1].chuDe || studentAttempts[i+1]['Chủ đề'] || studentAttempts[i+1].topic || '');
-        let t3 = cleanKey(studentAttempts[i+2].chuDe || studentAttempts[i+2]['Chủ đề'] || studentAttempts[i+2].topic || '');
-
-        // Điều kiện: 3 lần liên tiếp đạt 10 điểm VÀ 3 chủ đề khác nhau hoàn toàn
-        if (s1 === 10 && s2 === 10 && s3 === 10 && t1 !== t2 && t2 !== t3 && t1 !== t3) {
-            return true; 
-        }
-    }
-
-    return false;
-}
+// ==================== HÀM BẢNG XẾP HẠNG & XỬ LÝ KIM CƯƠNG ====================
 
 window.renderLeaderboard = function(subjectFilter = null) {
     const list = document.getElementById('ranking-list');
@@ -621,13 +537,10 @@ window.renderLeaderboard = function(subjectFilter = null) {
     
     let activeSubject = subjectFilter && subjectFilter !== "-- Chọn môn --" ? subjectFilter : null;
     
-    // Kiểm tra xem AppState.rankings có dữ liệu không
-    console.log("Tổng số bản ghi trong AppState.rankings:", AppState.rankings ? AppState.rankings.length : 0);
-
     let studentSubjects = {};
     AppState.rankings.forEach(item => {
-        let name = String(item.name || item['Họ tên'] || '').trim();
-        let subj = String(item.subject || item['Môn'] || '').trim();
+        let name = String(item.name || '').trim();
+        let subj = String(item.subject || '').trim();
         if (!name || !subj) return;
         let key = name + '___' + subj;
         if (!studentSubjects[key]) {
@@ -644,7 +557,6 @@ window.renderLeaderboard = function(subjectFilter = null) {
         let st = studentSubjects[key];
         if (activeSubject && cleanKey(st.subject) !== cleanKey(activeSubject)) continue;
         
-        // Lấy tất cả các lần làm bài của học sinh này (không phân biệt chữ hoa/thường)
         let attempts = AppState.rankings.filter(r => {
             let rName = String(r.name || r['Họ tên'] || '').trim().toLowerCase();
             let rSubj = cleanKey(r.subject || r['Môn'] || '');
@@ -653,7 +565,6 @@ window.renderLeaderboard = function(subjectFilter = null) {
 
         if (attempts.length === 0) continue;
 
-        // Chuẩn hóa điểm số từ mọi tên trường có thể có (score, Điểm)
         attempts.forEach(a => {
             let s = a.score !== undefined ? a.score : a['Điểm'];
             a._parsedScore = Number(s) || 0;
@@ -666,10 +577,7 @@ window.renderLeaderboard = function(subjectFilter = null) {
         let count9 = attempts.filter(a => a._parsedScore >= 9).length;
         let count8 = attempts.filter(a => a._parsedScore >= 8).length;
         
-        // Tính số bộ Kim Cương
         let kcCount = countKimCuongSetsFlexible(attempts);
-
-        console.log(`Học sinh: ${st.name}, Môn: ${st.subject} -> Tổng số bài: ${attempts.length}, Số lần 10đ: ${count10}, Số bộ Kim Cương: ${kcCount}`);
 
         if (kcCount > 0) {
             kimCuongList.push({ name: st.name, subject: st.subject, score: bestScore, count: kcCount, date: latestAttempt.date || latestAttempt['Ngày'] || '' });
@@ -710,18 +618,16 @@ window.renderLeaderboard = function(subjectFilter = null) {
     html += buildGroupHtml('💎 Kim Cương (3 lần liên tiếp đạt 10 điểm, khác chủ đề)', '#007bff', kimCuongList, 'lần đạt chuỗi Kim Cương');
     html += buildGroupHtml('🥇 Vàng (Có ít nhất 1 lần đạt 10 điểm)', '#d9822b', vangList, 'lần đạt 10 điểm');
     html += buildGroupHtml('🥈 Bạc (Có ít nhất 2 lần đạt 9 điểm trở lên)', '#6c757d', bacList, 'lần đạt từ 9đ trở lên');
-    html += buildGroupHtml('🥉 Đồng (Có ítнент 2 lần đạt 8 điểm trở lên)', '#cd7f32', dongList, 'lần đạt từ 8đ trở lên');
+    html += buildGroupHtml('🥉 Đồng (Có ít nhất 2 lần đạt 8 điểm trở lên)', '#cd7f32', dongList, 'lần đạt từ 8đ trở lên');
     html += '</div>';
 
     list.innerHTML = html;
 };
 
-// Hàm lấy tên chủ đề quét linh hoạt qua mọi trường dữ liệu
 function extractTopicFlexible(att) {
     let raw = att.chuDe || att['Chủ đề'] || att.topic || att.tieuDe || att.baiHoc || '';
     if (raw) return cleanKey(raw);
     
-    // Quét toàn bộ key
     for (let key in att) {
         let val = att[key];
         if (typeof val === 'string' && val.length > 2 && !['name', 'subject', 'date', 'score', 'Họ tên', 'Môn', 'Ngày', 'Điểm'].includes(key)) {
@@ -731,9 +637,7 @@ function extractTopicFlexible(att) {
     return '';
 }
 
-// Hàm đếm chuỗi kim cương cực kỳ linh hoạt
 function countKimCuongSetsFlexible(attempts) {
-    // Sắp xếp theo ngày tăng dần
     let sorted = [...attempts].sort((a, b) => {
         let d1 = parseCustomDate(a.date || a['Ngày'] || '');
         let d2 = parseCustomDate(b.date || b['Ngày'] || '');
@@ -754,7 +658,6 @@ function countKimCuongSetsFlexible(attempts) {
         let t3 = extractTopicFlexible(sorted[i+2]);
 
         if (s1 === 10 && s2 === 10 && s3 === 10) {
-            // Nếu không lấy được tên chủ đề hoặc các chủ đề khác nhau thì tính là 1 bộ Kim Cương
             if (!t1 || !t2 || !t3 || (t1 !== t2 && t2 !== t3 && t1 !== t3)) {
                 setsCount++;
                 i += 3;
