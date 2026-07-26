@@ -183,10 +183,8 @@ window.speakQuestion = function(index) {
 
     let textToRead = '';
     if (!hasAnswered) {
-        // Chưa chọn: đọc nội dung câu hỏi / gợi ý
         textToRead = item.question || '';
     } else {
-        // Đã chọn rồi: đọc câu đúng / đáp án đúng
         const chuDeLower = (item.chuDe || '').toLowerCase();
         const isVietAnh = chuDeLower.includes('việt anh') || chuDeLower.includes('viet anh');
         
@@ -512,13 +510,9 @@ window.handleQuizData = function(data) {
             });
         }
 
-        console.log("Đã nạp thành công tổng số dòng vào AppState.rankings:", AppState.rankings.length);
-
         window.initInterface();
     }
 };
-
-// ==================== HÀM HỖ TRỢ XỬ LÝ NGÀY THÁNG ====================
 
 function parseCustomDate(dateStr) {
     if (!dateStr) return 0;
@@ -536,8 +530,6 @@ function parseCustomDate(dateStr) {
     let parsed = Date.parse(str);
     return isNaN(parsed) ? 0 : parsed;
 }
-
-// ==================== HÀM BẢNG XẾP HẠNG CHUẨN XÁC ====================
 
 window.renderLeaderboard = function(subjectFilter = null) {
     const list = document.getElementById('ranking-list');
@@ -624,18 +616,10 @@ window.renderLeaderboard = function(subjectFilter = null) {
                 }
             }
 
-            if (isKimCuong) {
-                kimCuongList.push(record);
-            }
-            if (count10 > 0) {
-                vangList.push(record);
-            }
-            if (count9 >= 2) {
-                bacList.push(record);
-            }
-            if (count8 >= 2) {
-                dongList.push(record);
-            }
+            if (isKimCuong) kimCuongList.push(record);
+            if (count10 > 0) vangList.push(record);
+            if (count9 >= 2) bacList.push(record);
+            if (count8 >= 2) dongList.push(record);
         }
     }
 
@@ -678,40 +662,6 @@ function extractTopicFlexible(att) {
         }
     }
     return '';
-}
-
-function countKimCuongSetsFlexible(attempts) {
-    let sorted = [...attempts].sort((a, b) => {
-        let d1 = parseCustomDate(a.date || a['Ngày'] || '');
-        let d2 = parseCustomDate(b.date || b['Ngày'] || '');
-        return d1 - d2;
-    });
-    
-    if (sorted.length < 3) return 0;
-
-    let setsCount = 0;
-    let i = 0;
-    while (i <= sorted.length - 3) {
-        let s1 = sorted[i]._parsedScore;
-        let s2 = sorted[i+1]._parsedScore;
-        let s3 = sorted[i+2]._parsedScore;
-
-        let t1 = extractTopicFlexible(sorted[i]);
-        let t2 = extractTopicFlexible(sorted[i+1]);
-        let t3 = extractTopicFlexible(sorted[i+2]);
-
-        if (s1 === 10 && s2 === 10 && s3 === 10) {
-            if (!t1 || !t2 || !t3 || (t1 !== t2 && t2 !== t3 && t1 !== t3)) {
-                setsCount++;
-                i += 3;
-            } else {
-                i++;
-            }
-        } else {
-            i++;
-        }
-    }
-    return setsCount;
 }
 
 function getCorrectKeys(item) {
