@@ -480,43 +480,57 @@ window.handleQuizData = function(data) {
         })).filter(p => p.chuDe !== '');
 
         // Xử lý chuẩn hóa bảng xếp hạng (hỗ trợ cả mảng lẫn object với mọi tên cột)
-        AppState.rankings = (data.rankings || []).map(raw => {
-            if (!raw) return null;
-            if (Array.isArray(raw)) {
-                return {
-                    name: String(raw[0] || '').trim(),
-                    score: Number(raw[1] || 0),
-                    subject: standardizeSubject(String(raw[2] || '').trim()),
-                    level: String(raw[3] || '').trim(),
-                    chuDe: String(raw[4] || '').trim(),
-                    date: String(raw[5] || '').trim()
-                };
-            } else if (typeof raw === 'object') {
-                const getVal = (keys) => {
-                    for (let k of keys) {
-                        for (let rk of Object.keys(raw)) {
-                            if (cleanKey(rk) === cleanKey(k)) {
-                                return raw[rk];
-                            }
+        // Đảm bảo đoạn code nạp dữ liệu nhận toàn bộ danh sách mà không bị ghi đè học sinh
+AppState.rankings = [];
+
+if (data.rankings && Array.isArray(data.rankings)) {
+    data.rankings.forEach(raw => {
+        if (!raw) return;
+        
+        let item = null;
+        if (Array.isArray(raw)) {
+            // Trường hợp dữ liệu là mảng theo thứ tự cột Excel [Họ tên, Điểm, Môn, Level, Chủ đề, Ngày]
+            item = {
+                name: String(raw[0] || '').trim(),
+                score: Number(raw[1] || 0),
+                subject: standardizeSubject(String(raw[2] || '').trim()),
+                level: String(raw[3] || '').trim(),
+                chuDe: String(raw[4] || '').trim(),
+                date: String(raw[5] || '').trim()
+            };
+        } else if (typeof raw === 'object') {
+            // Trường hợp dữ liệu là object từ Google Sheets / JSON
+            const getVal = (keys) => {
+                for (let k of keys) {
+                    for (let rk of Object.keys(raw)) {
+                        if (cleanKey(rk) === cleanKey(k)) {
+                            return raw[rk];
                         }
                     }
-                    return '';
-                };
-                return {
-                    name: String(getVal(['name', 'hoten', 'ho_ten', 'hovaten', 'họ tên'])).trim(),
-                    score: Number(getVal(['score', 'diem', 'điểm']) || 0),
-                    subject: standardizeSubject(String(getVal(['subject', 'mon', 'môn'])).trim()),
-                    level: String(getVal(['level', 'capdo', 'cấp độ'])).trim(),
-                    chuDe: String(getVal(['chude', 'topic', 'chủ đề'])).trim(),
-                    date: String(getVal(['date', 'ngay', 'ngày'])).trim()
-                };
-            }
-            return null;
-        }).filter(r => r && r.name !== '');
-    }
+                }
+                return '';
+            };
+            item = {
+                name: String(getVal(['name', 'hoten', 'ho_ten', 'hovaten', 'họ tên'])).trim(),
+                score: Number(getVal(['score', 'diem', 'điểm']) || 0),
+                subject: standardizeSubject(String(getVal(['subject', 'mon', 'môn'])).trim()),
+                level: String(getVal(['level', 'capdo', 'cấp độ'])).trim(),
+                chuDe: String(getVal(['chude', 'topic', 'chủ đề'])).trim(),
+                date: String(getVal(['date', 'ngay', 'ngày'])).trim()
+            };
+        }
 
-    window.initInterface();
-};
+        // Chỉ đẩy vào nếu có tên học sinh hợp lệ
+        if (item && item.name !== '') {
+            AppState.rankings.push(item);
+        }
+    });
+}
+
+// Kiểm tra ngay sau khi nạp dữ liệu xem đã nhận đủ số dòng chưa
+console.log("Đã nạp thành công tổng số dòng vào AppState.rankings:", AppState.rankings.length);
+
+window.initInterface();
 
 function parseCustomDate(dateStr) {
     if (!dateStr) return 0;
