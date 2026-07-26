@@ -536,33 +536,32 @@ function parseCustomDate(dateStr) {
     return isNaN(parsed) ? 0 : parsed;
 }
 
-function hasThreeConsecutiveHighScores(rankings, studentName, subject) {
+function hasThreeConsecutiveHighScores(rankings, studentName, subjectName) {
+    // 1. Lọc các lượt thi của học sinh đúng môn, đã được chuẩn hóa tên và môn
     let studentAttempts = rankings.filter(r => 
         String(r.name).trim().toLowerCase() === String(studentName).trim().toLowerCase() &&
-        cleanKey(r.subject || '') === cleanKey(subject)
+        cleanKey(r.subject || '') === cleanKey(subjectName)
     );
-    
+
+    // 2. Sắp xếp theo thời gian tăng dần (cũ nhất -> mới nhất)
+    // Đảm bảo trường chứa ngày tháng của bạn là 'date' hoặc thay bằng 'timestamp'/'time' tương ứng
+    studentAttempts.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    // Nếu số lần thi chưa đủ 3 thì chắc chắn không đạt
     if (studentAttempts.length < 3) return false;
-    
-    // Sắp xếp tăng dần theo thời gian (cũ nhất đến mới nhất)
-    studentAttempts.sort((a, b) => parseCustomDate(a.date) - parseCustomDate(b.date));
-    
+
+    // 3. Kiểm tra xem có 3 lần liên tiếp nào đạt điểm cao không (ví dụ điểm >= 8 hoặc mốc điểm quy định)
     for (let i = 0; i <= studentAttempts.length - 3; i++) {
-        let s1 = Number(studentAttempts[i].score);
-        let s2 = Number(studentAttempts[i+1].score);
-        let s3 = Number(studentAttempts[i+2].score);
-        
-        if (s1 === 10 && s2 === 10 && s3 === 10) {
-            let t1 = cleanKey(studentAttempts[i].chuDe || '');
-            let t2 = cleanKey(studentAttempts[i+1].chuDe || '');
-            let t3 = cleanKey(studentAttempts[i+2].chuDe || '');
-            
-            // Đảm bảo 3 chủ đề liên tiếp phải hoàn toàn khác nhau đôi một
-            if (t1 !== t2 && t2 !== t3 && t1 !== t3) {
-                return true;
-            }
+        let a1 = Number(studentAttempts[i].score);
+        let a2 = Number(studentAttempts[i+1].score);
+        let a3 = Number(studentAttempts[i+2].score);
+
+        // Định nghĩa thế nào là "High score" (Ví dụ: >= 8 điểm hoặc tùy theo logic của bạn)
+        if (a1 >= 8 && a2 >= 8 && a3 >= 8) {
+            return true; // Tìm thấy 3 lần liên tiếp đạt điểm cao
         }
     }
+
     return false;
 }
 
@@ -593,9 +592,9 @@ window.renderLeaderboard = function(subjectFilter = null) {
         if (activeSubject && cleanKey(st.subject) !== cleanKey(activeSubject)) continue;
         
         let attempts = AppState.rankings.filter(r => 
-            String(r.name).trim().toLowerCase() === st.name.toLowerCase() &&
-            cleanKey(r.subject || '') === cleanKey(st.subject)
-        );
+    String(r.name).trim().toLowerCase() === String(st.name).trim().toLowerCase() &&
+    cleanKey(r.subject || '') === cleanKey(st.subject)
+);
         if (attempts.length === 0) continue;
 
         let bestScore = Math.max(...attempts.map(a => Number(a.score)));
