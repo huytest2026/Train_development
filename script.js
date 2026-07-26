@@ -1452,3 +1452,188 @@ document.addEventListener('touchend', function() {
         }
     }, 200);
 });
+// ==========================================
+// HÀM TIỆN ÍCH CƠ BẢN
+// ==========================================
+function escapeHTML(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function removeDiacritics(str) {
+    return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D");
+}
+
+// ==========================================
+// ĐIỀU HƯỚNG MÀN HÌNH QUIZ
+// ==========================================
+function startQuiz() {
+    const startScreen = document.getElementById('start-screen');
+    const quizScreen = document.getElementById('quiz-screen');
+    if (startScreen && quizScreen) {
+        startScreen.style.display = 'none';
+        quizScreen.style.display = 'block';
+    }
+}
+
+function returnToHome() {
+    const startScreen = document.getElementById('start-screen');
+    const resultScreen = document.getElementById('result-screen');
+    const quizScreen = document.getElementById('quiz-screen');
+    if (startScreen && resultScreen && quizScreen) {
+        resultScreen.style.display = 'none';
+        quizScreen.style.display = 'none';
+        startScreen.style.display = 'block';
+    }
+}
+
+// ==========================================
+// QUẢN LÝ BẢNG ĐỘNG TỪ BẤT QUY TẮC
+// ==========================================
+
+const IRREGULAR_VERBS_DATA = [
+    { v1: "be", v2: "was / were", v3: "been", meaning: "là, ở" },
+    { v1: "beat", v2: "beat", v3: "beaten", meaning: "đánh, đập" },
+    { v1: "become", v2: "became", v3: "become", meaning: "trở thành" },
+    { v1: "begin", v2: "began", v3: "begun", meaning: "bắt đầu" },
+    { v1: "bite", v2: "bit", v3: "bitten", meaning: "cắn" },
+    { v1: "blow", v2: "blew", v3: "blown", meaning: "thổi" },
+    { v1: "break", v2: "broke", v3: "broken", meaning: "làm vỡ, gãy" },
+    { v1: "bring", v2: "brought", v3: "brought", meaning: "mang lại" },
+    { v1: "build", v2: "built", v3: "built", meaning: "xây dựng" },
+    { v1: "buy", v2: "bought", v3: "bought", meaning: "mua" },
+    { v1: "catch", v2: "caught", v3: "caught", meaning: "bắt, tóm" },
+    { v1: "choose", v2: "chose", v3: "chosen", meaning: "chọn, lựa" },
+    { v1: "come", v2: "came", v3: "come", meaning: "đến, đi đến" },
+    { v1: "cost", v2: "cost", v3: "cost", meaning: "có giá là" },
+    { v1: "cut", v2: "cut", v3: "cut", meaning: "cắt" },
+    { v1: "do", v2: "did", v3: "done", meaning: "làm" },
+    { v1: "draw", v2: "drew", v3: "drawn", meaning: "vẽ, kéo" },
+    { v1: "drink", v2: "drank", v3: "drunk", meaning: "uống" },
+    { v1: "drive", v2: "drove", v3: "driven", meaning: "lái xe" },
+    { v1: "eat", v2: "ate", v3: "eaten", meaning: "ăn" },
+    { v1: "fall", v2: "fell", v3: "fallen", meaning: "ngã, rơi" },
+    { v1: "feel", v2: "felt", v3: "felt", meaning: "cảm thấy" },
+    { v1: "find", v2: "found", v3: "found", meaning: "tìm thấy" },
+    { v1: "fly", v2: "flew", v3: "flown", meaning: "bay" },
+    { v1: "forget", v2: "forgot", v3: "forgotten", meaning: "quên" },
+    { v1: "get", v2: "got", v3: "got / gotten", meaning: "được, nhận" },
+    { v1: "give", v2: "gave", v3: "given", meaning: "cho, tặng" },
+    { v1: "go", v2: "went", v3: "gone", meaning: "đi" },
+    { v1: "grow", v2: "grew", v3: "grown", meaning: "mọc, phát triển" },
+    { v1: "have", v2: "had", v3: "had", meaning: "có" },
+    { v1: "hear", v2: "heard", v3: "heard", meaning: "nghe" },
+    { v1: "hide", v2: "hid", v3: "hidden", meaning: "trốn, giấu" },
+    { v1: "hit", v2: "hit", v3: "hit", meaning: "đánh" },
+    { v1: "hold", v2: "held", v3: "held", meaning: "cầm, nắm" },
+    { v1: "hurt", v2: "hurt", v3: "hurt", meaning: "làm đau" },
+    { v1: "keep", v2: "kept", v3: "kept", meaning: "giữ" },
+    { v1: "know", v2: "knew", v3: "known", meaning: "biết" },
+    { v1: "leave", v2: "left", v3: "left", meaning: "rời đi, để lại" },
+    { v1: "lend", v2: "lent", v3: "lent", meaning: "cho mượn" },
+    { v1: "let", v2: "let", v3: "let", meaning: "cho phép" },
+    { v1: "lie", v2: "lay", v3: "lain", meaning: "nằm" },
+    { v1: "lose", v2: "lost", v3: "lost", meaning: "mất, thua" },
+    { v1: "make", v2: "made", v3: "made", meaning: "làm, chế tạo" },
+    { v1: "meet", v2: "met", v3: "met", meaning: "gặp" },
+    { v1: "pay", v2: "paid", v3: "paid", meaning: "trả tiền" },
+    { v1: "put", v2: "put", v3: "put", meaning: "đặt, để" },
+    { v1: "read", v2: "read", v3: "read", meaning: "đọc" },
+    { v1: "ride", v2: "rode", v3: "ridden", meaning: "cưỡi, lái" },
+    { v1: "ring", v2: "rang", v3: "rung", meaning: "reo, rung chuông" },
+    { v1: "rise", v2: "rose", v3: "risen", meaning: "mọc, tăng lên" },
+    { v1: "run", v2: "ran", v3: "run", meaning: "chạy" },
+    { v1: "say", v2: "said", v3: "said", meaning: "nói" },
+    { v1: "see", v2: "saw", v3: "seen", meaning: "nhìn thấy" },
+    { v1: "sell", v2: "sold", v3: "sold", meaning: "bán" },
+    { v1: "send", v2: "sent", v3: "sent", meaning: "gửi" },
+    { v1: "show", v2: "showed", v3: "shown", meaning: "trình bày, chỉ" },
+    { v1: "shut", v2: "shut", v3: "shut", meaning: "đóng lại" },
+    { v1: "sing", v2: "sang", v3: "sung", meaning: "hát" },
+    { v1: "sit", v2: "sat", v3: "sat", meaning: "ngồi" },
+    { v1: "sleep", v2: "slept", v3: "slept", meaning: "ngủ" },
+    { v1: "speak", v2: "spoke", v3: "spoken", meaning: "nói" },
+    { v1: "spend", v2: "spent", v3: "spent", meaning: "tiêu xài, trải qua" },
+    { v1: "stand", v2: "stood", v3: "stood", meaning: "đứng" },
+    { v1: "swim", v2: "swam", v3: "swum", meaning: "bơi" },
+    { v1: "take", v2: "took", v3: "taken", meaning: "cầm, lấy" },
+    { v1: "teach", v2: "taught", v3: "taught", meaning: "dạy" },
+    { v1: "tear", v2: "tore", v3: "torn", meaning: "xé" },
+    { v1: "tell", v2: "told", v3: "told", meaning: "kể, bảo" },
+    { v1: "think", v2: "thought", v3: "thought", meaning: "suy nghĩ" },
+    { v1: "throw", v2: "threw", v3: "thrown", meaning: "ném, quăng" },
+    { v1: "understand", v2: "understood", v3: "understood", meaning: "hiểu" },
+    { v1: "wake", v2: "woke", v3: "woken", meaning: "thức dậy" },
+    { v1: "wear", v2: "wore", v3: "worn", meaning: "mặc" },
+    { v1: "win", v2: "won", v3: "won", meaning: "thắng, chiến thắng" },
+    { v1: "write", v2: "wrote", v3: "written", meaning: "viết" }
+];
+
+window.openIrregularVerbsModal = function() {
+    const modal = document.getElementById('irregular-verbs-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        window.renderIrregularVerbsTable(IRREGULAR_VERBS_DATA);
+        const searchInput = document.getElementById('iv-search-input');
+        if (searchInput) searchInput.focus();
+    }
+};
+
+window.closeIrregularVerbsModal = function() {
+    const modal = document.getElementById('irregular-verbs-modal');
+    if (modal) modal.style.display = 'none';
+};
+
+window.renderIrregularVerbsTable = function(dataArray) {
+    const resultList = document.getElementById('iv-result-list');
+    if (!resultList) return;
+
+    if (dataArray.length === 0) {
+        resultList.innerHTML = '<div style="text-align: center; color: #888; padding: 15px;">Không tìm thấy động từ phù hợp.</div>';
+        return;
+    }
+
+    let html = '<table style="width: 100%; border-collapse: collapse; font-size: 1.02em;">';
+    html += '<tr style="background: #540606; color: white; text-align: left;">' +
+            '<th style="padding: 10px; border: 1px solid #ddd;">V1 (Base)</th>' +
+            '<th style="padding: 10px; border: 1px solid #ddd;">V2 (Past)</th>' +
+            '<th style="padding: 10px; border: 1px solid #ddd;">V3 (Participle)</th>' +
+            '<th style="padding: 10px; border: 1px solid #ddd;">Ý nghĩa</th>' +
+            '</tr>';
+
+    dataArray.forEach((item, index) => {
+        let bg = index % 2 === 0 ? '#ffffff' : '#f1f3f5';
+        html += `<tr style="background: ${bg};">` +
+                `<td style="padding: 8px 10px; border: 1px solid #ddd; font-weight: bold; color: #007bff;">${escapeHTML(item.v1)}</td>` +
+                `<td style="padding: 8px 10px; border: 1px solid #ddd;">${escapeHTML(item.v2)}</td>` +
+                `<td style="padding: 8px 10px; border: 1px solid #ddd;">${escapeHTML(item.v3)}</td>` +
+                `<td style="padding: 8px 10px; border: 1px solid #ddd; font-style: italic;">${escapeHTML(item.meaning)}</td>` +
+                `</tr>`;
+    });
+    html += '</table>';
+    resultList.innerHTML = html;
+};
+
+window.filterIrregularVerbs = function() {
+    const input = document.getElementById('iv-search-input');
+    if (!input) return;
+    let keyword = removeDiacritics(input.value.trim().toLowerCase());
+
+    if (!keyword) {
+        window.renderIrregularVerbsTable(IRREGULAR_VERBS_DATA);
+        return;
+    }
+
+    let filtered = IRREGULAR_VERBS_DATA.filter(item => 
+        removeDiacritics(item.v1.toLowerCase()).includes(keyword) ||
+        removeDiacritics(item.v2.toLowerCase()).includes(keyword) ||
+        removeDiacritics(item.v3.toLowerCase()).includes(keyword) ||
+        removeDiacritics(item.meaning.toLowerCase()).includes(keyword)
+    );
+
+    window.renderIrregularVerbsTable(filtered);
+};
