@@ -684,8 +684,8 @@ window.renderLeaderboard = function(subjectFilter = null) {
     let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
     html += buildGroupHtml('💎 Kim Cương (3 lần liên tiếp đạt 10 điểm, khác chủ đề)', '#007bff', kimCuongList);
     html += buildGroupHtml('🥇 Vàng (Có ít nhất 1 lần đạt 10 điểm)', '#d9822b', vangList);
-    html += buildGroupHtml('🥈 Bạc (Có ít nhất 2 lần đạt 9 điểm trở lên)', '#6c757d', bacList);
-    html += buildGroupHtml('🥉 Đồng (Có ít nhất 2 lần đạt 8 điểm trở lên)', '#cd7f32', dongList);
+    html += buildGroupHtml('🥈 Bạc (Có ít nhất 1 lần đạt 9 điểm trở lên và nhỏ hơn 10)', '#6c757d', bacList);
+    html += buildGroupHtml('🥉 Đồng (Có ít nhất 1 lần đạt 8 điểm trở lên và nhỏ hơn 9)', '#cd7f32', dongList);
     html += '</div>';
 
     list.innerHTML = html;
