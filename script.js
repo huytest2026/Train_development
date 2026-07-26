@@ -521,19 +521,48 @@ window.handleQuizData = function(data) {
 function parseCustomDate(dateStr) {
     if (!dateStr) return 0;
     let cleanStr = String(dateStr).trim();
-    let parts = cleanStr.split(/[\/\s:]+/);
-    if (parts.length >= 6) {
-        let year = Number(parts[2]);
-        let month = Number(parts[1]) - 1;
-        let day = Number(parts[0]);
-        let hour = Number(parts[3]);
-        let minute = Number(parts[4]);
-        let second = Number(parts[5]);
-        let d = new Date(year, month, day, hour, minute, second);
-        return isNaN(d.getTime()) ? 0 : d.getTime();
-    }
+    
+    // Thử parse trực tiếp nếu là định dạng chuẩn
     let parsed = Date.parse(cleanStr);
-    return isNaN(parsed) ? 0 : parsed;
+    if (!isNaN(parsed)) return parsed;
+
+    // Xử lý tách chuỗi theo các ký tự phân cách (/, -, khoảng trắng, dấu hai chấm)
+    let parts = cleanStr.split(/[\/\s:\-]+/);
+    if (parts.length >= 3) {
+        let p0 = Number(parts[0]);
+        let p1 = Number(parts[1]);
+        let p2 = Number(parts[2]);
+        
+        let year, month, day;
+        
+        // Nếu số đầu tiên lớn hơn 31, chắc chắn là định dạng Năm trước (YYYY-MM-DD)
+        if (p0 > 31) {
+            year = p0;
+            month = p1 - 1;
+            day = p2;
+        } 
+        // Nếu số thứ hai lớn hơn 12, chắc chắn là định dạng Tháng trước (MM/DD/YYYY - chuẩn Mỹ)
+        else if (p1 > 12) {
+            month = p0 - 1;
+            day = p1;
+            year = p2 < 100 ? 2000 + p2 : p2;
+        } 
+        // Mặc định theo kiểu Ngày trước (DD/MM/YYYY)
+        else {
+            day = p0;
+            month = p1 - 1;
+            year = p2 < 100 ? 2000 + p2 : p2;
+        }
+
+        let hour = parts[3] ? Number(parts[3]) : 0;
+        let minute = parts[4] ? Number(parts[4]) : 0;
+        let second = parts[5] ? Number(parts[5]) : 0;
+
+        let d = new Date(year, month, day, hour, minute, second);
+        if (!isNaN(d.getTime())) return d.getTime();
+    }
+    
+    return 0;
 }
 
 function hasThreeConsecutiveHighScores(rankings, studentName, subjectName) {
