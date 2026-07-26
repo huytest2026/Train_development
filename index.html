@@ -138,7 +138,21 @@
         </div>
     </div>
 </div>
-
+<!-- MODAL BẢNG ĐỘNG TỪ BẤT QUY TẮC -->
+<div id="irregular-verbs-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+    <div class="dict-content" style="max-width: 650px; width: 95%;">
+        <h3 style="color: #540606; margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
+            📚 Bảng Động Từ Bất Quy Tắc Tiếng Anh
+            <button type="button" onclick="window.closeIrregularVerbsModal()" style="background: none; border: none; font-size: 1.2em; cursor: pointer; font-weight: bold;">✕</button>
+        </h3>
+        <div style="margin-bottom: 12px;">
+            <input type="text" id="iv-search-input" placeholder="Nhập từ cần tìm (V1, V2, V3 hoặc nghĩa tiếng Việt)..." oninput="window.filterIrregularVerbs()" style="margin: 0; width: 100%; padding: 12px; border: 1px solid #540606; border-radius: 8px;">
+        </div>
+        <div id="iv-result-list" style="max-height: 350px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+            <!-- Danh sách động từ sẽ được render tự động ở đây -->
+        </div>
+    </div>
+</div>
 <script src="script.js"></script>
 </body>
 </html>
