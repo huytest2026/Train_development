@@ -607,10 +607,13 @@ window.renderLeaderboard = function(subjectFilter = null) {
     
     let activeSubject = subjectFilter && subjectFilter !== "-- Chọn môn --" ? subjectFilter : null;
     
+    // Kiểm tra xem AppState.rankings có dữ liệu không
+    console.log("Tổng số bản ghi trong AppState.rankings:", AppState.rankings ? AppState.rankings.length : 0);
+
     let studentSubjects = {};
     AppState.rankings.forEach(item => {
-        let name = String(item.name || '').trim();
-        let subj = String(item.subject || '').trim();
+        let name = String(item.name || item['Họ tên'] || '').trim();
+        let subj = String(item.subject || item['Môn'] || '').trim();
         if (!name || !subj) return;
         let key = name + '___' + subj;
         if (!studentSubjects[key]) {
@@ -627,36 +630,47 @@ window.renderLeaderboard = function(subjectFilter = null) {
         let st = studentSubjects[key];
         if (activeSubject && cleanKey(st.subject) !== cleanKey(activeSubject)) continue;
         
-        let attempts = AppState.rankings.filter(r => 
-            String(r.name).trim().toLowerCase() === String(st.name).trim().toLowerCase() &&
-            cleanKey(r.subject || '') === cleanKey(st.subject)
-        );
+        // Lấy tất cả các lần làm bài của học sinh này (không phân biệt chữ hoa/thường)
+        let attempts = AppState.rankings.filter(r => {
+            let rName = String(r.name || r['Họ tên'] || '').trim().toLowerCase();
+            let rSubj = cleanKey(r.subject || r['Môn'] || '');
+            return rName === st.name.toLowerCase() && rSubj === cleanKey(st.subject);
+        });
+
         if (attempts.length === 0) continue;
 
-        let bestScore = Math.max(...attempts.map(a => Number(a.score)));
+        // Chuẩn hóa điểm số từ mọi tên trường có thể có (score, Điểm)
+        attempts.forEach(a => {
+            let s = a.score !== undefined ? a.score : a['Điểm'];
+            a._parsedScore = Number(s) || 0;
+        });
+
+        let bestScore = Math.max(...attempts.map(a => a._parsedScore));
         let latestAttempt = attempts[attempts.length - 1];
 
-        let count10 = attempts.filter(a => Number(a.score) === 10).length;
-        let count9 = attempts.filter(a => Number(a.score) >= 9).length;
-        let count8 = attempts.filter(a => Number(a.score) >= 8).length;
+        let count10 = attempts.filter(a => a._parsedScore === 10).length;
+        let count9 = attempts.filter(a => a._parsedScore >= 9).length;
+        let count8 = attempts.filter(a => a._parsedScore >= 8).length;
         
-        // Gọi hàm đếm số bộ Kim Cương
-        let kcCount = countKimCuongSets(attempts);
+        // Tính số bộ Kim Cương
+        let kcCount = countKimCuongSetsFlexible(attempts);
+
+        console.log(`Học sinh: ${st.name}, Môn: ${st.subject} -> Tổng số bài: ${attempts.length}, Số lần 10đ: ${count10}, Số bộ Kim Cương: ${kcCount}`);
 
         if (kcCount > 0) {
-            kimCuongList.push({ name: st.name, subject: st.subject, score: bestScore, count: kcCount, date: latestAttempt.date || '' });
+            kimCuongList.push({ name: st.name, subject: st.subject, score: bestScore, count: kcCount, date: latestAttempt.date || latestAttempt['Ngày'] || '' });
         }
         
         if (count10 > 0) {
-            vangList.push({ name: st.name, subject: st.subject, score: bestScore, count: count10, date: latestAttempt.date || '' });
+            vangList.push({ name: st.name, subject: st.subject, score: bestScore, count: count10, date: latestAttempt.date || latestAttempt['Ngày'] || '' });
         }
         
         if (count9 >= 2) {
-            bacList.push({ name: st.name, subject: st.subject, score: bestScore, count: count9, date: latestAttempt.date || '' });
+            bacList.push({ name: st.name, subject: st.subject, score: bestScore, count: count9, date: latestAttempt.date || latestAttempt['Ngày'] || '' });
         }
         
         if (count8 >= 2) {
-            dongList.push({ name: st.name, subject: st.subject, score: bestScore, count: count8, date: latestAttempt.date || '' });
+            dongList.push({ name: st.name, subject: st.subject, score: bestScore, count: count8, date: latestAttempt.date || latestAttempt['Ngày'] || '' });
         }
     }
 
@@ -682,55 +696,55 @@ window.renderLeaderboard = function(subjectFilter = null) {
     html += buildGroupHtml('💎 Kim Cương (3 lần liên tiếp đạt 10 điểm, khác chủ đề)', '#007bff', kimCuongList, 'lần đạt chuỗi Kim Cương');
     html += buildGroupHtml('🥇 Vàng (Có ít nhất 1 lần đạt 10 điểm)', '#d9822b', vangList, 'lần đạt 10 điểm');
     html += buildGroupHtml('🥈 Bạc (Có ít nhất 2 lần đạt 9 điểm trở lên)', '#6c757d', bacList, 'lần đạt từ 9đ trở lên');
-    html += buildGroupHtml('🥉 Đồng (Có ít nhất 2 lần đạt 8 điểm trở lên)', '#cd7f32', dongList, 'lần đạt từ 8đ trở lên');
+    html += buildGroupHtml('🥉 Đồng (Có ítнент 2 lần đạt 8 điểm trở lên)', '#cd7f32', dongList, 'lần đạt từ 8đ trở lên');
     html += '</div>';
 
     list.innerHTML = html;
 };
 
-// Hàm trích xuất tên chủ đề quét qua mọi tên trường có thể có (chuDe, topic, v.v. hoặc cột E trong dữ liệu của bạn)
-function extractTopic(att) {
-    // Thử tìm trong các tên property phổ biến hoặc quét qua mọi key có chứa chữ liên quan đến chủ đề/bài học
-    if (att.chuDe) return cleanKey(att.chuDe);
-    if (att['Chủ đề']) return cleanKey(att['Chủ đề']);
-    if (att.topic) return cleanKey(att.topic);
-    if (att.tieuDe) return cleanKey(att.tieuDe);
+// Hàm lấy tên chủ đề quét linh hoạt qua mọi trường dữ liệu
+function extractTopicFlexible(att) {
+    let raw = att.chuDe || att['Chủ đề'] || att.topic || att.tieuDe || att.baiHoc || '';
+    if (raw) return cleanKey(raw);
     
-    // Quét toàn bộ keys của object dòng dữ liệu xem có key nào chứa giá trị chuỗi dài (thường là tên chủ đề như ảnh)
+    // Quét toàn bộ key
     for (let key in att) {
         let val = att[key];
-        if (typeof val === 'string' && val.length > 3 && key !== 'name' && key !== 'subject' && key !== 'date' && key !== 'score') {
+        if (typeof val === 'string' && val.length > 2 && !['name', 'subject', 'date', 'score', 'Họ tên', 'Môn', 'Ngày', 'Điểm'].includes(key)) {
             return cleanKey(val);
         }
     }
     return '';
 }
 
-// Hàm đếm số chuỗi 3 lần 10 điểm khác chủ đề cực kỳ linh hoạt
-function countKimCuongSets(attempts) {
-    // Sắp xếp các lần làm theo thời gian tăng dần
-    let sortedAttempts = [...attempts].sort((a, b) => parseCustomDate(a.date) - parseCustomDate(b.date));
+// Hàm đếm chuỗi kim cương cực kỳ linh hoạt
+function countKimCuongSetsFlexible(attempts) {
+    // Sắp xếp theo ngày tăng dần
+    let sorted = [...attempts].sort((a, b) => {
+        let d1 = parseCustomDate(a.date || a['Ngày'] || '');
+        let d2 = parseCustomDate(b.date || b['Ngày'] || '');
+        return d1 - d2;
+    });
     
-    if (sortedAttempts.length < 3) return 0;
+    if (sorted.length < 3) return 0;
 
     let setsCount = 0;
     let i = 0;
-    while (i <= sortedAttempts.length - 3) {
-        let s1 = Number(sortedAttempts[i].score);
-        let s2 = Number(sortedAttempts[i+1].score);
-        let s3 = Number(sortedAttempts[i+2].score);
+    while (i <= sorted.length - 3) {
+        let s1 = sorted[i]._parsedScore;
+        let s2 = sorted[i+1]._parsedScore;
+        let s3 = sorted[i+2]._parsedScore;
 
-        let t1 = extractTopic(sortedAttempts[i]);
-        let t2 = extractTopic(sortedAttempts[i+1]);
-        let t3 = extractTopic(sortedAttempts[i+2]);
+        let t1 = extractTopicFlexible(sorted[i]);
+        let t2 = extractTopicFlexible(sorted[i+1]);
+        let t3 = extractTopicFlexible(sorted[i+2]);
 
         if (s1 === 10 && s2 === 10 && s3 === 10) {
-            // Nếu các chủ đề khác nhau (hoặc hệ thống không lấy được chủ đề thì mặc định vẫn chấp nhận chuỗi 3 điểm 10)
+            // Nếu không lấy được tên chủ đề hoặc các chủ đề khác nhau thì tính là 1 bộ Kim Cương
             if (!t1 || !t2 || !t3 || (t1 !== t2 && t2 !== t3 && t1 !== t3)) {
                 setsCount++;
-                i += 3; // Nhảy cóc qua 3 bài để tính chuỗi tiếp theo
+                i += 3;
             } else {
-                // Nếu bị trùng chủ đề liên tiếp trong cụm 3 bài này, dịch chuyển 1 bước để tìm cụm khác thỏa mãn
                 i++;
             }
         } else {
