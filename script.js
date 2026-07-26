@@ -517,6 +517,11 @@ window.handleQuizData = function(data) {
                 }
 
                 if (item && item.name !== '') {
+                    let lowerName = item.name.toLowerCase();
+                    let lowerSubj = cleanKey(item.subject);
+                    if (lowerName === 'họ tên' || lowerName === 'hoten' || lowerName === 'name' || lowerSubj === 'mon' || lowerSubj === 'môn') {
+                        return;
+                    }
                     AppState.rankings.push(item);
                 }
             });
@@ -528,7 +533,31 @@ window.handleQuizData = function(data) {
     }
 };
 
-// ==================== HÀM BẢNG XẾP HẠNG & XỬ LÝ KIM CƯƠNG ====================
+// ==================== HÀM HỖ TRỢ XỬ LÝ NGÀY THÁNG ====================
+
+function parseCustomDate(dateStr) {
+    if (!dateStr) return 0;
+    let str = String(dateStr).trim();
+    let parts = str.split(/[\s/\-:]+/);
+    if (parts.length >= 5) {
+        let day = parseInt(parts[0], 10);
+        let month = parseInt(parts[1], 10) - 1;
+        let year = parseInt(parts[2], 10);
+        let hour = parseInt(parts[3], 10) || 0;
+        let minute = parseInt(parts[4], 10) || 0;
+        let second = parseInt(parts[5], 10) || 0;
+        return new Date(year, month, day, hour, minute, second).getTime();
+    }
+    let parsed = Date.parse(str);
+    return isNaN(parsed) ? 0 : parsed;
+}
+
+function extractTopicFlexible(att) {
+    let raw = att.chuDe || att['Chủ đề'] || att.topic || '';
+    return cleanKey(raw);
+}
+
+// ==================== HÀM BẢNG XẾP HẠNG CHUẨN XÁC ====================
 
 window.renderLeaderboard = function(subjectFilter = null) {
     const list = document.getElementById('ranking-list');
@@ -557,41 +586,80 @@ window.renderLeaderboard = function(subjectFilter = null) {
         if (activeSubject && cleanKey(st.subject) !== cleanKey(activeSubject)) continue;
         
         let attempts = AppState.rankings.filter(r => {
-            let rName = String(r.name || r['Họ tên'] || '').trim().toLowerCase();
-            let rSubj = cleanKey(r.subject || r['Môn'] || '');
+            let rName = String(r.name || '').trim().toLowerCase();
+            let rSubj = cleanKey(r.subject || '');
             return rName === st.name.toLowerCase() && rSubj === cleanKey(st.subject);
         });
 
         if (attempts.length === 0) continue;
 
         attempts.forEach(a => {
-            let s = a.score !== undefined ? a.score : a['Điểm'];
+            let s = a.score !== undefined ? a.score : 0;
             a._parsedScore = Number(s) || 0;
         });
 
         let bestScore = Math.max(...attempts.map(a => a._parsedScore));
         let latestAttempt = attempts[attempts.length - 1];
 
-        let count10 = attempts.filter(a => a._parsedScore === 10).length;
-        let count9 = attempts.filter(a => a._parsedScore >= 9).length;
-        let count8 = attempts.filter(a => a._parsedScore >= 8).length;
-        
-        let kcCount = countKimCuongSetsFlexible(attempts);
+        // Kiểm tra xem dữ liệu Google Sheets có sẵn cột Level không
+        let hasExplicitLevel = attempts.some(a => a.level && a.level.trim() !== '');
 
-        if (kcCount > 0) {
-            kimCuongList.push({ name: st.name, subject: st.subject, score: bestScore, count: kcCount, date: latestAttempt.date || latestAttempt['Ngày'] || '' });
-        }
-        
-        if (count10 > 0) {
-            vangList.push({ name: st.name, subject: st.subject, score: bestScore, count: count10, date: latestAttempt.date || latestAttempt['Ngày'] || '' });
-        }
-        
-        if (count9 >= 2) {
-            bacList.push({ name: st.name, subject: st.subject, score: bestScore, count: count9, date: latestAttempt.date || latestAttempt['Ngày'] || '' });
-        }
-        
-        if (count8 >= 2) {
-            dongList.push({ name: st.name, subject: st.subject, score: bestScore, count: count8, date: latestAttempt.date || latestAttempt['Ngày'] || '' });
+        let record = {
+            name: st.name,
+            subject: st.subject,
+            score: bestScore,
+            date: latestAttempt.date || ''
+        };
+
+        if (hasExplicitLevel) {
+            // Nếu Google Sheets có điền sẵn cột Level, ưu tiên phân loại theo cột Level
+            attempts.forEach(a => {
+                let lvl = String(a.level || '').trim();
+                let rec = { name: st.name, subject: st.subject, score: Number(a.score) || bestScore, date: a.date || '' };
+                if (lvl === "Kim Cương" && !kimCuongList.some(x => x.name === st.name && x.subject === st.subject)) kimCuongList.push(rec);
+                if (lvl === "Vàng" && !vangList.some(x => x.name === st.name && x.subject === st.subject)) vangList.push(rec);
+                if (lvl === "Bạc" && !bacList.some(x => x.name === st.name && x.subject === st.subject)) bacList.push(rec);
+                if (lvl === "Đồng" && !dongList.some(x => x.name === st.name && x.subject === st.subject)) dongList.push(rec);
+            });
+        } else {
+            // Nếu cột Level trong Sheets đang trống, tự động tính toán thông minh dựa trên lịch sử điểm và chủ đề
+            let count10 = attempts.filter(a => a._parsedScore === 10).length;
+            let count9 = attempts.filter(a => a._parsedScore >= 9).length;
+            let count8 = attempts.filter(a => a._parsedScore >= 8).length;
+
+            // Kiểm tra điều kiện Kim Cương: 3 lần liên tiếp đạt 10 điểm, khác chủ đề
+            let sortedAttempts = [...attempts].sort((a, b) => parseCustomDate(a.date) - parseCustomDate(b.date));
+            let isKimCuong = false;
+            if (sortedAttempts.length >= 3) {
+                for (let i = 0; i <= sortedAttempts.length - 3; i++) {
+                    let s1 = sortedAttempts[i]._parsedScore;
+                    let s2 = sortedAttempts[i+1]._parsedScore;
+                    let s3 = sortedAttempts[i+2]._parsedScore;
+                    let t1 = extractTopicFlexible(sortedAttempts[i]);
+                    let t2 = extractTopicFlexible(sortedAttempts[i+1]);
+                    let t3 = extractTopicFlexible(sortedAttempts[i+2]);
+
+                    if (s1 === 10 && s2 === 10 && s3 === 10) {
+                        if (!t1 || !t2 || !t3 || (t1 !== t2 && t2 !== t3 && t1 !== t3)) {
+                            isKimCuong = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (isKimCuong) {
+                kimCuongList.push(record);
+            }
+            if (count10 > 0) {
+                vangList.push(record);
+            }
+            if (count9 >= 2) {
+                bacList.push(record);
+            }
+            if (count8 >= 2) {
+                dongList.push(record);
+            }
         }
     }
 
@@ -600,12 +668,12 @@ window.renderLeaderboard = function(subjectFilter = null) {
     bacList.sort((a, b) => b.score - a.score);
     dongList.sort((a, b) => b.score - a.score);
 
-    function buildGroupHtml(title, color, listItems, unitLabel) {
+    function buildGroupHtml(title, color, listItems) {
         if (listItems.length === 0) {
             return `<div style="margin-bottom: 12px; font-size: 1.02em;"><b>${title}:</b> <span style="color: #888; font-style: italic;">Chưa có học sinh đạt chuẩn</span></div>`;
         }
         let itemsHtml = listItems.map(item => 
-            `<li style="margin: 6px 0;"><b>${escapeHTML(item.name)}</b> (Môn: <span style="color: #007bff; font-weight: 600;">${escapeHTML(item.subject)}</span> - Điểm cao nhất: ${item.score} đ - Số lượng: <b>${item.count} ${unitLabel}</b>)</li>`
+            `<li style="margin: 6px 0;"><b>${escapeHTML(item.name)}</b> (Môn: <span style="color: #007bff; font-weight: 600;">${escapeHTML(item.subject)}</span> - Điểm cao nhất: ${item.score} đ)</li>`
         ).join('');
         return `<div style="margin-bottom: 16px;">
                     <b style="color: ${color}; font-size: 1.1em;">${title}:</b>
@@ -614,10 +682,10 @@ window.renderLeaderboard = function(subjectFilter = null) {
     }
 
     let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
-    html += buildGroupHtml('💎 Kim Cương (3 lần liên tiếp đạt 10 điểm, khác chủ đề)', '#007bff', kimCuongList, 'lần đạt chuỗi Kim Cương');
-    html += buildGroupHtml('🥇 Vàng (Có ít nhất 1 lần đạt 10 điểm)', '#d9822b', vangList, 'lần đạt 10 điểm');
-    html += buildGroupHtml('🥈 Bạc (Có ít nhất 2 lần đạt 9 điểm trở lên)', '#6c757d', bacList, 'lần đạt từ 9đ trở lên');
-    html += buildGroupHtml('🥉 Đồng (Có ít nhất 2 lần đạt 8 điểm trở lên)', '#cd7f32', dongList, 'lần đạt từ 8đ trở lên');
+    html += buildGroupHtml('💎 Kim Cương (3 lần liên tiếp đạt 10 điểm, khác chủ đề)', '#007bff', kimCuongList);
+    html += buildGroupHtml('🥇 Vàng (Có ít nhất 1 lần đạt 10 điểm)', '#d9822b', vangList);
+    html += buildGroupHtml('🥈 Bạc (Có ít nhất 2 lần đạt 9 điểm trở lên)', '#6c757d', bacList);
+    html += buildGroupHtml('🥉 Đồng (Có ít nhất 2 lần đạt 8 điểm trở lên)', '#cd7f32', dongList);
     html += '</div>';
 
     list.innerHTML = html;
