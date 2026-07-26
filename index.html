@@ -15,6 +15,7 @@
         .option-box:hover { background: #e2e6ea; }
         .option-box.selected { background: #d1ecf1; border-color: #0c5460; }
         #topic-container { margin: 10px 0; padding: 14px; border: 1px solid #ddd; max-height: 180px; overflow-y: auto; background: #fff; border-radius: 8px; font-size: 1.05em; }
+        #topic-container label { display: block; margin-bottom: 8px; font-weight: normal; cursor: pointer; }
         
         /* Thanh trạng thái cố định khi cuộn */
         .quiz-sticky-header {
@@ -124,9 +125,7 @@
         <label style="margin: 0; font-size: 1.1em;">Chọn chủ đề:</label>
         <button type="button" onclick="window.toggleAllTopics()" style="padding: 6px 12px; font-size: 0.95em; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Chọn/Bỏ chọn tất cả</button>
     </div>
-    <div id="topic-container">
-        <label><input type="checkbox" class="topic-checkbox" value="general" checked> Chủ đề tổng hợp</label>
-    </div>
+    <div id="topic-container">Chưa tải dữ liệu...</div>
 
     <button type="button" id="start-btn" onclick="window.startQuiz()" style="width: 100%; padding: 16px; background: #007bff; color: white; border: none; cursor: pointer; margin-top: 15px; border-radius: 8px; font-weight: bold; font-size: 1.2em;">Bắt Đầu Làm Bài</button>
 
@@ -222,6 +221,22 @@
 
 <!-- JAVASCRIPT TÍCH HỢP ĐẦY ĐỦ -->
 <script>
+    // Dữ liệu chủ đề cho từng môn học
+    const topicsMap = {
+        math: [
+            { id: "algebra", name: "Đại số cơ bản & Phương trình" },
+            { id: "geometry", name: "Hình học phẳng và không gian" },
+            { id: "arithmetic", name: "Số học, Phân số & Tỷ lệ phần trăm" },
+            { id: "word_problems", name: "Giải toán có lời văn" }
+        ],
+        english: [
+            { id: "grammar", name: "Ngữ pháp (Thì, Mạo từ, Câu điều kiện)" },
+            { id: "vocabulary", name: "Từ vựng & Từ đồng nghĩa/Trái nghĩa" },
+            { id: "reading", name: "Đọc hiểu đoạn văn (Reading Comprehension)" },
+            { id: "phonics", name: "Phát âm & Trọng âm (Pronunciation & Stress)" }
+        ]
+    };
+
     // Dữ liệu động từ bất quy tắc mẫu
     const irregularVerbsData = [
         { v1: "be", v2: "was/were", v3: "been", meaning: "là, ở" },
@@ -247,7 +262,23 @@
     let timerInterval = null;
     let secondsElapsed = 0;
 
-    // Các hàm điều khiển giao diện & dữ liệu
+    // Hàm cập nhật danh sách chủ đề dựa theo môn học được chọn
+    function updateTopics() {
+        const subject = document.getElementById('subject-select').value;
+        const topicContainer = document.getElementById('topic-container');
+        
+        if (!subject || !topicsMap[subject]) {
+            topicContainer.innerHTML = '<span style="color: #666;">Vui lòng chọn môn học để hiển thị chủ đề...</span>';
+            return;
+        }
+
+        let html = '';
+        topicsMap[subject].forEach(topic => {
+            html += `<label><input type="checkbox" class="topic-checkbox" value="${topic.id}" checked> ${topic.name}</label>`;
+        });
+        topicContainer.innerHTML = html;
+    }
+
     window.loadData = function() {
         const code = document.getElementById('student-code').value.trim();
         if(!code) {
@@ -256,6 +287,7 @@
         }
         alert('Đã tải dữ liệu thành công cho học sinh: ' + code);
         document.getElementById('ranking-list').innerHTML = `<p style="color: green;">👤 ${code}: Sẵn sàng làm bài.</p>`;
+        updateTopics();
     };
 
     window.handleSubjectChange = function() {
@@ -266,6 +298,7 @@
         } else {
             levelContainer.style.display = 'none';
         }
+        updateTopics();
     };
 
     window.toggleMadeMode = function() {
@@ -292,6 +325,7 @@
 
     window.toggleAllTopics = function() {
         const checkboxes = document.querySelectorAll('.topic-checkbox');
+        if (checkboxes.length === 0) return;
         const allChecked = Array.from(checkboxes).every(cb => cb.checked);
         checkboxes.forEach(cb => cb.checked = !allChecked);
     };
