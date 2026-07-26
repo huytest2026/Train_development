@@ -17,7 +17,48 @@ function handleBeforeUnload(e) {
     e.returnValue = '';
 }
 
-// 1. Quản lý Tra từ điển
+// ==========================================
+// HÀM TIỆN ÍCH CƠ BẢN VÀ PHÁT ÂM
+// ==========================================
+function escapeHTML(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>"']/g, function(m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+    });
+}
+
+function removeDiacritics(str) {
+    if (!str) return ''; 
+    return String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
+}
+
+function cleanKey(str) {
+    if (!str) return ''; 
+    return removeDiacritics(str).toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function standardizeSubject(monStr) {
+    if (!monStr) return '';
+    const cleanM = cleanKey(monStr);
+    if (cleanM.includes('anh') || cleanM.includes('english')) return 'Tiếng Anh';
+    if (cleanM.includes('toan') || cleanM.includes('math')) return 'Toán';
+    if (cleanM.includes('tiengviet') || cleanM.includes('tv')) return 'Tiếng Việt';
+    return monStr.trim();
+}
+
+function speakWord(text) {
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        let cleanText = text.replace(/\/.+?\//g, '').trim();
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.lang = 'en-US';
+        utterance.rate = 0.9;
+        window.speechSynthesis.speak(utterance);
+    } else {
+        alert("Trình duyệt của bạn không hỗ trợ tính năng phát âm.");
+    }
+}
+
 // 1. Quản lý Tra từ điển (Đã tích hợp Anh - Việt)
 window.openDictionaryModal = function() {
     const modal = document.getElementById('dict-modal');
@@ -51,7 +92,6 @@ window.lookupWord = async function() {
 
     resultBox.innerHTML = 'Đang tra từ Anh - Việt...';
     try {
-        // Gọi song song API từ điển Anh-Anh và API dịch nghĩa Anh-Việt
         let [dictResponse, transResponse] = await Promise.all([
             fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`).catch(() => null),
             fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|vi`).catch(() => null)
@@ -89,7 +129,6 @@ window.lookupWord = async function() {
             }
             html += `</div>`;
 
-            // Hiển thị khung nghĩa tiếng Việt nổi bật lên đầu
             if (vietnameseMeaning && vietnameseMeaning.toLowerCase() !== word) {
                 html += `<div style="margin-top: 8px; padding: 10px; background: #e8f5e9; border-radius: 6px; border: 1px solid #c8e6c9;">` +
                         `<b style="color: #2e7d32;">🇻🇳 Nghĩa tiếng Việt:</b> <span style="color: #1b5e20; font-weight: bold; font-size: 1.1em;">${escapeHTML(vietnameseMeaning)}</span>` +
@@ -98,7 +137,7 @@ window.lookupWord = async function() {
 
             entry.meanings.forEach(meaning => {
                 html += `<div style="margin-top: 10px;"><b style="color: #007bff;">(${escapeHTML(meaning.partOfSpeech)})</b>`;
-                meaning.definitions.slice(0, 2).forEach((def, idx) => {
+                meaning.definitions.slice(0, 2).forEach((def) => {
                     html += `<div style="margin-left: 10px; margin-top: 4px;">• ${escapeHTML(def.definition)}`;
                     if (def.example) {
                         html += `<br><span style="color: #555; font-size: 0.95em; font-style: italic;">Ví dụ: "${escapeHTML(def.example)}"</span>`;
@@ -114,7 +153,7 @@ window.lookupWord = async function() {
     }
 };
 
-// 1. Lưu nhớ trạng thái môn và chủ đề đã chọn
+// Lưu nhớ trạng thái môn và chủ đề đã chọn
 window.saveUserSelections = function() {
     const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
     const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : '';
@@ -307,32 +346,6 @@ window.speakQuestion = function(index) {
     }
 };
 
-function escapeHTML(str) {
-    if (!str) return '';
-    return String(str).replace(/[&<>"']/g, function(m) {
-        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
-    });
-}
-
-function removeDiacritics(str) {
-    if (!str) return ''; 
-    return String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
-}
-
-function cleanKey(str) {
-    if (!str) return ''; 
-    return removeDiacritics(str).toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-function standardizeSubject(monStr) {
-    if (!monStr) return '';
-    const cleanM = cleanKey(monStr);
-    if (cleanM.includes('anh') || cleanM.includes('english')) return 'Tiếng Anh';
-    if (cleanM.includes('toan') || cleanM.includes('math')) return 'Toán';
-    if (cleanM.includes('tiengviet') || cleanM.includes('tv')) return 'Tiếng Việt';
-    return monStr.trim();
-}
-
 function normalizeItem(item) {
     if (!item) return null;
     if (!Array.isArray(item) && typeof item === 'object') {
@@ -497,7 +510,6 @@ window.initInterface = function() {
     window.renderLeaderboard();
     window.updateTopicList();
     window.updateMadeList();
-    
     window.restoreUserSelections();
 };
 
@@ -1417,16 +1429,15 @@ window.backToHome = function() {
         if (resContainer) resContainer.remove();
     }
 };
+
 // TỰ ĐỘNG TRA TỪ KHI BÔI ĐEN HOẶC CHỌN TỪ TRÊN MÀN HÌNH
 document.addEventListener('mouseup', function() {
     setTimeout(() => {
         let selectedText = window.getSelection().toString().trim();
-        // Kiểm tra nếu là một từ đơn tiếng Anh (chỉ chứa chữ cái, không có khoảng trắng dài)
         if (selectedText && selectedText.split(/\s+/).length === 1 && /^[a-zA-ZÀ-ỹ]+$/.test(selectedText)) {
             const modal = document.getElementById('dict-modal');
             const input = document.getElementById('dict-input');
             if (modal && input) {
-                // Chỉ tự động tra nếu modal chưa mở hoặc từ được chọn khác với từ đang tra
                 if (modal.style.display !== 'flex' || input.value.trim().toLowerCase() !== selectedText.toLowerCase()) {
                     modal.style.display = 'flex';
                     input.value = selectedText;
@@ -1437,7 +1448,6 @@ document.addEventListener('mouseup', function() {
     }, 100);
 });
 
-// Hỗ trợ thêm cho thiết bị cảm ứng (Mobile/Tablet): Chạm nhấc tay sau khi bôi đen
 document.addEventListener('touchend', function() {
     setTimeout(() => {
         let selectedText = window.getSelection().toString().trim();
@@ -1452,40 +1462,10 @@ document.addEventListener('touchend', function() {
         }
     }, 200);
 });
-// ==========================================
-// HÀM TIỆN ÍCH CƠ BẢN VÀ PHÁT ÂM
-// ==========================================
-function escapeHTML(str) {
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-}
-
-function removeDiacritics(str) {
-    return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D");
-}
-
-function speakWord(text) {
-    if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel(); // Dừng các âm thanh đang phát trước đó
-        // Lọc bỏ ký hiệu phụ nếu có để đọc chuẩn hơn
-        let cleanText = text.replace(/\/.+?\//g, '').trim();
-        const utterance = new SpeechSynthesisUtterance(cleanText);
-        utterance.lang = 'en-US';
-        utterance.rate = 0.9; // Tốc độ đọc chậm một chút cho dễ nghe
-        window.speechSynthesis.speak(utterance);
-    } else {
-        alert("Trình duyệt của bạn không hỗ trợ tính năng phát âm.");
-    }
-}
 
 // ==========================================
 // QUẢN LÝ BẢNG ĐỘNG TỪ BẤT QUY TẮC (CÓ IPA & PHÁT ÂM)
 // ==========================================
-
 const IRREGULAR_VERBS_DATA = [
     { v1: "be", ipa1: "/biː/", v2: "was / were", ipa2: "/wɒz / wɜː/", v3: "been", ipa3: "/biːn/", meaning: "là, ở" },
     { v1: "beat", ipa1: "/biːt/", v2: "beat", ipa2: "/biːt/", v3: "beaten", ipa3: "/ˈbiːtn/", meaning: "đánh, đập" },
@@ -1640,10 +1620,10 @@ window.filterIrregularVerbs = function() {
 
     window.renderIrregularVerbsTable(filtered);
 };
+
 // ==========================================
 // QUẢN LÝ MÁY TÍNH BỎ TÚI (CALCULATOR)
 // ==========================================
-
 window.openCalculatorModal = function() {
     const modal = document.getElementById('calc-modal');
     if (modal) modal.style.display = 'flex';
@@ -1654,28 +1634,26 @@ window.closeCalculatorModal = function() {
     if (modal) modal.style.display = 'none';
 };
 
-function calcInput(value) {
+window.calcInput = function(value) {
     const display = document.getElementById('calc-display');
     if (display) {
         display.value += value;
     }
-}
+};
 
-function calcClear() {
+window.calcClear = function() {
     const display = document.getElementById('calc-display');
     if (display) {
         display.value = '';
     }
-}
+};
 
-function calcCalculate() {
+window.calcCalculate = function() {
     const display = document.getElementById('calc-display');
     if (!display || !display.value.trim()) return;
 
     try {
-        // Thay thế biểu thức để tính toán an toàn
         let expression = display.value.replace(/×/g, '*').replace(/÷/g, '/');
-        // Sử dụng Function thay vì eval để tăng tính bảo mật
         let result = new Function(`return ${expression}`)();
         
         if (result !== undefined && !isNaN(result)) {
@@ -1686,4 +1664,4 @@ function calcCalculate() {
     } catch (e) {
         display.value = 'Lỗi';
     }
-}
+};
