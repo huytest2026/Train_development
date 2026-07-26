@@ -33,8 +33,8 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         }
 
-        /* Modal tra từ */
-        #dict-modal {
+        /* Modal chung (Tra từ & Động từ bất quy tắc) */
+        #dict-modal, #irregular-verbs-modal {
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -48,7 +48,7 @@
             padding: 25px;
             border-radius: 12px;
             width: 90%;
-            max-width: 500px;
+            max-width: 650px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
             border: 2px solid #540606;
             position: relative;
@@ -113,6 +113,7 @@
         <div>⏱️ <span id="timer-display" style="color: red; font-size: 1.15em;">--:--</span></div>
         <div style="display: flex; gap: 8px;">
             <button type="button" onclick="window.openDictionaryModal()" style="background: #17a2b8; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📖 Tra từ</button>
+            <button type="button" onclick="window.openIrregularVerbsModal()" style="background: #e0a800; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📚 ĐT Bất Quy Tắc</button>
             <button type="button" onclick="window.backToHome()" style="background: #6c757d; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🏠 Trang chủ</button>
         </div>
         <div>Đúng: <span id="correct-count-display" style="color: green;">0</span> | Sai: <span id="wrong-count-display" style="color: red;">0</span></div>
@@ -130,7 +131,7 @@
             <button type="button" onclick="window.closeDictionaryModal()" style="background: none; border: none; font-size: 1.2em; cursor: pointer; font-weight: bold;">✕</button>
         </h3>
         <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-            <input type="text" id="dict-input" placeholder="Nhập từ tiếng Anh cần tra..." onkeydown="if(event.key==='Enter') window.lookupWord()" style="margin: 0; flex: 1;">
+            <input type="text" id="dict-input" placeholder="Nhập từ tiếng Anh cần tra..." onkeydown="if(event.key==='Enter') window.lookupWord()" style="margin: 0; flex: 1; padding: 10px; border: 1px solid #540606; border-radius: 6px;">
             <button type="button" onclick="window.lookupWord()" style="background: #007bff; color: white; border: none; padding: 0 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">Tra</button>
         </div>
         <div id="dict-result" style="max-height: 250px; overflow-y: auto; background: #f8f9fa; padding: 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 1.05em;">
@@ -138,21 +139,23 @@
         </div>
     </div>
 </div>
+
 <!-- MODAL BẢNG ĐỘNG TỪ BẤT QUY TẮC -->
-<div id="irregular-verbs-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
-    <div class="dict-content" style="max-width: 650px; width: 95%;">
+<div id="irregular-verbs-modal">
+    <div class="dict-content" style="max-width: 700px;">
         <h3 style="color: #540606; margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
             📚 Bảng Động Từ Bất Quy Tắc Tiếng Anh
             <button type="button" onclick="window.closeIrregularVerbsModal()" style="background: none; border: none; font-size: 1.2em; cursor: pointer; font-weight: bold;">✕</button>
         </h3>
         <div style="margin-bottom: 12px;">
-            <input type="text" id="iv-search-input" placeholder="Nhập từ cần tìm (V1, V2, V3 hoặc nghĩa tiếng Việt)..." oninput="window.filterIrregularVerbs()" style="margin: 0; width: 100%; padding: 12px; border: 1px solid #540606; border-radius: 8px;">
+            <input type="text" id="iv-search-input" placeholder="Nhập từ cần tìm (V1, V2, V3 hoặc nghĩa tiếng Việt)..." oninput="window.filterIrregularVerbs()" style="margin: 0; width: 100%; padding: 12px; border: 1px solid #540606; border-radius: 8px; box-sizing: border-box;">
         </div>
         <div id="iv-result-list" style="max-height: 350px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
-            <!-- Danh sách động từ sẽ được render tự động ở đây -->
+            <!-- Danh sách động từ sẽ được render tự động qua JS -->
         </div>
     </div>
 </div>
+
 <script src="script.js"></script>
 </body>
 </html>
