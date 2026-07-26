@@ -518,11 +518,19 @@ window.handleQuizData = function(data) {
 
 function parseCustomDate(dateStr) {
     if (!dateStr) return 0;
-    let parts = dateStr.split(/[\/\s:]+/);
+    let cleanStr = String(dateStr).trim();
+    let parts = cleanStr.split(/[\/\s:]+/);
     if (parts.length >= 6) {
-        return new Date(parts[2], parts[1] - 1, parts[0], parts[3], parts[4], parts[5]).getTime();
+        let year = Number(parts[2]);
+        let month = Number(parts[1]) - 1;
+        let day = Number(parts[0]);
+        let hour = Number(parts[3]);
+        let minute = Number(parts[4]);
+        let second = Number(parts[5]);
+        let d = new Date(year, month, day, hour, minute, second);
+        return isNaN(d.getTime()) ? 0 : d.getTime();
     }
-    let parsed = Date.parse(dateStr);
+    let parsed = Date.parse(cleanStr);
     return isNaN(parsed) ? 0 : parsed;
 }
 
@@ -534,6 +542,7 @@ function hasThreeConsecutiveHighScores(rankings, studentName, subject) {
     
     if (studentAttempts.length < 3) return false;
     
+    // Sắp xếp tăng dần theo thời gian (cũ nhất đến mới nhất)
     studentAttempts.sort((a, b) => parseCustomDate(a.date) - parseCustomDate(b.date));
     
     for (let i = 0; i <= studentAttempts.length - 3; i++) {
@@ -546,7 +555,8 @@ function hasThreeConsecutiveHighScores(rankings, studentName, subject) {
             let t2 = cleanKey(studentAttempts[i+1].chuDe || '');
             let t3 = cleanKey(studentAttempts[i+2].chuDe || '');
             
-            if (!(t1 === t2 && t2 === t3)) {
+            // Đảm bảo 3 chủ đề liên tiếp phải hoàn toàn khác nhau đôi một
+            if (t1 !== t2 && t2 !== t3 && t1 !== t3) {
                 return true;
             }
         }
