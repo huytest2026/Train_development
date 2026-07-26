@@ -11,13 +11,13 @@ let AppState = {
     wrongQuestions: []
 };
 
-// Hàm chặn tắt/đóng/load lại trang khi đang làm bài
+// Hàm chặn tắt/đóng/load lại trang khi đang làm bài[cite: 3]
 function handleBeforeUnload(e) {
     e.preventDefault();
     e.returnValue = '';
 }
 
-// 1. Lưu nhớ trạng thái môn và chủ đề đã chọn
+// 1. Lưu nhớ trạng thái môn và chủ đề đã chọn[cite: 3]
 window.saveUserSelections = function() {
     const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
     const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : '';
@@ -483,7 +483,6 @@ window.handleQuizData = function(data) {
     window.initInterface();
 };
 
-// Hàm hỗ trợ phân tích chuỗi ngày tháng sang giá trị số để sắp xếp chính xác thời gian
 function parseCustomDate(dateStr) {
     if (!dateStr) return 0;
     let parts = dateStr.split(/[\/\s:]+/);
@@ -494,7 +493,6 @@ function parseCustomDate(dateStr) {
     return isNaN(parsed) ? 0 : parsed;
 }
 
-// CẬP NHẬT: Kiểm tra Kim Cương có sắp xếp theo thời gian tăng dần để bắt chuẩn 3 lần liên tiếp
 function hasThreeConsecutiveHighScores(rankings, studentName, subject) {
     let studentAttempts = rankings.filter(r => 
         String(r.name).trim().toLowerCase() === String(studentName).trim().toLowerCase() &&
@@ -503,7 +501,6 @@ function hasThreeConsecutiveHighScores(rankings, studentName, subject) {
     
     if (studentAttempts.length < 3) return false;
     
-    // Sắp xếp các lần làm bài theo thời gian tăng dần (cũ nhất đến mới nhất)
     studentAttempts.sort((a, b) => parseCustomDate(a.date) - parseCustomDate(b.date));
     
     for (let i = 0; i <= studentAttempts.length - 3; i++) {
@@ -516,7 +513,6 @@ function hasThreeConsecutiveHighScores(rankings, studentName, subject) {
             let t2 = cleanKey(studentAttempts[i+1].chuDe || studentAttempts[i+1].topic || '');
             let t3 = cleanKey(studentAttempts[i+2].chuDe || studentAttempts[i+2].topic || '');
             
-            // Yêu cầu 3 lần liên tiếp đạt 10 điểm phải qua các chủ đề khác nhau (t1, t2, t3 không giống nhau y hệt)
             if (!(t1 === t2 && t2 === t3)) {
                 return true;
             }
@@ -1098,7 +1094,8 @@ window.submitQuiz = function() {
         window.removeEventListener('beforeunload', handleBeforeUnload);
     }
 
-    let maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_hs');
+    // ĐÃ SỬA: Dùng 'saved_maHS' thay vì 'saved_hs' để đảm bảo luôn lấy đúng mã học sinh đã lưu
+    let maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
     let mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
     let levelSelect = document.getElementById('level-select');
     let level = levelSelect ? levelSelect.value : '';
