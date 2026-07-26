@@ -607,49 +607,39 @@ window.renderLeaderboard = function(subjectFilter = null) {
     
     let activeSubject = subjectFilter && subjectFilter !== "-- Chọn môn --" ? subjectFilter : null;
     
-    let studentSubjects = {};
-    AppState.rankings.forEach(item => {
-        let name = String(item.name || '').trim();
-        let subj = String(item.subject || '').trim();
-        if (!name || !subj) return;
-        let key = name + '___' + subj;
-        if (!studentSubjects[key]) {
-            studentSubjects[key] = { name: name, subject: subj };
-        }
-    });
-
     let kimCuongList = [];
     let vangList = [];
     let bacList = [];
     let dongList = [];
 
-    for (let key in studentSubjects) {
-        let st = studentSubjects[key];
-        if (activeSubject && cleanKey(st.subject) !== cleanKey(activeSubject)) continue;
-        
-        let attempts = AppState.rankings.filter(r => 
-    String(r.name).trim().toLowerCase() === String(st.name).trim().toLowerCase() &&
-    cleanKey(r.subject || '') === cleanKey(st.subject)
-);
-        if (attempts.length === 0) continue;
+    // Lọc và nhóm dữ liệu trực tiếp từ AppState.rankings dựa vào thuộc tính level từ server trả về
+    AppState.rankings.forEach(item => {
+        let name = String(item.name || '').trim();
+        let subj = String(item.subject || '').trim();
+        if (!name || !subj) return;
 
-        let bestScore = Math.max(...attempts.map(a => Number(a.score)));
-        let latestAttempt = attempts[attempts.length - 1];
+        if (activeSubject && cleanKey(subj) !== cleanKey(activeSubject)) return;
 
-        if (hasThreeConsecutiveHighScores(AppState.rankings, st.name, st.subject)) {
-            kimCuongList.push({ name: st.name, subject: st.subject, score: bestScore, date: latestAttempt.date || '' });
-        } 
-        else if (attempts.some(a => Number(a.score) === 10)) {
-            vangList.push({ name: st.name, subject: st.subject, score: bestScore, date: latestAttempt.date || '' });
-        }
-        else if (attempts.filter(a => Number(a.score) >= 9).length >= 2) {
-            bacList.push({ name: st.name, subject: st.subject, score: bestScore, date: latestAttempt.date || '' });
-        }
-        else if (attempts.filter(a => Number(a.score) >= 8).length >= 2) {
-            dongList.push({ name: st.name, subject: st.subject, score: bestScore, date: latestAttempt.date || '' });
-        }
-    }
+        let record = {
+            name: name,
+            subject: subj,
+            score: Number(item.score) || 0,
+            date: item.date || ''
+        };
 
+        let lvl = String(item.level || '').trim();
+        if (lvl === "Kim Cương") {
+            kimCuongList.push(record);
+        } else if (lvl === "Vàng") {
+            vangList.push(record);
+        } else if (lvl === "Bạc") {
+            bacList.push(record);
+        } else if (lvl === "Đồng") {
+            dongList.push(record);
+        }
+    });
+
+    // Sắp xếp theo điểm số giảm dần trong từng nhóm
     kimCuongList.sort((a, b) => b.score - a.score);
     vangList.sort((a, b) => b.score - a.score);
     bacList.sort((a, b) => b.score - a.score);
