@@ -483,7 +483,18 @@ window.handleQuizData = function(data) {
     window.initInterface();
 };
 
-// CẬP NHẬT: Kiểm tra Kim Cương (3 lần liên tiếp đạt 10 điểm nhưng KHÔNG được trùng hoàn toàn một chủ đề)
+// Hàm hỗ trợ phân tích chuỗi ngày tháng sang giá trị số để sắp xếp chính xác thời gian
+function parseCustomDate(dateStr) {
+    if (!dateStr) return 0;
+    let parts = dateStr.split(/[\/\s:]+/);
+    if (parts.length >= 6) {
+        return new Date(parts[2], parts[1] - 1, parts[0], parts[3], parts[4], parts[5]).getTime();
+    }
+    let parsed = Date.parse(dateStr);
+    return isNaN(parsed) ? 0 : parsed;
+}
+
+// CẬP NHẬT: Kiểm tra Kim Cương có sắp xếp theo thời gian tăng dần để bắt chuẩn 3 lần liên tiếp
 function hasThreeConsecutiveHighScores(rankings, studentName, subject) {
     let studentAttempts = rankings.filter(r => 
         String(r.name).trim().toLowerCase() === String(studentName).trim().toLowerCase() &&
@@ -491,6 +502,9 @@ function hasThreeConsecutiveHighScores(rankings, studentName, subject) {
     );
     
     if (studentAttempts.length < 3) return false;
+    
+    // Sắp xếp các lần làm bài theo thời gian tăng dần (cũ nhất đến mới nhất)
+    studentAttempts.sort((a, b) => parseCustomDate(a.date) - parseCustomDate(b.date));
     
     for (let i = 0; i <= studentAttempts.length - 3; i++) {
         let s1 = Number(studentAttempts[i].score);
@@ -623,7 +637,6 @@ window.startQuiz = function() {
 
     const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
     
-    // CẬP NHẬT: Kiểm tra điều kiện khi chọn MADE (Đã đạt 10 điểm và chưa qua 6 tiếng)
     const toggleMade = document.getElementById('toggle-made');
     const selectedMade = (toggleMade && toggleMade.checked && document.getElementById('made-select')) ? document.getElementById('made-select').value.trim() : '';
     
@@ -1097,7 +1110,6 @@ window.submitQuiz = function() {
     let totalQuestions = AppState.currentQuizData.length;
     let score = Math.round((AppState.correctCount / totalQuestions) * 10 * 10) / 10;
 
-    // CẬP NHẬT: Nếu làm theo Mã đề và đạt điểm 10, ghi nhận mốc thời gian để chặn hoặc mở lại sau 6 tiếng
     if (selectedMade && score === 10) {
         localStorage.setItem('made_10_time_' + maHS + '_' + mon + '_' + selectedMade, Date.now());
     }
