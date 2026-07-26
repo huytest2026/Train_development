@@ -566,29 +566,34 @@ function parseCustomDate(dateStr) {
 }
 
 function hasThreeConsecutiveHighScores(rankings, studentName, subjectName) {
-    // 1. Lọc các lượt thi của học sinh (nếu tính theo từng môn thì giữ subjectName, nếu tính chung tất cả các môn thì bỏ điều kiện lọc subject)
+    // 1. Lọc các lượt thi của học sinh đúng môn
     let studentAttempts = rankings.filter(r => 
         String(r.name).trim().toLowerCase() === String(studentName).trim().toLowerCase() &&
         cleanKey(r.subject || '') === cleanKey(subjectName)
     );
 
-    // 2. Sắp xếp theo thời gian tăng dần an toàn (dùng helper parse ngày nếu có, tránh lỗi NaN của new Date)
+    // 2. Sắp xếp theo thời gian tăng dần (cũ nhất -> mới nhất)
     studentAttempts.sort((a, b) => {
-        let timeA = new Date(a.date).getTime();
-        let timeB = new Date(b.date).getTime();
-        return (isNaN(timeA) ? 0 : timeA) - (isNaN(timeB) ? 0 : timeB);
+        let timeA = parseCustomDate(a.date);
+        let timeB = parseCustomDate(b.date);
+        return timeA - timeB;
     });
 
     if (studentAttempts.length < 3) return false;
 
-    // 3. Kiểm tra 3 lần liên tiếp PHẢI ĐẠT ĐÚNG 10 ĐIỂM
+    // 3. Kiểm tra 3 lần liên tiếp đạt 10 điểm VÀ khác chủ đề
     for (let i = 0; i <= studentAttempts.length - 3; i++) {
         let s1 = Number(studentAttempts[i].score);
         let s2 = Number(studentAttempts[i+1].score);
         let s3 = Number(studentAttempts[i+2].score);
 
-        // Bắt buộc phải là 10 điểm tuyệt đối
-        if (s1 === 10 && s2 === 10 && s3 === 10) {
+        // Lấy thông tin chủ đề từ nhiều khả năng tên trường dữ liệu có thể xảy ra
+        let t1 = cleanKey(studentAttempts[i].chuDe || studentAttempts[i]['Chủ đề'] || studentAttempts[i].topic || '');
+        let t2 = cleanKey(studentAttempts[i+1].chuDe || studentAttempts[i+1]['Chủ đề'] || studentAttempts[i+1].topic || '');
+        let t3 = cleanKey(studentAttempts[i+2].chuDe || studentAttempts[i+2]['Chủ đề'] || studentAttempts[i+2].topic || '');
+
+        // Điều kiện: 3 lần liên tiếp đạt 10 điểm VÀ 3 chủ đề khác nhau hoàn toàn
+        if (s1 === 10 && s2 === 10 && s3 === 10 && t1 !== t2 && t2 !== t3 && t1 !== t3) {
             return true; 
         }
     }
