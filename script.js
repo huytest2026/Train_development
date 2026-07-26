@@ -479,55 +479,54 @@ window.handleQuizData = function(data) {
             chuDe: String(p.chuDe || p[2] || '').trim()
         })).filter(p => p.chuDe !== '');
 
-        // Xử lý chuẩn hóa bảng xếp hạng (hỗ trợ cả mảng lẫn object với mọi tên cột)
-        // Đảm bảo đoạn code nạp dữ liệu nhận toàn bộ danh sách mà không bị ghi đè học sinh
-AppState.rankings = [];
+        AppState.rankings = [];
 
-if (data.rankings && Array.isArray(data.rankings)) {
-    data.rankings.forEach(raw => {
-        if (!raw) return;
-        
-        let item = null;
-        if (Array.isArray(raw)) {
-            item = {
-                name: String(raw[0] || '').trim(),
-                score: Number(raw[1] || 0),
-                subject: standardizeSubject(String(raw[2] || '').trim()),
-                level: String(raw[3] || '').trim(),
-                chuDe: String(raw[4] || '').trim(),
-                date: String(raw[5] || '').trim()
-            };
-        } else if (typeof raw === 'object') {
-            const getVal = (keys) => {
-                for (let k of keys) {
-                    for (let rk of Object.keys(raw)) {
-                        if (cleanKey(rk) === cleanKey(k)) {
-                            return raw[rk];
+        if (data.rankings && Array.isArray(data.rankings)) {
+            data.rankings.forEach(raw => {
+                if (!raw) return;
+                
+                let item = null;
+                if (Array.isArray(raw)) {
+                    item = {
+                        name: String(raw[0] || '').trim(),
+                        score: Number(raw[1] || 0),
+                        subject: standardizeSubject(String(raw[2] || '').trim()),
+                        level: String(raw[3] || '').trim(),
+                        chuDe: String(raw[4] || '').trim(),
+                        date: String(raw[5] || '').trim()
+                    };
+                } else if (typeof raw === 'object') {
+                    const getVal = (keys) => {
+                        for (let k of keys) {
+                            for (let rk of Object.keys(raw)) {
+                                if (cleanKey(rk) === cleanKey(k)) {
+                                    return raw[rk];
+                                }
+                            }
                         }
-                    }
+                        return '';
+                    };
+                    item = {
+                        name: String(getVal(['name', 'hoten', 'ho_ten', 'hovaten', 'họ tên'])).trim(),
+                        score: Number(getVal(['score', 'diem', 'điểm']) || 0),
+                        subject: standardizeSubject(String(getVal(['subject', 'mon', 'môn'])).trim()),
+                        level: String(getVal(['level', 'capdo', 'cấp độ'])).trim(),
+                        chuDe: String(getVal(['chude', 'topic', 'chủ đề'])).trim(),
+                        date: String(getVal(['date', 'ngay', 'ngày'])).trim()
+                    };
                 }
-                return '';
-            };
-            item = {
-                name: String(getVal(['name', 'hoten', 'ho_ten', 'hovaten', 'họ tên'])).trim(),
-                score: Number(getVal(['score', 'diem', 'điểm']) || 0),
-                subject: standardizeSubject(String(getVal(['subject', 'mon', 'môn'])).trim()),
-                level: String(getVal(['level', 'capdo', 'cấp độ'])).trim(),
-                chuDe: String(getVal(['chude', 'topic', 'chủ đề'])).trim(),
-                date: String(getVal(['date', 'ngay', 'ngày'])).trim()
-            };
+
+                if (item && item.name !== '') {
+                    AppState.rankings.push(item);
+                }
+            });
         }
 
-        if (item && item.name !== '') {
-            AppState.rankings.push(item);
-        }
-    });
-}
+        console.log("Đã nạp thành công tổng số dòng vào AppState.rankings:", AppState.rankings.length);
 
-console.log("Đã nạp thành công tổng số dòng vào AppState.rankings:", AppState.rankings.length);
-
-window.initInterface();
-
+        window.initInterface();
+    }
+};
 
 // ==================== HÀM BẢNG XẾP HẠNG & XỬ LÝ KIM CƯƠNG ====================
 
