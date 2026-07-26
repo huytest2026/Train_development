@@ -235,10 +235,12 @@ function escapeHTML(str) {
 }
 
 function removeDiacritics(str) {
+    if (!str) return ''; // An toàn khi gặp null, undefined, chuỗi rỗng
     return String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
 }
 
 function cleanKey(str) {
+    if (!str) return ''; // An toàn khi gặp null, undefined, chuỗi rỗng
     return removeDiacritics(str).toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
