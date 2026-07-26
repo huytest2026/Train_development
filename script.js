@@ -607,50 +607,73 @@ window.renderLeaderboard = function(subjectFilter = null) {
     
     let activeSubject = subjectFilter && subjectFilter !== "-- Chọn môn --" ? subjectFilter : null;
     
+    let studentSubjects = {};
+    AppState.rankings.forEach(item => {
+        let name = String(item.name || '').trim();
+        let subj = String(item.subject || '').trim();
+        if (!name || !subj) return;
+        let key = name + '___' + subj;
+        if (!studentSubjects[key]) {
+            studentSubjects[key] = { name: name, subject: subj };
+        }
+    });
+
     let kimCuongList = [];
     let vangList = [];
     let bacList = [];
     let dongList = [];
 
-    // Lọc và nhóm dữ liệu trực tiếp từ AppState.rankings dựa vào thuộc tính level từ server trả về
-    AppState.rankings.forEach(item => {
-        let name = String(item.name || '').trim();
-        let subj = String(item.subject || '').trim();
-        if (!name || !subj) return;
+    for (let key in studentSubjects) {
+        let st = studentSubjects[key];
+        if (activeSubject && cleanKey(st.subject) !== cleanKey(activeSubject)) continue;
+        
+        let attempts = AppState.rankings.filter(r => 
+            String(r.name).trim().toLowerCase() === String(st.name).trim().toLowerCase() &&
+            cleanKey(r.subject || '') === cleanKey(st.subject)
+        );
+        if (attempts.length === 0) continue;
 
-        if (activeSubject && cleanKey(subj) !== cleanKey(activeSubject)) return;
+        let bestScore = Math.max(...attempts.map(a => Number(a.score)));
+        let latestAttempt = attempts[attempts.length - 1];
 
-        let record = {
-            name: name,
-            subject: subj,
-            score: Number(item.score) || 0,
-            date: item.date || ''
-        };
+        // Tính toán các chỉ số độc lập cho từng huy chương
+        let count10 = attempts.filter(a => Number(a.score) === 10).length;
+        let count9 = attempts.filter(a => Number(a.score) >= 9).length;
+        let count8 = attempts.filter(a => Number(a.score) >= 8).length;
+        
+        // Số lần đạt chuẩn Kim Cương (mỗi chuỗi 3 lần 10 điểm khác chủ đề tính là 1 lần)
+        let kcCount = countKimCuongSets(AppState.rankings, st.name, st.subject);
 
-        let lvl = String(item.level || '').trim();
-        if (lvl === "Kim Cương") {
-            kimCuongList.push(record);
-        } else if (lvl === "Vàng") {
-            vangList.push(record);
-        } else if (lvl === "Bạc") {
-            bacList.push(record);
-        } else if (lvl === "Đồng") {
-            dongList.push(record);
+        // Đánh giá độc lập từng bậc (không dùng else if để học sinh có thể xuất hiện ở nhiều bậc)
+        if (kcCount > 0) {
+            kimCuongList.push({ name: st.name, subject: st.subject, score: bestScore, count: kcCount, date: latestAttempt.date || '' });
         }
-    });
+        
+        if (count10 > 0) {
+            vangList.push({ name: st.name, subject: st.subject, score: bestScore, count: count10, date: latestAttempt.date || '' });
+        }
+        
+        if (count9 >= 2) {
+            bacList.push({ name: st.name, subject: st.subject, score: bestScore, count: count9, date: latestAttempt.date || '' });
+        }
+        
+        if (count8 >= 2) {
+            dongList.push({ name: st.name, subject: st.subject, score: bestScore, count: count8, date: latestAttempt.date || '' });
+        }
+    }
 
-    // Sắp xếp theo điểm số giảm dần trong từng nhóm
+    // Sắp xếp danh sách theo điểm số giảm dần
     kimCuongList.sort((a, b) => b.score - a.score);
     vangList.sort((a, b) => b.score - a.score);
     bacList.sort((a, b) => b.score - a.score);
     dongList.sort((a, b) => b.score - a.score);
 
-    function buildGroupHtml(title, color, listItems) {
+    function buildGroupHtml(title, color, listItems, unitLabel) {
         if (listItems.length === 0) {
             return `<div style="margin-bottom: 12px; font-size: 1.02em;"><b>${title}:</b> <span style="color: #888; font-style: italic;">Chưa có học sinh đạt chuẩn</span></div>`;
         }
         let itemsHtml = listItems.map(item => 
-            `<li style="margin: 6px 0;"><b>${escapeHTML(item.name)}</b> (Môn: <span style="color: #007bff; font-weight: 600;">${escapeHTML(item.subject)}</span> - Điểm cao nhất: ${item.score} đ)</li>`
+            `<li style="margin: 6px 0;"><b>${escapeHTML(item.name)}</b> (Môn: <span style="color: #007bff; font-weight: 600;">${escapeHTML(item.subject)}</span> - Điểm cao nhất: ${item.score} đ - Số lượng: <b>${item.count} ${unitLabel}</b>)</li>`
         ).join('');
         return `<div style="margin-bottom: 16px;">
                     <b style="color: ${color}; font-size: 1.1em;">${title}:</b>
@@ -659,14 +682,45 @@ window.renderLeaderboard = function(subjectFilter = null) {
     }
 
     let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
-    html += buildGroupHtml('💎 Kim Cương (3 lần liên tiếp đạt 10 điểm, khác chủ đề)', '#007bff', kimCuongList);
-    html += buildGroupHtml('🥇 Vàng (Có ít nhất 1 lần đạt 10 điểm)', '#d9822b', vangList);
-    html += buildGroupHtml('🥈 Bạc (Có ít nhất 2 lần đạt 9 điểm trở lên)', '#6c757d', bacList);
-    html += buildGroupHtml('🥉 Đồng (Có ít nhất 2 lần đạt 8 điểm trở lên)', '#cd7f32', dongList);
+    html += buildGroupHtml('💎 Kim Cương (3 lần liên tiếp đạt 10 điểm, khác chủ đề)', '#007bff', kimCuongList, 'lần đạt chuỗi Kim Cương');
+    html += buildGroupHtml('🥇 Vàng (Có ít nhất 1 lần đạt 10 điểm)', '#d9822b', vangList, 'lần đạt 10 điểm');
+    html += buildGroupHtml('🥈 Bạc (Có ít nhất 2 lần đạt 9 điểm trở lên)', '#6c757d', bacList, 'lần đạt từ 9đ trở lên');
+    html += buildGroupHtml('🥉 Đồng (Có ít nhất 2 lần đạt 8 điểm trở lên)', '#cd7f32', dongList, 'lần đạt từ 8đ trở lên');
     html += '</div>';
 
     list.innerHTML = html;
 };
+
+// Hàm đếm số bộ 3 lần 10 điểm khác chủ đề (không bị đè lặp các bài trùng nhau)
+function countKimCuongSets(rankings, studentName, subjectName) {
+    let studentAttempts = rankings.filter(r => 
+        String(r.name).trim().toLowerCase() === String(studentName).trim().toLowerCase() &&
+        cleanKey(r.subject || '') === cleanKey(subjectName)
+    );
+    studentAttempts.sort((a, b) => parseCustomDate(a.date) - parseCustomDate(b.date));
+    
+    let setsCount = 0;
+    if (studentAttempts.length < 3) return 0;
+
+    let i = 0;
+    while (i <= studentAttempts.length - 3) {
+        let s1 = Number(studentAttempts[i].score);
+        let s2 = Number(studentAttempts[i+1].score);
+        let s3 = Number(studentAttempts[i+2].score);
+
+        let t1 = cleanKey(studentAttempts[i].chuDe || studentAttempts[i]['Chủ đề'] || studentAttempts[i].topic || '');
+        let t2 = cleanKey(studentAttempts[i+1].chuDe || studentAttempts[i+1]['Chủ đề'] || studentAttempts[i+1].topic || '');
+        let t3 = cleanKey(studentAttempts[i+2].chuDe || studentAttempts[i+2]['Chủ đề'] || studentAttempts[i+2].topic || '');
+
+        if (s1 === 10 && s2 === 10 && s3 === 10 && t1 !== t2 && t2 !== t3 && t1 !== t3) {
+            setsCount++;
+            i += 3; // Nhảy cóc qua 3 bài tiếp theo để tính chuỗi mới chính xác
+        } else {
+            i++;
+        }
+    }
+    return setsCount;
+}
 
 function getCorrectKeys(item) {
     const raw = String(item.correct || '').trim();
