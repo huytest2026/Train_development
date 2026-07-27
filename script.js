@@ -1695,3 +1695,20 @@ window.calcCalculate = function() {
         display.value = 'Lỗi';
     }
 };
+// Hàm mở Máy tính
+window.openCalculatorModal = function() {
+    const modal = document.getElementById('calc-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+    } else {
+        alert("Chưa tìm thấy HTML của Máy tính! Vui lòng kiểm tra lại thẻ <div id='calc-modal'> trong file HTML.");
+    }
+};
+
+// Đảm bảo nút "Máy tính" luôn nhận sự kiện bấm khi tải trang
+document.addEventListener('DOMContentLoaded', function() {
+    const btnCalc = document.getElementById('btn-calc');
+    if (btnCalc) {
+        btnCalc.addEventListener('click', window.openCalculatorModal);
+    }
+});
