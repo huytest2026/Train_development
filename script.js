@@ -1653,3 +1653,29 @@ function playAudio(audioUrl) {
         alert("Không thể phát âm thanh! Hãy kiểm tra lại link hoặc quyền chia sẻ file trên Google Drive.");
     });
 }
+// Hàm tự động chuẩn hóa đường dẫn Google Drive thành link nghe trực tiếp
+function formatDriveAudioUrl(url) {
+    if (!url) return '';
+    
+    let fileId = '';
+    
+    // Tách ID nếu link dạng: /d/FILE_ID/...
+    let match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (match && match[1]) {
+        fileId = match[1];
+    } 
+    // Tách ID nếu link dạng: ?id=FILE_ID
+    else {
+        match = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+        if (match && match[1]) {
+            fileId = match[1];
+        }
+    }
+
+    // Trả về đường dẫn phát trực tiếp chuẩn cho thẻ Audio
+    if (fileId) {
+        return `https://docs.google.com/uc?export=open&id=${fileId}`;
+    }
+    
+    return url.trim();
+}
