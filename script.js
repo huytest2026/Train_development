@@ -837,6 +837,7 @@ window.startQuiz = function() {
         }
     }
 };
+window.startQuiz = function() {
     const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
     if (!mon) return alert("Vui lòng chọn môn học trước khi bắt đầu!");
 
