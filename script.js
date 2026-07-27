@@ -827,7 +827,7 @@ window.startQuiz = function() {
             btnVerbs.style.display = 'block';  // Hiện động từ bất quy tắc
         }
     }
-};
+}
     const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
     if (!mon) return alert("Vui lòng chọn môn học trước khi bắt đầu!");
 
