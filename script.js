@@ -155,37 +155,39 @@ window.lookupWord = async function() {
 
 // Lưu nhớ trạng thái môn và chủ đề đã chọn
 window.saveUserSelections = function() {
-    const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
-    const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : '';
-    const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
-    
-    if (maHS) localStorage.setItem('saved_maHS', maHS);
-    if (mon) localStorage.setItem('saved_mon', mon);
-    if (selectedTopics.length > 0) {
-        localStorage.setItem('saved_topics_' + maHS + '_' + mon, JSON.stringify(selectedTopics));
-    }
+    try {
+        const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
+        const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : '';
+        const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
+        
+        if (maHS) localStorage.setItem('saved_maHS', maHS);
+        if (mon) localStorage.setItem('saved_mon', mon);
+        if (selectedTopics.length > 0) {
+            localStorage.setItem('saved_topics_' + maHS + '_' + mon, JSON.stringify(selectedTopics));
+        }
+    } catch(e) {}
 };
 
 window.restoreUserSelections = function() {
-    const savedMon = localStorage.getItem('saved_mon');
-    const subjectSelect = document.getElementById('subject-select');
-    if (savedMon && subjectSelect) {
-        subjectSelect.value = savedMon;
-        window.handleSubjectChange();
-        
-        const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : '';
-        const savedTopics = localStorage.getItem('saved_topics_' + maHS + '_' + savedMon);
-        if (savedTopics) {
-            try {
+    try {
+        const savedMon = localStorage.getItem('saved_mon');
+        const subjectSelect = document.getElementById('subject-select');
+        if (savedMon && subjectSelect) {
+            subjectSelect.value = savedMon;
+            window.handleSubjectChange();
+            
+            const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : '';
+            const savedTopics = localStorage.getItem('saved_topics_' + maHS + '_' + savedMon);
+            if (savedTopics) {
                 let topicsArray = JSON.parse(savedTopics);
                 setTimeout(() => {
                     document.querySelectorAll('input[name="topic"]').forEach(cb => {
                         cb.checked = topicsArray.includes(cb.value);
                     });
                 }, 200);
-            } catch(e) {}
+            }
         }
-    }
+    } catch(e) {}
 };
 
 window.handleMadeChange = function() {
@@ -803,7 +805,6 @@ function getCorrectKeys(item) {
 }
 
 window.startQuiz = function() {
-    // Kiểm tra môn học đang chọn để ẩn/hiện nút phù hợp trên header
     const subjectSelect = document.getElementById('subject-select');
     const selectedSubject = subjectSelect ? subjectSelect.value.toLowerCase() : '';
 
@@ -811,13 +812,11 @@ window.startQuiz = function() {
     const btnDict = document.getElementById('btn-dict');
     const btnVerbs = document.getElementById('btn-verbs');
 
-    // Kiểm tra nếu là môn Toán (có chứa chữ 'toan' hoặc tương tự)
     if (selectedSubject.includes('toan') || selectedSubject.includes('math')) {
         if (btnCalc) btnCalc.style.display = 'block';
         if (btnDict) btnDict.style.display = 'none';
         if (btnVerbs) btnVerbs.style.display = 'none';
     } else {
-        // Mặc định hoặc môn Tiếng Anh
         if (btnCalc) btnCalc.style.display = 'none';
         if (btnDict) btnDict.style.display = 'block';
         if (btnVerbs) btnVerbs.style.display = 'block';
