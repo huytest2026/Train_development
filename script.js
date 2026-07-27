@@ -812,16 +812,22 @@ window.startQuiz = function() {
     const btnDict = document.getElementById('btn-dict');
     const btnVerbs = document.getElementById('btn-verbs');
 
-    if (selectedSubject.includes('toan') || selectedSubject.includes('math')) {
-        if (btnCalc) btnCalc.style.display = 'block';
-        if (btnDict) btnDict.style.display = 'none';
-        if (btnVerbs) btnVerbs.style.display = 'none';
-    } else {
-        if (btnCalc) btnCalc.style.display = 'none';
-        if (btnDict) btnDict.style.display = 'block';
-        if (btnVerbs) btnVerbs.style.display = 'block';
-    }
+    // Kiểm tra xem môn được chọn là Toán hay Tiếng Anh
+    const isMath = selectedSubject.includes('toán') || selectedSubject.includes('math');
+    const isEnglish = selectedSubject.includes('anh') || selectedSubject.includes('english');
 
+    if (btnCalc && btnDict && btnVerbs) {
+        if (isMath) {
+            btnCalc.style.display = 'block';   // Hiện máy tính
+            btnDict.style.display = 'none';    // Ẩn tra từ
+            btnVerbs.style.display = 'none';   // Ẩn động từ bất quy tắc
+        } else if (isEnglish) {
+            btnCalc.style.display = 'none';    // Ẩn máy tính
+            btnDict.style.display = 'block';   // Hiện tra từ
+            btnVerbs.style.display = 'block';  // Hiện động từ bất quy tắc
+        }
+    }
+};
     const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
     if (!mon) return alert("Vui lòng chọn môn học trước khi bắt đầu!");
 
