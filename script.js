@@ -808,20 +808,19 @@ window.startQuiz = function() {
     const subjectSelect = document.getElementById('subject-select');
     const selectedSubject = subjectSelect ? subjectSelect.value.toLowerCase() : '';
 
-    // Kiểm tra xem đã chọn môn học chưa
+    // 1. Kiểm tra chọn môn học
     const mon = subjectSelect ? subjectSelect.value : '';
     if (!mon) {
-        alert("Vui lòng chọn môn học trước khi bắt đầu!");
-        return;
+        return alert("Vui lòng chọn môn học trước khi bắt đầu!");
     }
 
     const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
 
+    // 2. Ẩn / Hiện các công cụ tương ứng với môn học (Toán / Tiếng Anh)
     const btnCalc = document.getElementById('btn-calc');
     const btnDict = document.getElementById('btn-dict');
     const btnVerbs = document.getElementById('btn-verbs');
 
-    // Kiểm tra xem môn được chọn là Toán hay Tiếng Anh
     const isMath = selectedSubject.includes('toán') || selectedSubject.includes('math');
     const isEnglish = selectedSubject.includes('anh') || selectedSubject.includes('english');
 
@@ -836,20 +835,15 @@ window.startQuiz = function() {
             btnVerbs.style.display = 'block';  // Hiện động từ bất quy tắc
         }
     }
-};
-window.startQuiz = function() {
-    const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
-    if (!mon) return alert("Vui lòng chọn môn học trước khi bắt đầu!");
 
-    const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
-    
+    // 3. Kiểm tra Mã đề (MADE) - Khóa 6 tiếng nếu từng đạt điểm 10
     const toggleMade = document.getElementById('toggle-made');
     const selectedMade = (toggleMade && toggleMade.checked && document.getElementById('made-select')) ? document.getElementById('made-select').value.trim() : '';
-    
+
     if (selectedMade) {
         const tenPointTimeKey = 'made_10_time_' + maHS + '_' + mon + '_' + selectedMade;
         const lastTenPointTime = localStorage.getItem(tenPointTimeKey);
-        
+
         if (lastTenPointTime) {
             const elapsedHours = (Date.now() - Number(lastTenPointTime)) / (1000 * 60 * 60);
             if (elapsedHours < 6) {
@@ -859,6 +853,7 @@ window.startQuiz = function() {
         }
     }
 
+    // 4. Kiểm tra điều kiện mở Level 2 & Level 3 (phải đạt 3 lần liên tiếp >= 8 điểm ở Level 1)
     const levelSelect = document.getElementById('level-select');
     const selectedLevel = levelSelect ? levelSelect.value : '';
     const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
