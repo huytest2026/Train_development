@@ -33,8 +33,8 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         }
 
-        /* Modal chung (Tra từ & Động từ bất quy tắc) */
-        #dict-modal, #irregular-verbs-modal {
+        /* Modal chung (Máy tính, Tra từ & Động từ bất quy tắc) */
+        #calc-modal, #dict-modal, #irregular-verbs-modal {
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -128,6 +128,43 @@
     <button type="button" id="submit-btn" onclick="window.submitQuiz()" style="width: 100%; padding: 16px; background: #28a745; color: white; border: none; cursor: pointer; border-radius: 8px; font-weight: bold; font-size: 1.2em; margin-top: 15px;">Nộp bài</button>
 </div>
 
+<!-- ========================================================= -->
+<!-- 🟢 MODAL MÁY TÍNH BỎ TÚI (ĐÃ BỔ SUNG KHUNG HTML DƯỚI ĐÂY) -->
+<!-- ========================================================= -->
+<div id="calc-modal">
+    <div class="dict-content" style="max-width: 320px; text-align: center;">
+        <h3 style="color: #540606; margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
+            🧮 Máy tính bỏ túi
+            <button type="button" onclick="window.closeCalculatorModal()" style="background: none; border: none; font-size: 1.2em; cursor: pointer; font-weight: bold;">✕</button>
+        </h3>
+        <input type="text" id="calc-display" readonly style="width: 100%; height: 45px; font-size: 1.4em; text-align: right; margin-bottom: 12px; padding: 5px 10px; box-sizing: border-box; border: 1px solid #540606; border-radius: 6px; background: #fff;" value="0">
+        
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+            <button type="button" onclick="window.calcClear()" style="padding: 12px; grid-column: span 2; background: #dc3545; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">C</button>
+            <button type="button" onclick="window.calcInput('/')" style="padding: 12px; background: #6c757d; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">÷</button>
+            <button type="button" onclick="window.calcInput('*')" style="padding: 12px; background: #6c757d; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">×</button>
+            
+            <button type="button" onclick="window.calcInput('7')" style="padding: 12px; background: #f8f9fa; border: 1px solid #ccc; border-radius: 6px; font-weight: bold; cursor: pointer;">7</button>
+            <button type="button" onclick="window.calcInput('8')" style="padding: 12px; background: #f8f9fa; border: 1px solid #ccc; border-radius: 6px; font-weight: bold; cursor: pointer;">8</button>
+            <button type="button" onclick="window.calcInput('9')" style="padding: 12px; background: #f8f9fa; border: 1px solid #ccc; border-radius: 6px; font-weight: bold; cursor: pointer;">9</button>
+            <button type="button" onclick="window.calcInput('-')" style="padding: 12px; background: #6c757d; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">-</button>
+            
+            <button type="button" onclick="window.calcInput('4')" style="padding: 12px; background: #f8f9fa; border: 1px solid #ccc; border-radius: 6px; font-weight: bold; cursor: pointer;">4</button>
+            <button type="button" onclick="window.calcInput('5')" style="padding: 12px; background: #f8f9fa; border: 1px solid #ccc; border-radius: 6px; font-weight: bold; cursor: pointer;">5</button>
+            <button type="button" onclick="window.calcInput('6')" style="padding: 12px; background: #f8f9fa; border: 1px solid #ccc; border-radius: 6px; font-weight: bold; cursor: pointer;">6</button>
+            <button type="button" onclick="window.calcInput('+')" style="padding: 12px; background: #6c757d; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">+</button>
+            
+            <button type="button" onclick="window.calcInput('1')" style="padding: 12px; background: #f8f9fa; border: 1px solid #ccc; border-radius: 6px; font-weight: bold; cursor: pointer;">1</button>
+            <button type="button" onclick="window.calcInput('2')" style="padding: 12px; background: #f8f9fa; border: 1px solid #ccc; border-radius: 6px; font-weight: bold; cursor: pointer;">2</button>
+            <button type="button" onclick="window.calcInput('3')" style="padding: 12px; background: #f8f9fa; border: 1px solid #ccc; border-radius: 6px; font-weight: bold; cursor: pointer;">3</button>
+            <button type="button" onclick="window.calcCalculate()" style="padding: 12px; grid-row: span 2; background: #28a745; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">=</button>
+            
+            <button type="button" onclick="window.calcInput('0')" style="padding: 12px; grid-column: span 2; background: #f8f9fa; border: 1px solid #ccc; border-radius: 6px; font-weight: bold; cursor: pointer;">0</button>
+            <button type="button" onclick="window.calcInput('.')" style="padding: 12px; background: #f8f9fa; border: 1px solid #ccc; border-radius: 6px; font-weight: bold; cursor: pointer;">.</button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL TRA TỪ ĐIỂN -->
 <div id="dict-modal">
     <div class="dict-content">
@@ -163,6 +200,41 @@
 
 <script src="script.js"></script>
 <script>
+    // --- Các hàm hỗ trợ Mở / Đóng và Tính toán cho Máy Tính ---
+    window.openCalculatorModal = function() {
+        const modal = document.getElementById('calc-modal');
+        if (modal) modal.style.display = 'flex';
+    };
+
+    window.closeCalculatorModal = function() {
+        const modal = document.getElementById('calc-modal');
+        if (modal) modal.style.display = 'none';
+    };
+
+    window.calcInput = function(val) {
+        const display = document.getElementById('calc-display');
+        if (display) {
+            if (display.value === '0' || display.value === 'Lỗi') display.value = val;
+            else display.value += val;
+        }
+    };
+
+    window.calcClear = function() {
+        const display = document.getElementById('calc-display');
+        if (display) display.value = '0';
+    };
+
+    window.calcCalculate = function() {
+        const display = document.getElementById('calc-display');
+        if (display) {
+            try {
+                display.value = eval(display.value.replace(/×/g, '*').replace(/÷/g, '/'));
+            } catch (e) {
+                display.value = 'Lỗi';
+            }
+        }
+    };
+
     // Hàm phụ trợ tự động nhận diện môn học và bật/tắt nút công cụ tương ứng khi bấm Bắt Đầu Làm Bài
     window.startQuizWithToolCheck = function() {
         const subjectSelect = document.getElementById('subject-select');
@@ -172,7 +244,6 @@
         const btnDict = document.getElementById('btn-dict');
         const btnVerbs = document.getElementById('btn-verbs');
 
-        // Kiểm tra xem có chứa từ khóa toán hay tiếng anh không
         const isMath = selectedSubject.includes('toán') || selectedSubject.includes('math');
         const isEnglish = selectedSubject.includes('anh') || selectedSubject.includes('english');
 
@@ -185,13 +256,12 @@
             if (btnDict) btnDict.style.display = 'block';
             if (btnVerbs) btnVerbs.style.display = 'block';
         } else {
-            // Mặc định nếu không phân loại rõ thì ẩn hết hoặc hiện theo nhu cầu chung
             if (btnCalc) btnCalc.style.display = 'none';
             if (btnDict) btnDict.style.display = 'none';
             if (btnVerbs) btnVerbs.style.display = 'none';
         }
 
-        // Gọi tiếp hàm startQuiz gốc trong file script.js của bạn
+        // Gọi tiếp hàm startQuiz gốc trong file script.js
         if (typeof window.startQuiz === 'function') {
             window.startQuiz();
         }
