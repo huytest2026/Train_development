@@ -808,6 +808,15 @@ window.startQuiz = function() {
     const subjectSelect = document.getElementById('subject-select');
     const selectedSubject = subjectSelect ? subjectSelect.value.toLowerCase() : '';
 
+    // Kiểm tra xem đã chọn môn học chưa
+    const mon = subjectSelect ? subjectSelect.value : '';
+    if (!mon) {
+        alert("Vui lòng chọn môn học trước khi bắt đầu!");
+        return;
+    }
+
+    const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
+
     const btnCalc = document.getElementById('btn-calc');
     const btnDict = document.getElementById('btn-dict');
     const btnVerbs = document.getElementById('btn-verbs');
@@ -827,7 +836,7 @@ window.startQuiz = function() {
             btnVerbs.style.display = 'block';  // Hiện động từ bất quy tắc
         }
     }
-}
+};
     const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
     if (!mon) return alert("Vui lòng chọn môn học trước khi bắt đầu!");
 
