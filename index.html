@@ -118,7 +118,9 @@
             <!-- Nút Công cụ Tiếng Anh (Sẽ tự ẩn/hiện dựa theo môn học) -->
             <button type="button" id="btn-dict" onclick="window.openDictionaryModal()" style="display: none; background: #17a2b8; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📖 Tra từ</button>
             <button type="button" id="btn-verbs" onclick="window.openIrregularVerbsModal()" style="display: none; background: #e0a800; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📚 ĐT Bất Quy Tắc</button>
-            
+            <button class="btn-listen" onclick="playAudio('https://drive.google.com/uc?export=open&id=1F3LzQAq2stgh11cecDaOOxYM4sxVO9eb')">
+  🔊 Nghe câu hỏi
+</button>
             <button type="button" onclick="window.backToHome()" style="background: #6c757d; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🏠 Trang chủ</button>
         </div>
         <div>Đúng: <span id="correct-count-display" style="color: green;">0</span> | Sai: <span id="wrong-count-display" style="color: red;">0</span></div>
