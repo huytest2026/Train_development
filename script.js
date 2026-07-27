@@ -1635,3 +1635,21 @@ document.addEventListener('DOMContentLoaded', function() {
         btnCalc.addEventListener('click', window.openCalculatorModal);
     }
 });
+// Biến lưu trữ file audio đang phát
+let currentAudio = null;
+
+function playAudio(audioUrl) {
+    // Nếu đang phát một đoạn âm thanh khác thì dừng lại trước
+    if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+    }
+
+    // Tạo đối tượng âm thanh mới và phát
+    currentAudio = new Audio(audioUrl);
+    
+    currentAudio.play().catch(error => {
+        console.error("Lỗi phát âm thanh:", error);
+        alert("Không thể phát âm thanh! Hãy kiểm tra lại link hoặc quyền chia sẻ file trên Google Drive.");
+    });
+}
