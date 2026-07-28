@@ -1828,40 +1828,22 @@ document.getElementById('btnMixedQuiz').addEventListener('click', function() {
 // ==========================================
 document.addEventListener('DOMContentLoaded', function() {
     
-    // Hàm tìm và bấm nút "Xác nhận Mã & Tải đề" tự động
-    function triggerLoadData() {
-        let loadBtn = document.getElementById('load-data-btn');
-        if (!loadBtn) {
-            const allButtons = document.querySelectorAll('button, input[type="button"], input[type="submit"]');
-            for (let btn of allButtons) {
-                if (btn.textContent.includes('Xác nhận Mã') || (btn.value && btn.value.includes('Xác nhận Mã'))) {
-                    loadBtn = btn;
-                    break;
+    // Tự động kích hoạt tải dữ liệu ngầm khi trang vừa load xong hoàn toàn
+    window.addEventListener('load', function() {
+        setTimeout(function() {
+            if (!window.AppState || !AppState.currentQuizData || AppState.currentQuizData.length === 0) {
+                let loadBtn = document.getElementById('load-data-btn');
+                if (loadBtn) {
+                    if (window.jQuery) {
+                        window.jQuery('#load-data-btn').click();
+                    } else {
+                        loadBtn.click();
+                    }
                 }
             }
-        }
-        if (loadBtn) {
-            console.log("Đang tự động kích hoạt tải dữ liệu...");
-            // Dùng dispatchEvent để kích hoạt sự kiện click chuẩn xác như người dùng bấm thật
-            let clickEvent = new MouseEvent('click', {
-                view: window,
-                bubbles: true,
-                cancelable: true
-            });
-            loadBtn.dispatchEvent(clickEvent);
-            return true;
-        }
-        return false;
-    }
+        }, 1000);
+    });
 
-    // 1. Tự động tải dữ liệu ngầm sau 1 giây khi vừa mở trang (nếu có sẵn mã học sinh)
-    setTimeout(function() {
-        if (!window.AppState || !AppState.currentQuizData || AppState.currentQuizData.length === 0) {
-            triggerLoadData();
-        }
-    }, 1000);
-
-    // 2. Xử lý sự kiện khi bấm nút "Tạo đề tổng hợp"
     const btnMixedQuiz = document.getElementById('btnMixedQuiz');
     if (btnMixedQuiz) {
         btnMixedQuiz.addEventListener('click', function() {
@@ -1918,27 +1900,32 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            // Kiểm tra dữ liệu: Nếu đã có sẵn thì tạo đề ngay lập tức
+            // Kiểm tra dữ liệu: Nếu đã có sẵn thì tạo đề ngay
             if (window.AppState && AppState.currentQuizData && AppState.currentQuizData.length > 0) {
                 generateMixedQuiz();
             } else {
-                // Nếu chưa có, kích hoạt tải dữ liệu và chờ tối đa 10 giây
-                let triggered = triggerLoadData();
-                if (triggered) {
-                    let attempts = 0;
-                    let checkInterval = setInterval(function() {
-                        attempts++;
-                        if (window.AppState && AppState.currentQuizData && AppState.currentQuizData.length > 0) {
-                            clearInterval(checkInterval);
-                            generateMixedQuiz();
-                        } else if (attempts > 20) {
-                            clearInterval(checkInterval);
-                            alert("Không thể tải dữ liệu tự động. Vui lòng bấm nút 'Xác nhận Mã & Tải đề' thủ công một lần!");
-                        }
-                    }, 500);
-                } else {
-                    alert("Vui lòng bấm 'Xác nhận Mã & Tải đề' thủ công một lần trước khi tạo đề tổng hợp!");
+                // Kích hoạt lại nút tải dữ liệu bằng cả jQuery và JS thuần
+                let loadBtn = document.getElementById('load-data-btn');
+                if (loadBtn) {
+                    if (window.jQuery) {
+                        window.jQuery('#load-data-btn').click();
+                    } else {
+                        loadBtn.click();
+                    }
                 }
+
+                // Chờ dữ liệu đổ về tối đa 15 giây
+                let attempts = 0;
+                let checkInterval = setInterval(function() {
+                    attempts++;
+                    if (window.AppState && AppState.currentQuizData && AppState.currentQuizData.length > 0) {
+                        clearInterval(checkInterval);
+                        generateMixedQuiz();
+                    } else if (attempts > 30) {
+                        clearInterval(checkInterval);
+                        alert("Lần đầu tiên mở trang, vui lòng bấm nút 'Xác nhận Mã & Tải đề' thủ công 1 lần. Từ các lần sau, hệ thống sẽ tự động nhớ và tạo đề tổng hợp ngay lập tức!");
+                    }
+                }, 500);
             }
         });
     }
