@@ -1768,86 +1768,15 @@ window.calcCalculate = function() {
         display.value = 'Lỗi';
     }
 };
-// DÁN ĐOẠN CODE TẠO ĐỀ TỔNG HỢP VÀO ĐÂY (Ở CUỐI FILE)
-// ==========================================
-document.getElementById('btnMixedQuiz').addEventListener('click', function() {
-    if (!AppState.currentQuizData || AppState.currentQuizData.length === 0) {
-        alert("Vui lòng xác nhận mã học sinh và tải dữ liệu trước!");
-        return;
-    }
-
-    const targetStructure = [
-        { chuDe: "Hình học", count: 2 },
-        { chuDe: "Đổi đơn vị", count: 6 },
-        { chuDe: "Phân số", count: 4 },
-        { chuDe: "Phép tính số thập phân", count: 5 },
-        { chuDe: "So sánh phân số", count: 4 }
-    ];
-
-    let mixedQuestions = [];
-    let errors = [];
-
-    targetStructure.forEach(item => {
-        let pool = AppState.currentQuizData.filter(q => {
-            let qChuDe = String(q.chuDe || q.chude || '').trim().toLowerCase();
-            return qChuDe === item.chuDe.toLowerCase();
-        });
-
-        if (pool.length < item.count) {
-            errors.push(`- Chủ đề "${item.chuDe}": Cần ${item.count} câu, nhưng trong kho chỉ có ${pool.length} câu.`);
-        }
-
-        pool.sort(() => Math.random() - 0.5);
-        let selected = pool.slice(0, item.count);
-        mixedQuestions = mixedQuestions.concat(selected);
-    });
-
-    if (errors.length > 0) {
-        alert("Không đủ dữ liệu tạo đề:\n\n" + errors.join("\n") + "\n\nBạn vui lòng kiểm tra lại cột chủ đề trong Google Sheet!");
-        return;
-    }
-
-    mixedQuestions.sort(() => Math.random() - 0.5);
-    AppState.currentQuizData = mixedQuestions;
-
-    // Thiết lập thời gian 30 phút (1800 giây)
-    if (typeof startTimer === 'function') {
-        startTimer(30 * 60); 
-    } else if (window.timeLeft !== undefined) {
-        window.timeLeft = 30 * 60;
-    }
-
-    if (typeof startQuiz === 'function') {
-        startQuiz();
-    } else {
-        alert("Đã tạo thành công đề tổng hợp 30 phút! Vui lòng bấm nút 'Bắt Đầu Làm Bài'.");
-    }
-});
 // ==========================================
 // TỰ ĐỘNG TẢI DỮ LIỆU & TẠO ĐỀ TỔNG HỢP (30 phút - 21 câu)
 // ==========================================
 document.addEventListener('DOMContentLoaded', function() {
-    
-    // Tự động kích hoạt tải dữ liệu ngầm khi trang vừa load xong hoàn toàn
-    window.addEventListener('load', function() {
-        setTimeout(function() {
-            if (!window.AppState || !AppState.currentQuizData || AppState.currentQuizData.length === 0) {
-                let loadBtn = document.getElementById('load-data-btn');
-                if (loadBtn) {
-                    if (window.jQuery) {
-                        window.jQuery('#load-data-btn').click();
-                    } else {
-                        loadBtn.click();
-                    }
-                }
-            }
-        }, 1000);
-    });
-
     const btnMixedQuiz = document.getElementById('btnMixedQuiz');
     if (btnMixedQuiz) {
         btnMixedQuiz.addEventListener('click', function() {
             
+            // Hàm xử lý cắt ghép 21 câu hỏi theo đúng cấu trúc
             function generateMixedQuiz() {
                 const targetStructure = [
                     { chuDe: "Hình học", count: 2 },
@@ -1900,11 +1829,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            // Kiểm tra dữ liệu: Nếu đã có sẵn thì tạo đề ngay
+            // 1. Nếu dữ liệu đã có sẵn -> Tạo đề ngay lập tức
             if (window.AppState && AppState.currentQuizData && AppState.currentQuizData.length > 0) {
                 generateMixedQuiz();
-            } else {
-                // Kích hoạt lại nút tải dữ liệu bằng cả jQuery và JS thuần
+            } 
+            // 2. Nếu chưa có dữ liệu -> Tự động kích hoạt nút tải và kiên nhẫn chờ đợi đến khi xong
+            else {
                 let loadBtn = document.getElementById('load-data-btn');
                 if (loadBtn) {
                     if (window.jQuery) {
@@ -1914,16 +1844,25 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
-                // Chờ dữ liệu đổ về tối đa 15 giây
+                // Đổi thông báo trên nút thành "Đang tạo đề..." để người dùng biết hệ thống đang xử lý
+                const originalText = btnMixedQuiz.innerHTML;
+                btnMixedQuiz.innerHTML = "⏳ Đang tải và tạo đề...";
+                btnMixedQuiz.disabled = true;
+
+                // Kiên nhẫn chờ dữ liệu về (kiểm tra mỗi 0.5 giây, chờ tối đa 40 giây)
                 let attempts = 0;
                 let checkInterval = setInterval(function() {
                     attempts++;
                     if (window.AppState && AppState.currentQuizData && AppState.currentQuizData.length > 0) {
                         clearInterval(checkInterval);
-                        generateMixedQuiz();
-                    } else if (attempts > 30) {
+                        btnMixedQuiz.innerHTML = originalText;
+                        btnMixedQuiz.disabled = false;
+                        generateMixedQuiz(); // Tự động tạo đề ngay khi dữ liệu về!
+                    } else if (attempts > 80) { // 80 lần x 0.5s = 40 giây
                         clearInterval(checkInterval);
-                        alert("Lần đầu tiên mở trang, vui lòng bấm nút 'Xác nhận Mã & Tải đề' thủ công 1 lần. Từ các lần sau, hệ thống sẽ tự động nhớ và tạo đề tổng hợp ngay lập tức!");
+                        btnMixedQuiz.innerHTML = originalText;
+                        btnMixedQuiz.disabled = false;
+                        alert("Quá thời gian tải dữ liệu. Vui lòng kiểm tra lại kết nối mạng hoặc bấm nút 'Xác nhận Mã & Tải đề' thủ công một lần!");
                     }
                 }, 500);
             }
