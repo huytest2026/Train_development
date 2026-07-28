@@ -306,7 +306,9 @@ window.speakQuestion = function(index) {
     const item = AppState.currentQuizData[index];
     if (!item) return;
     
-    // 1. NHẬN DIỆN CÁC DẠNG BÀI ĐẶC BIỆT (Giữ nguyên logic cũ của bạn)
+    // ==========================================
+    // 1. NHẬN DIỆN CÁC DẠNG BÀI VÀ XỬ LÝ CHỮ (GIỮ NGUYÊN)
+    // ==========================================
     let isListeningType = false;
     if (item.loai === 'listening_fill') {
         isListeningType = true;
@@ -321,7 +323,6 @@ window.speakQuestion = function(index) {
     const chuDeLower = (item.chuDe || '').toLowerCase();
     const isVietAnh = chuDeLower.includes('việt anh') || chuDeLower.includes('viet anh');
 
-    // 2. KIỂM TRA TRẠNG THÁI TRẢ LỜI
     let hasAnswered = false;
     const quizCards = document.querySelectorAll('.quiz-card');
     if (quizCards[index]) {
@@ -331,7 +332,6 @@ window.speakQuestion = function(index) {
                       item._isAnswered;
     }
 
-    // 3. CHUẨN BỊ TEXT CÂU HỎI VÀ ĐÁP ÁN (Giữ nguyên logic lấy đáp án cũ của bạn)
     let questionText = item.passage || item.question || '';
     let correctAnswerStr = '';
     
@@ -343,10 +343,7 @@ window.speakQuestion = function(index) {
     }
 
     let textToRead = '';
-
-    // 4. XỬ LÝ LỌC TEXT CHO TỪNG LOẠI BÀI
     if (isListeningType) {
-        // [Tính năng cũ]: Ưu tiên đọc nội dung dạng listening. Nếu có chỗ trống và có đáp án thì ghép vào.
         textToRead = questionText;
         if (correctAnswerStr) {
             if (textToRead.includes('___')) {
@@ -356,48 +353,69 @@ window.speakQuestion = function(index) {
             }
         }
     } else {
-        // [Tính năng chuẩn hóa]: Các dạng bài tập thông thường
         if (!hasAnswered) {
-            // Chưa làm: Chỉ lấy đề bài (sẽ được lọc dấu gạch dưới ở bước cuối)
             textToRead = questionText;
         } else {
-            // Đã làm: Chia trường hợp
             if (isVietAnh) {
-                // Bài Việt-Anh: Chỉ đọc đáp án (Tránh AI đọc tiếng Việt)
                 textToRead = correctAnswerStr;
             } else if (questionText.match(/_{2,}|\.{3,}/) && correctAnswerStr) {
-                // Câu hỏi trắc nghiệm có lỗ hổng (___): Ghép nối đáp án vào đúng vị trí
                 textToRead = questionText.replace(/_{2,}|\.{3,}/g, " " + correctAnswerStr + " ");
             } else {
-                // Câu hỏi trắc nghiệm bình thường: Đọc đề bài, nghỉ một chút, đọc đáp án
                 textToRead = questionText + ". " + correctAnswerStr;
             }
         }
     }
 
-    // 5. PHÁT FILE ÂM THANH ONLINE (Giữ nguyên tính năng cũ)
-    if (textToRead && (textToRead.startsWith('http://') || textToRead.startsWith('https://')) && 
-        (textToRead.endsWith('.mp3') || textToRead.endsWith('.wav') || textToRead.endsWith('.m4a') || textToRead.includes('drive.google.com'))) {
-        new Audio(textToRead).play().catch(() => alert("Không thể phát file âm thanh."));
-        return;
-    }
+    // ==========================================
+    // 2. HÀM FALLBACK: ĐỌC BẰNG AI (NẾU MP3 LỖI/KHÔNG CÓ)
+    // ==========================================
+    const playTextToSpeech = () => {
+        if (textToRead && 'speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            let finalCleanText = textToRead.replace(/_/g, ' ')
+                                           .replace(/\s+/g, ' ')
+                                           .trim();
+                                           
+            const utterance = new SpeechSynthesisUtterance(finalCleanText);
+            utterance.lang = 'en-US';
+            utterance.rate = isListeningType ? 0.85 : 0.9; 
+            window.speechSynthesis.speak(utterance);
+        }
+    };
 
-    // 6. PHÁT ÂM BẰNG TEXT-TO-SPEECH (Tích hợp chống lỗi "underscore")
-    if (textToRead && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
+    // ==========================================
+    // 3. XỬ LÝ PHÁT FILE MP3 TỪ EXCEL (CỘT Mp3)
+    // ==========================================
+    
+    // Lấy dữ liệu từ cột Mp3 (đề phòng trường hợp viết hoa/thường)
+    let audioUrl = item.Mp3 || item.mp3 || item.MP3 || ''; 
+    
+    if (audioUrl && typeof audioUrl === 'string' && audioUrl.trim() !== '') {
+        // CHUẨN HÓA LINK GOOGLE DRIVE ĐỂ TRÌNH DUYỆT CÓ THỂ ĐỌC ĐƯỢC
+        if (audioUrl.includes('drive.google.com') && audioUrl.includes('id=')) {
+            // Cắt lấy ID của file Google Drive
+            const urlParams = new URLSearchParams(audioUrl.substring(audioUrl.indexOf('?')));
+            const fileId = urlParams.get('id');
+            if (fileId) {
+                // Đổi thành link export=download để luồng Audio có thể stream
+                audioUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+            }
+        }
         
-        // TRIỆT ĐỂ: Dọn sạch mọi dấu gạch dưới còn sót và khoảng trắng thừa 
-        // để AI đọc mượt mà cho dù người dùng đã chọn đáp án hay chưa
-        let finalCleanText = textToRead.replace(/_/g, ' ')
-                                       .replace(/\s+/g, ' ')
-                                       .trim();
-                                       
-        const utterance = new SpeechSynthesisUtterance(finalCleanText);
-        utterance.lang = 'en-US';
-        // [Tính năng cũ]: Tốc độ đọc chậm hơn (0.85) cho bài Listening, bình thường (0.9)
-        utterance.rate = isListeningType ? 0.85 : 0.9; 
+        // Dừng giọng AI nếu đang đọc
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         
-        window.speechSynthesis.speak(utterance);
+        const audio = new Audio(audioUrl);
+        audio.play().then(() => {
+            console.log("Đã phát file âm thanh:", audioUrl);
+        }).catch(error => {
+            // Nếu vẫn lỗi (do file Drive bị chặn quyền hoặc bị xóa), sẽ tự động chuyển sang đọc văn bản
+            console.warn("Không phát được file MP3, tự động chuyển sang đọc văn bản.", error);
+            playTextToSpeech();
+        });
+    } else {
+        // Không có cột Mp3 trống -> Gọi AI đọc chữ
+        playTextToSpeech();
     }
 };
 
