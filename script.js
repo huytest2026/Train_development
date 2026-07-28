@@ -1827,23 +1827,11 @@ document.getElementById('btnMixedQuiz').addEventListener('click', function() {
 // TỰ ĐỘNG TẢI DỮ LIỆU & TẠO ĐỀ TỔNG HỢP (30 phút - 21 câu)
 // ==========================================
 document.addEventListener('DOMContentLoaded', function() {
-    
-    // 1. Tự động tải dữ liệu ngầm ngay khi mở trang (dựa vào mã học sinh có sẵn)
-    setTimeout(function() {
-        if (typeof window.loadData === 'function') {
-            const studentCodeInput = document.getElementById('student-code');
-            if (studentCodeInput && studentCodeInput.value.trim() !== '') {
-                console.log("Đang tự động tải dữ liệu cho mã học sinh:", studentCodeInput.value);
-                window.loadData();
-            }
-        }
-    }, 800); // Chờ 0.8 giây để hệ thống ổn định rồi tự động gọi lệnh tải đề
-
-    // 2. Xử lý sự kiện khi bấm nút "Tạo đề tổng hợp"
     const btnMixedQuiz = document.getElementById('btnMixedQuiz');
     if (btnMixedQuiz) {
         btnMixedQuiz.addEventListener('click', function() {
             
+            // Hàm xử lý cắt ghép 21 câu hỏi theo đúng cấu trúc
             function generateMixedQuiz() {
                 const targetStructure = [
                     { chuDe: "Hình học", count: 2 },
@@ -1896,27 +1884,43 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            // Kiểm tra dữ liệu: Nếu đã có sẵn thì tạo đề ngay lập tức
+            // 1. Nếu dữ liệu đã có sẵn trong bộ nhớ -> Tạo đề ngay lập tức
             if (window.AppState && AppState.currentQuizData && AppState.currentQuizData.length > 0) {
                 generateMixedQuiz();
-            } else {
-                // Nếu chưa kịp tải xong, gọi lệnh tải và chờ tối đa 15 giây
-                if (typeof window.loadData === 'function') {
-                    window.loadData();
-                    
+            } 
+            // 2. Nếu chưa có dữ liệu -> Tự động tìm nút "Xác nhận Mã & Tải đề" trên giao diện và bấm giùm người dùng
+            else {
+                let loadBtn = document.getElementById('load-data-btn');
+                
+                // Nếu không tìm thấy bằng ID, tự động quét tìm nút có chữ "Xác nhận Mã"
+                if (!loadBtn) {
+                    const allButtons = document.querySelectorAll('button, input[type="button"], input[type="submit"]');
+                    for (let btn of allButtons) {
+                        if (btn.textContent.includes('Xác nhận Mã') || (btn.value && btn.value.includes('Xác nhận Mã'))) {
+                            loadBtn = btn;
+                            break;
+                        }
+                    }
+                }
+
+                if (loadBtn) {
+                    console.log("Đang tự động kích hoạt tải dữ liệu...");
+                    loadBtn.click(); // Tự động bấm nút tải đề gốc của trang
+
+                    // Chờ dữ liệu đổ về (kiểm tra mỗi 0.5 giây, tối đa 15 giây)
                     let attempts = 0;
                     let checkInterval = setInterval(function() {
                         attempts++;
                         if (window.AppState && AppState.currentQuizData && AppState.currentQuizData.length > 0) {
                             clearInterval(checkInterval);
-                            generateMixedQuiz();
-                        } else if (attempts > 30) { // 30 lần x 0.5s = 15 giây
+                            generateMixedQuiz(); // Tạo đề ngay sau khi tải xong
+                        } else if (attempts > 30) {
                             clearInterval(checkInterval);
-                            alert("Không thể tải dữ liệu tự động. Vui lòng kiểm tra kết nối mạng hoặc bấm nút 'Xác nhận Mã & Tải đề' thủ công!");
+                            alert("Không thể tải dữ liệu tự động. Vui lòng bấm nút 'Xác nhận Mã & Tải đề' một lần bằng tay, sau đó bấm lại nút Tạo đề tổng hợp nhé!");
                         }
                     }, 500);
                 } else {
-                    alert("Vui lòng bấm 'Xác nhận Mã & Tải đề' trước!");
+                    alert("Vui lòng bấm 'Xác nhận Mã & Tải đề' thủ công một lần trước khi tạo đề tổng hợp!");
                 }
             }
         });
