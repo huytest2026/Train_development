@@ -49,7 +49,13 @@ function standardizeSubject(monStr) {
 function speakWord(text) {
     if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
-        let cleanText = text.replace(/\/.+?\//g, '').trim();
+        
+        // Đã thêm lệnh loại bỏ dấu gạch dưới (_) và chuẩn hóa khoảng trắng
+        let cleanText = text.replace(/\/.+?\//g, '')
+                            .replace(/_/g, ' ')
+                            .replace(/\s+/g, ' ')
+                            .trim();
+                            
         const utterance = new SpeechSynthesisUtterance(cleanText);
         utterance.lang = 'en-US';
         utterance.rate = 0.9;
