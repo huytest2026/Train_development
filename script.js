@@ -306,6 +306,9 @@ window.speakQuestion = function(index) {
     const item = AppState.currentQuizData[index];
     if (!item) return;
     
+    // In thông tin câu hỏi ra Console để bạn kiểm tra xem dòng này có link MP3 hay không
+    console.log("--- Kiểm tra câu hỏi số " + (index + 1) + " ---", item);
+
     // ==========================================
     // 1. NHẬN DIỆN CÁC DẠNG BÀI VÀ XỬ LÝ CHỮ (GIỮ NGUYÊN)
     // ==========================================
@@ -367,7 +370,7 @@ window.speakQuestion = function(index) {
     }
 
     // ==========================================
-    // 2. HÀM FALLBACK: ĐỌC BẰNG AI (NẾU MP3 LỖI/KHÔNG CÓ)
+    // 2. HÀM FALLBACK: ĐỌC BẰNG AI 
     // ==========================================
     const playTextToSpeech = () => {
         if (textToRead && 'speechSynthesis' in window) {
@@ -384,14 +387,12 @@ window.speakQuestion = function(index) {
     };
 
     // ==========================================
-    // 3. LẤY LINK MP3 TRỰC TIẾP TỪ OBJECT CÂU HỎI
+    // 3. LẤY LINK MP3 AN TOÀN VÀ KIỂM TRA HỢP LỆ
     // ==========================================
     let audioUrl = '';
     try {
-        // Kiểm tra mọi biến thể tên thuộc tính có thể có trong Object
         audioUrl = item.Mp3 || item.mp3 || item.MP3 || item.audio || item.linkMp3 || '';
         
-        // Nếu tên thuộc tính trong object bị dính khoảng trắng hoặc viết hoa khác thường, quét qua tất cả key
         if (!audioUrl && item && typeof item === 'object') {
             for (let key in item) {
                 if (key.trim().toLowerCase() === 'mp3' || key.trim().toLowerCase() === 'audio') {
@@ -403,11 +404,13 @@ window.speakQuestion = function(index) {
     } catch (e) {
         console.warn("Lỗi đọc thuộc tính Mp3:", e);
     }
+
+    console.log("Đường dẫn audioUrl lấy được:", audioUrl);
     
-    if (audioUrl && typeof audioUrl === 'string' && audioUrl.trim() !== '') {
+    // Chỉ chạy Audio khi audioUrl thực sự là một đường dẫn web hợp lệ bắt đầu bằng 'http'
+    if (audioUrl && typeof audioUrl === 'string' && audioUrl.trim().startsWith('http')) {
         audioUrl = audioUrl.trim();
         
-        // Chuẩn hóa link Google Drive (nếu có)
         if (audioUrl.includes('drive.google.com') && audioUrl.includes('id=')) {
             const urlParams = new URLSearchParams(audioUrl.substring(audioUrl.indexOf('?')));
             const fileId = urlParams.get('id');
@@ -416,18 +419,17 @@ window.speakQuestion = function(index) {
             }
         }
         
-        // Dừng giọng đọc AI nếu đang chạy
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         
         const audio = new Audio(audioUrl);
         audio.play().then(() => {
             console.log("Đã phát file MP3 thành công:", audioUrl);
         }).catch(error => {
-            console.warn("Không phát được file MP3, tự động chuyển sang đọc văn bản.", error);
+            console.warn("Link MP3 bị lỗi hoặc không tải được, chuyển sang đọc văn bản.", error);
             playTextToSpeech();
         });
     } else {
-        // Không có link MP3 -> Gọi AI đọc chữ
+        // Nếu không có link hoặc link không hợp lệ -> Tự động chuyển sang AI đọc văn bản mượt mà
         playTextToSpeech();
     }
 };
