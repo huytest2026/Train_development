@@ -1768,3 +1768,58 @@ window.calcCalculate = function() {
         display.value = 'Lỗi';
     }
 };
+// DÁN ĐOẠN CODE TẠO ĐỀ TỔNG HỢP VÀO ĐÂY (Ở CUỐI FILE)
+// ==========================================
+document.getElementById('btnMixedQuiz').addEventListener('click', function() {
+    if (!AppState.currentQuizData || AppState.currentQuizData.length === 0) {
+        alert("Vui lòng xác nhận mã học sinh và tải dữ liệu trước!");
+        return;
+    }
+
+    const targetStructure = [
+        { chuDe: "Hình học", count: 2 },
+        { chuDe: "Đổi đơn vị", count: 6 },
+        { chuDe: "Phân số", count: 4 },
+        { chuDe: "Phép tính số thập phân", count: 5 },
+        { chuDe: "So sánh phân số", count: 4 }
+    ];
+
+    let mixedQuestions = [];
+    let errors = [];
+
+    targetStructure.forEach(item => {
+        let pool = AppState.currentQuizData.filter(q => {
+            let qChuDe = String(q.chuDe || q.chude || '').trim().toLowerCase();
+            return qChuDe === item.chuDe.toLowerCase();
+        });
+
+        if (pool.length < item.count) {
+            errors.push(`- Chủ đề "${item.chuDe}": Cần ${item.count} câu, nhưng trong kho chỉ có ${pool.length} câu.`);
+        }
+
+        pool.sort(() => Math.random() - 0.5);
+        let selected = pool.slice(0, item.count);
+        mixedQuestions = mixedQuestions.concat(selected);
+    });
+
+    if (errors.length > 0) {
+        alert("Không đủ dữ liệu tạo đề:\n\n" + errors.join("\n") + "\n\nBạn vui lòng kiểm tra lại cột chủ đề trong Google Sheet!");
+        return;
+    }
+
+    mixedQuestions.sort(() => Math.random() - 0.5);
+    AppState.currentQuizData = mixedQuestions;
+
+    // Thiết lập thời gian 30 phút (1800 giây)
+    if (typeof startTimer === 'function') {
+        startTimer(30 * 60); 
+    } else if (window.timeLeft !== undefined) {
+        window.timeLeft = 30 * 60;
+    }
+
+    if (typeof startQuiz === 'function') {
+        startQuiz();
+    } else {
+        alert("Đã tạo thành công đề tổng hợp 30 phút! Vui lòng bấm nút 'Bắt Đầu Làm Bài'.");
+    }
+});
