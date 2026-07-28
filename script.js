@@ -1827,11 +1827,45 @@ document.getElementById('btnMixedQuiz').addEventListener('click', function() {
 // TỰ ĐỘNG TẢI DỮ LIỆU & TẠO ĐỀ TỔNG HỢP (30 phút - 21 câu)
 // ==========================================
 document.addEventListener('DOMContentLoaded', function() {
+    
+    // Hàm tìm và bấm nút "Xác nhận Mã & Tải đề" tự động
+    function triggerLoadData() {
+        let loadBtn = document.getElementById('load-data-btn');
+        if (!loadBtn) {
+            const allButtons = document.querySelectorAll('button, input[type="button"], input[type="submit"]');
+            for (let btn of allButtons) {
+                if (btn.textContent.includes('Xác nhận Mã') || (btn.value && btn.value.includes('Xác nhận Mã'))) {
+                    loadBtn = btn;
+                    break;
+                }
+            }
+        }
+        if (loadBtn) {
+            console.log("Đang tự động kích hoạt tải dữ liệu...");
+            // Dùng dispatchEvent để kích hoạt sự kiện click chuẩn xác như người dùng bấm thật
+            let clickEvent = new MouseEvent('click', {
+                view: window,
+                bubbles: true,
+                cancelable: true
+            });
+            loadBtn.dispatchEvent(clickEvent);
+            return true;
+        }
+        return false;
+    }
+
+    // 1. Tự động tải dữ liệu ngầm sau 1 giây khi vừa mở trang (nếu có sẵn mã học sinh)
+    setTimeout(function() {
+        if (!window.AppState || !AppState.currentQuizData || AppState.currentQuizData.length === 0) {
+            triggerLoadData();
+        }
+    }, 1000);
+
+    // 2. Xử lý sự kiện khi bấm nút "Tạo đề tổng hợp"
     const btnMixedQuiz = document.getElementById('btnMixedQuiz');
     if (btnMixedQuiz) {
         btnMixedQuiz.addEventListener('click', function() {
             
-            // Hàm xử lý cắt ghép 21 câu hỏi theo đúng cấu trúc
             function generateMixedQuiz() {
                 const targetStructure = [
                     { chuDe: "Hình học", count: 2 },
@@ -1884,39 +1918,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            // 1. Nếu dữ liệu đã có sẵn trong bộ nhớ -> Tạo đề ngay lập tức
+            // Kiểm tra dữ liệu: Nếu đã có sẵn thì tạo đề ngay lập tức
             if (window.AppState && AppState.currentQuizData && AppState.currentQuizData.length > 0) {
                 generateMixedQuiz();
-            } 
-            // 2. Nếu chưa có dữ liệu -> Tự động tìm nút "Xác nhận Mã & Tải đề" trên giao diện và bấm giùm người dùng
-            else {
-                let loadBtn = document.getElementById('load-data-btn');
-                
-                // Nếu không tìm thấy bằng ID, tự động quét tìm nút có chữ "Xác nhận Mã"
-                if (!loadBtn) {
-                    const allButtons = document.querySelectorAll('button, input[type="button"], input[type="submit"]');
-                    for (let btn of allButtons) {
-                        if (btn.textContent.includes('Xác nhận Mã') || (btn.value && btn.value.includes('Xác nhận Mã'))) {
-                            loadBtn = btn;
-                            break;
-                        }
-                    }
-                }
-
-                if (loadBtn) {
-                    console.log("Đang tự động kích hoạt tải dữ liệu...");
-                    loadBtn.click(); // Tự động bấm nút tải đề gốc của trang
-
-                    // Chờ dữ liệu đổ về (kiểm tra mỗi 0.5 giây, tối đa 15 giây)
+            } else {
+                // Nếu chưa có, kích hoạt tải dữ liệu và chờ tối đa 10 giây
+                let triggered = triggerLoadData();
+                if (triggered) {
                     let attempts = 0;
                     let checkInterval = setInterval(function() {
                         attempts++;
                         if (window.AppState && AppState.currentQuizData && AppState.currentQuizData.length > 0) {
                             clearInterval(checkInterval);
-                            generateMixedQuiz(); // Tạo đề ngay sau khi tải xong
-                        } else if (attempts > 30) {
+                            generateMixedQuiz();
+                        } else if (attempts > 20) {
                             clearInterval(checkInterval);
-                            alert("Không thể tải dữ liệu tự động. Vui lòng bấm nút 'Xác nhận Mã & Tải đề' một lần bằng tay, sau đó bấm lại nút Tạo đề tổng hợp nhé!");
+                            alert("Không thể tải dữ liệu tự động. Vui lòng bấm nút 'Xác nhận Mã & Tải đề' thủ công một lần!");
                         }
                     }, 500);
                 } else {
