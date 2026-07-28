@@ -18,7 +18,7 @@ function handleBeforeUnload(e) {
 }
 
 // ==========================================
-// HÀM TIỆN ÍCH CƠ BẢN VÀ PHÁT ÂM (PHẦN 1)
+// PHẦN 1: HÀM TIỆN ÍCH CƠ BẢN VÀ TỪ ĐIỂN
 // ==========================================
 function escapeHTML(str) {
     if (!str) return '';
@@ -49,12 +49,10 @@ function standardizeSubject(monStr) {
 function speakWord(text) {
     if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
-        
         let cleanText = text.replace(/\/.*?\//g, '')
                             .replace(/_/g, ' ')
                             .replace(/\s+/g, ' ')
                             .trim();
-                            
         const utterance = new SpeechSynthesisUtterance(cleanText);
         utterance.lang = 'en-US';
         utterance.rate = 0.9;
@@ -64,7 +62,6 @@ function speakWord(text) {
     }
 }
 
-// 1. Quản lý Tra từ điển (Đã tích hợp Anh - Việt)
 window.openDictionaryModal = function() {
     const modal = document.getElementById('dict-modal');
     if (modal) modal.style.display = 'flex';
@@ -324,6 +321,9 @@ function getCorrectKeys(item) {
     return keys;
 }
 
+// ==========================================
+// PHẦN 2: XỬ LÝ PHÁT ÂM (TEXT-TO-SPEECH)
+// ==========================================
 window.speakQuestion = function(index) {
     const item = AppState.currentQuizData[index];
     if (!item) return;
@@ -411,7 +411,6 @@ window.speakQuestion = function(index) {
     }
 };
 
-// 3. Hàm speakText chung
 function speakText(text, rate = 0.9) {
     if (!text) return;
     if ('speechSynthesis' in window) {
@@ -428,6 +427,9 @@ function speakText(text, rate = 0.9) {
     }
 }
 
+// ==========================================
+// PHẦN 3: CHUẨN HÓA DỮ LIỆU VÀ SỰ KIỆN KHỞI TẠO
+// ==========================================
 function normalizeItem(item) {
     if (!item) return null;
     if (!Array.isArray(item) && typeof item === 'object') {
@@ -604,6 +606,9 @@ window.initInterface = function() {
     window.restoreUserSelections();
 };
 
+// ==========================================
+// PHẦN 4: TẢI DỮ LIỆU GOOGLE SHEETS & XỬ LÝ KẾT QUẢ
+// ==========================================
 window.loadData = function() {
     const maHS = document.getElementById('student-code').value.trim();
     if (!maHS) return alert("Vui lòng nhập mã học sinh!");
@@ -741,6 +746,9 @@ function parseCustomDate(dateStr) {
     }
 }
 
+// ==========================================
+// PHẦN 5: BẢNG XẾP HẠNG, GIAO DIỆN LÀM BÀI & CHẤM ĐIỂM
+// ==========================================
 window.renderLeaderboard = function(monFilter = '') {
     const container = document.getElementById('leaderboard-container');
     if (!container) return;
