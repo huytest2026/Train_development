@@ -1823,3 +1823,72 @@ document.getElementById('btnMixedQuiz').addEventListener('click', function() {
         alert("Đã tạo thành công đề tổng hợp 30 phút! Vui lòng bấm nút 'Bắt Đầu Làm Bài'.");
     }
 });
+// ==========================================
+// CHỨC NĂNG TẠO ĐỀ TỔNG HỢP (30 phút - 21 câu)
+// ==========================================
+document.addEventListener('DOMContentLoaded', function() {
+    const btnMixedQuiz = document.getElementById('btnMixedQuiz');
+    if (btnMixedQuiz) {
+        btnMixedQuiz.addEventListener('click', function() {
+            if (!window.AppState || !AppState.currentQuizData || AppState.currentQuizData.length === 0) {
+                alert("Vui lòng bấm 'Xác nhận Mã & Tải đề' trước!");
+                return;
+            }
+
+            // Cấu trúc đề yêu cầu: 21 câu tổng cộng
+            const targetStructure = [
+                { chuDe: "Hình học", count: 2 },
+                { chuDe: "Đổi đơn vị", count: 6 },
+                { chuDe: "Phân số", count: 4 },
+                { chuDe: "Phép tính số thập phân", count: 5 },
+                { chuDe: "So sánh phân số", count: 4 }
+            ];
+
+            let mixedQuestions = [];
+            let errors = [];
+
+            targetStructure.forEach(item => {
+                let pool = AppState.currentQuizData.filter(q => {
+                    let qChuDe = String(q.chuDe || q.chude || '').trim().toLowerCase();
+                    return qChuDe === item.chuDe.toLowerCase();
+                });
+
+                if (pool.length < item.count) {
+                    errors.push(`- Chủ đề "${item.chuDe}": Cần ${item.count} câu, nhưng trong kho chỉ có ${pool.length} câu.`);
+                }
+
+                // Xáo trộn ngẫu nhiên và lấy đủ số lượng
+                pool.sort(() => Math.random() - 0.5);
+                let selected = pool.slice(0, item.count);
+                mixedQuestions = mixedQuestions.concat(selected);
+            });
+
+            if (errors.length > 0) {
+                alert("Không đủ dữ liệu tạo đề tổng hợp:\n\n" + errors.join("\n") + "\n\nBạn vui lòng kiểm tra lại tên cột chủ đề trong Google Sheet!");
+                return;
+            }
+
+            // Xáo trộn tổng thể thứ tự 21 câu hỏi
+            mixedQuestions.sort(() => Math.random() - 0.5);
+
+            // Cập nhật lại dữ liệu bài kiểm tra hiện tại
+            AppState.currentQuizData = mixedQuestions;
+
+            // Đặt thời gian làm bài là 30 phút (1800 giây)
+            if (typeof window.startTimer === 'function') {
+                window.startTimer(30 * 60);
+            } else if (window.timeLeft !== undefined) {
+                window.timeLeft = 30 * 60;
+            }
+
+            // Tự động kích hoạt kiểm tra công cụ (Máy tính/Từ điển) và bắt đầu làm bài
+            if (typeof window.startQuizWithToolCheck === 'function') {
+                window.startQuizWithToolCheck();
+            } else if (typeof window.startQuiz === 'function') {
+                window.startQuiz();
+            } else {
+                alert("Đã tạo thành công đề tổng hợp 30 phút! Vui lòng bấm 'Bắt Đầu Làm Bài'.");
+            }
+        });
+    }
+});
