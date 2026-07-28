@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbzKhjTj95GBob8cPfSikXMUVg2S0vJ0BkEOTk2da1IY9xUFFGa8HvrM3FGLO-AJ6tvJ/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
 
 let AppState = {
     allQuizData: [],
@@ -306,9 +306,6 @@ window.speakQuestion = function(index) {
     const item = AppState.currentQuizData[index];
     if (!item) return;
     
-    // In thông tin câu hỏi ra Console để bạn kiểm tra xem dòng này có link MP3 hay không
-    console.log("--- Kiểm tra câu hỏi số " + (index + 1) + " ---", item);
-
     // ==========================================
     // 1. NHẬN DIỆN CÁC DẠNG BÀI VÀ XỬ LÝ CHỮ (GIỮ NGUYÊN)
     // ==========================================
@@ -370,7 +367,7 @@ window.speakQuestion = function(index) {
     }
 
     // ==========================================
-    // 2. HÀM FALLBACK: ĐỌC BẰNG AI 
+    // 2. HÀM FALLBACK: ĐỌC BẰNG AI (NẾU MP3 LỖI/KHÔNG CÓ)
     // ==========================================
     const playTextToSpeech = () => {
         if (textToRead && 'speechSynthesis' in window) {
@@ -387,49 +384,37 @@ window.speakQuestion = function(index) {
     };
 
     // ==========================================
-    // 3. LẤY LINK MP3 AN TOÀN VÀ KIỂM TRA HỢP LỆ
+    // 3. XỬ LÝ PHÁT FILE MP3 TỪ EXCEL (CỘT Mp3)
     // ==========================================
-    let audioUrl = '';
-    try {
-        audioUrl = item.Mp3 || item.mp3 || item.MP3 || item.audio || item.linkMp3 || '';
-        
-        if (!audioUrl && item && typeof item === 'object') {
-            for (let key in item) {
-                if (key.trim().toLowerCase() === 'mp3' || key.trim().toLowerCase() === 'audio') {
-                    audioUrl = item[key];
-                    break;
-                }
-            }
-        }
-    } catch (e) {
-        console.warn("Lỗi đọc thuộc tính Mp3:", e);
-    }
-
-    console.log("Đường dẫn audioUrl lấy được:", audioUrl);
     
-    // Chỉ chạy Audio khi audioUrl thực sự là một đường dẫn web hợp lệ bắt đầu bằng 'http'
-    if (audioUrl && typeof audioUrl === 'string' && audioUrl.trim().startsWith('http')) {
-        audioUrl = audioUrl.trim();
-        
+    // Lấy dữ liệu từ cột Mp3 (đề phòng trường hợp viết hoa/thường)
+    let audioUrl = item.Mp3 || item.mp3 || item.MP3 || ''; 
+    
+    if (audioUrl && typeof audioUrl === 'string' && audioUrl.trim() !== '') {
+        // CHUẨN HÓA LINK GOOGLE DRIVE ĐỂ TRÌNH DUYỆT CÓ THỂ ĐỌC ĐƯỢC
         if (audioUrl.includes('drive.google.com') && audioUrl.includes('id=')) {
+            // Cắt lấy ID của file Google Drive
             const urlParams = new URLSearchParams(audioUrl.substring(audioUrl.indexOf('?')));
             const fileId = urlParams.get('id');
             if (fileId) {
+                // Đổi thành link export=download để luồng Audio có thể stream
                 audioUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
             }
         }
         
+        // Dừng giọng AI nếu đang đọc
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         
         const audio = new Audio(audioUrl);
         audio.play().then(() => {
-            console.log("Đã phát file MP3 thành công:", audioUrl);
+            console.log("Đã phát file âm thanh:", audioUrl);
         }).catch(error => {
-            console.warn("Link MP3 bị lỗi hoặc không tải được, chuyển sang đọc văn bản.", error);
+            // Nếu vẫn lỗi (do file Drive bị chặn quyền hoặc bị xóa), sẽ tự động chuyển sang đọc văn bản
+            console.warn("Không phát được file MP3, tự động chuyển sang đọc văn bản.", error);
             playTextToSpeech();
         });
     } else {
-        // Nếu không có link hoặc link không hợp lệ -> Tự động chuyển sang AI đọc văn bản mượt mà
+        // Không có cột Mp3 trống -> Gọi AI đọc chữ
         playTextToSpeech();
     }
 };
@@ -1378,26 +1363,21 @@ window.submitQuiz = function() {
         };
     });
     if (maHS && mon) {
-        fetch(WEB_APP_URL)
-  .then(response => response.json())
-  .then(data => {
-      // 1. Kiểm tra xem dữ liệu có trả về đúng object không
-      if (data && data.questions) {
-          AppState.currentQuizData = data.questions; // Gán đúng mảng câu hỏi
-          AppState.permissions = data.permissions || []; // Gán phân quyền nếu có
-          AppState.rankings = data.rankings || []; // Gán bảng xếp hạng nếu có
-          
-          // 2. Gọi tiếp hàm khởi tạo giao diện/hiển thị môn học, chủ đề ở đây
-          // Ví dụ: renderSubjectOptions();
-          console.log("Tải dữ liệu thành công:", data.questions.length, "câu hỏi.");
-      } else {
-          throw new Error("Cấu trúc dữ liệu trả về không hợp lệ.");
-      }
-  })
-  .catch(error => {
-      console.error("Lỗi:", error);
-      // Hiển thị lỗi ra ô giao diện nếu cần
-  });
+        fetch(API_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                maHS: maHS, 
+                mon: mon, 
+                score: score, 
+                level: level, 
+                chuDe: selectedTopicsStr,
+                made: selectedMade,
+                details: details 
+            })
+        }).catch(err => console.log('Lỗi gửi kết quả:', err));
+    }
     let quizScreen = document.getElementById('quiz-screen');
     if (quizScreen) quizScreen.style.display = 'none';
     let resultContainer = document.getElementById('result-container');
