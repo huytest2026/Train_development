@@ -384,44 +384,29 @@ window.speakQuestion = function(index) {
     };
 
     // ==========================================
-    // 3. TỰ ĐỘNG QUÉT VÀ LẤY LINK MP3 (THÔNG MINH & AN TOÀN 100%)
+    // 3. LẤY LINK MP3 TRỰC TIẾP TỪ OBJECT CÂU HỎI
     // ==========================================
     let audioUrl = '';
     try {
-        if (item && typeof item === 'object' && !Array.isArray(item)) {
-            audioUrl = item.Mp3 || item.mp3 || item.MP3 || '';
-        }
+        // Kiểm tra mọi biến thể tên thuộc tính có thể có trong Object
+        audioUrl = item.Mp3 || item.mp3 || item.MP3 || item.audio || item.linkMp3 || '';
         
-        // Nếu dữ liệu là dạng mảng từ Google Sheet
-        if (!audioUrl && Array.isArray(item)) {
-            // Cách A: Dò theo hàng tiêu đề gốc trong kho dữ liệu tổng `AppState.allQuizData`
-            const rawData = AppState.allQuizData || [];
-            if (rawData.length > 0) {
-                const headers = rawData[0] || [];
-                let mp3Index = headers.findIndex(h => String(h).trim().toLowerCase() === 'mp3');
-                if (mp3Index !== -1 && item[mp3Index]) {
-                    audioUrl = String(item[mp3Index]).trim();
-                }
-            }
-            
-            // Cách B: Tự động quét toàn bộ các cột của câu hỏi, tìm ô nào chứa link file âm thanh
-            if (!audioUrl) {
-                for (let cell of item) {
-                    if (cell && typeof cell === 'string') {
-                        let val = cell.trim();
-                        if (val.includes('.mp3') || val.includes('github.io') || val.includes('drive.google.com')) {
-                            audioUrl = val;
-                            break;
-                        }
-                    }
+        // Nếu tên thuộc tính trong object bị dính khoảng trắng hoặc viết hoa khác thường, quét qua tất cả key
+        if (!audioUrl && item && typeof item === 'object') {
+            for (let key in item) {
+                if (key.trim().toLowerCase() === 'mp3' || key.trim().toLowerCase() === 'audio') {
+                    audioUrl = item[key];
+                    break;
                 }
             }
         }
     } catch (e) {
-        console.warn("Lỗi đọc cột Mp3:", e);
+        console.warn("Lỗi đọc thuộc tính Mp3:", e);
     }
     
     if (audioUrl && typeof audioUrl === 'string' && audioUrl.trim() !== '') {
+        audioUrl = audioUrl.trim();
+        
         // Chuẩn hóa link Google Drive (nếu có)
         if (audioUrl.includes('drive.google.com') && audioUrl.includes('id=')) {
             const urlParams = new URLSearchParams(audioUrl.substring(audioUrl.indexOf('?')));
@@ -434,7 +419,7 @@ window.speakQuestion = function(index) {
         // Dừng giọng đọc AI nếu đang chạy
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         
-        const audio = new Audio(audioUrl.trim());
+        const audio = new Audio(audioUrl);
         audio.play().then(() => {
             console.log("Đã phát file MP3 thành công:", audioUrl);
         }).catch(error => {
