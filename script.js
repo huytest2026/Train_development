@@ -384,20 +384,31 @@ window.speakQuestion = function(index) {
     };
 
     // ==========================================
-    // 3. XỬ LÝ PHÁT FILE MP3 TỪ EXCEL (CỘT Mp3)
+    // 3. XỬ LÝ PHÁT FILE MP3 (HỖ TRỢ CẢ MẢNG VÀ OBJECT)
     // ==========================================
-    
-    // Lấy dữ liệu từ cột Mp3 (đề phòng trường hợp viết hoa/thường)
-    let audioUrl = item.Mp3 || item.mp3 || item.MP3 || ''; 
+    let audioUrl = '';
+    try {
+        if (Array.isArray(item)) {
+            // Nếu dữ liệu là mảng, tự động dò tìm vị trí cột 'Mp3' từ hàng tiêu đề đầu tiên
+            const headers = AppState.currentQuizData[0] || [];
+            let mp3Index = headers.findIndex(h => String(h).trim().toLowerCase() === 'mp3');
+            if (mp3Index !== -1) {
+                audioUrl = item[mp3Index] || '';
+            }
+        } else if (item && typeof item === 'object') {
+            // Nếu dữ liệu là Object
+            audioUrl = item.Mp3 || item.mp3 || item.MP3 || '';
+        }
+    } catch (e) {
+        console.warn("Lỗi đọc cột Mp3:", e);
+    }
     
     if (audioUrl && typeof audioUrl === 'string' && audioUrl.trim() !== '') {
-        // CHUẨN HÓA LINK GOOGLE DRIVE ĐỂ TRÌNH DUYỆT CÓ THỂ ĐỌC ĐƯỢC
+        // Nếu là link Google Drive (đề phòng)
         if (audioUrl.includes('drive.google.com') && audioUrl.includes('id=')) {
-            // Cắt lấy ID của file Google Drive
             const urlParams = new URLSearchParams(audioUrl.substring(audioUrl.indexOf('?')));
             const fileId = urlParams.get('id');
             if (fileId) {
-                // Đổi thành link export=download để luồng Audio có thể stream
                 audioUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
             }
         }
@@ -405,16 +416,15 @@ window.speakQuestion = function(index) {
         // Dừng giọng AI nếu đang đọc
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         
-        const audio = new Audio(audioUrl);
+        const audio = new Audio(audioUrl.trim());
         audio.play().then(() => {
-            console.log("Đã phát file âm thanh:", audioUrl);
+            console.log("Đã phát file MP3 từ GitHub thành công:", audioUrl);
         }).catch(error => {
-            // Nếu vẫn lỗi (do file Drive bị chặn quyền hoặc bị xóa), sẽ tự động chuyển sang đọc văn bản
             console.warn("Không phát được file MP3, tự động chuyển sang đọc văn bản.", error);
             playTextToSpeech();
         });
     } else {
-        // Không có cột Mp3 trống -> Gọi AI đọc chữ
+        // Không tìm thấy link MP3 -> Gọi AI đọc chữ
         playTextToSpeech();
     }
 };
