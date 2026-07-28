@@ -305,14 +305,14 @@ document.addEventListener('click', function(e) {
 window.speakQuestion = function(index) {
     const item = AppState.currentQuizData[index];
     if (!item) return;
-
+    
     const isListeningType = item.loai === 'listening_fill' || 
                             cleanKey(item.loai).includes('listening') || 
                             cleanKey(item.chuDe).includes('listening') ||
                             cleanKey(item.chuDe).includes('listu');
-
+                            
     let textToRead = '';
-
+    
     if (isListeningType) {
         // Ưu tiên đọc nội dung dạng listening fill
         textToRead = item.passage || item.question || '';
@@ -330,7 +330,7 @@ window.speakQuestion = function(index) {
                           quizCards[index].querySelector('input:disabled') !== null ||
                           item._isAnswered;
         }
-
+        
         if (!hasAnswered) {
             textToRead = item.question || '';
         } else {
@@ -351,17 +351,23 @@ window.speakQuestion = function(index) {
             }
         }
     }
-
+    
     // Nếu textToRead chứa liên kết âm thanh online (mp3, wav, Google Drive audio)
     if (textToRead && (textToRead.startsWith('http://') || textToRead.startsWith('https://')) && 
         (textToRead.endsWith('.mp3') || textToRead.endsWith('.wav') || textToRead.endsWith('.m4a') || textToRead.includes('drive.google.com'))) {
         new Audio(textToRead).play().catch(() => alert("Không thể phát file âm thanh."));
         return;
     }
-
+    
     if (textToRead && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(textToRead);
+        
+        // XỬ LÝ TRIỆT ĐỂ LỖI ĐỌC UNDERSCORE TRƯỚC KHI ĐƯA VÀO SPEECH
+        let finalCleanText = textToRead.replace(/_/g, ' ')
+                                       .replace(/\s+/g, ' ')
+                                       .trim();
+                                       
+        const utterance = new SpeechSynthesisUtterance(finalCleanText);
         utterance.lang = 'en-US';
         utterance.rate = isListeningType ? 0.85 : 0.9;
         window.speechSynthesis.speak(utterance);
