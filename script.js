@@ -306,70 +306,64 @@ window.speakQuestion = function(index) {
     const item = AppState.currentQuizData[index];
     if (!item) return;
     
-    const isListeningType = item.loai === 'listening_fill' || 
-                            cleanKey(item.loai).includes('listening') || 
-                            cleanKey(item.chuDe).includes('listening') ||
-                            cleanKey(item.chuDe).includes('listu');
-                            
     let textToRead = '';
+    let questionText = item.passage || item.question || '';
+    let correctAnswerStr = '';
     
-    if (isListeningType) {
-        // Ưu tiên đọc nội dung dạng listening fill
-        textToRead = item.passage || item.question || '';
-        if (textToRead.includes('___') && item.correct) {
-            textToRead = textToRead.replace(/_{2,}/g, item.correct);
-        } else if (textToRead.includes('...') && item.correct) {
-            textToRead = textToRead.replace(/\.{3,}/g, item.correct);
-        }
+    // 1. Kiểm tra xem người dùng đã trả lời câu hỏi này chưa
+    let hasAnswered = false;
+    const quizCards = document.querySelectorAll('.quiz-card');
+    if (quizCards[index]) {
+        hasAnswered = quizCards[index].querySelector('.option-box.selected-option') !== null || 
+                      quizCards[index].querySelector('input[type="checkbox"]:checked') !== null ||
+                      quizCards[index].querySelector('input:disabled') !== null ||
+                      item._isAnswered;
+    }
+    
+    // 2. Lấy nội dung của đáp án đúng (và loại bỏ các chữ cái A, B, C, D ở đầu nếu có)
+    let correctKeys = item._correctKeys || (typeof getCorrectKeys === 'function' ? getCorrectKeys(item) : []);
+    if (correctKeys.length > 0 && item[correctKeys[0]]) {
+        correctAnswerStr = typeof cleanOptionText === 'function' ? cleanOptionText(item[correctKeys[0]]) : item[correctKeys[0]].replace(/^[A-D][\.\)]\s*/, '');
+    } else if (item.correct) {
+        correctAnswerStr = typeof cleanOptionText === 'function' ? cleanOptionText(item.correct) : item.correct;
+    }
+    
+    // 3. XỬ LÝ LỌC TEXT ĐỂ ĐỌC
+    if (!hasAnswered) {
+        // Nếu CHƯA trả lời: Chỉ lấy nguyên câu hỏi để đọc
+        textToRead = questionText;
     } else {
-        let hasAnswered = false;
-        const quizCards = document.querySelectorAll('.quiz-card');
-        if (quizCards[index]) {
-            hasAnswered = quizCards[index].querySelector('.option-box.selected-option') !== null || 
-                          quizCards[index].querySelector('input[type="checkbox"]:checked') !== null ||
-                          quizCards[index].querySelector('input:disabled') !== null ||
-                          item._isAnswered;
-        }
-        
-        if (!hasAnswered) {
-            textToRead = item.question || '';
+        // Nếu ĐÃ trả lời: Ghép đáp án đúng vào chỗ trống của câu hỏi
+        if (questionText.match(/_{2,}|\.{3,}/) && correctAnswerStr) {
+            // Thay thế dấu "___" hoặc "..." bằng nội dung đáp án đúng
+            textToRead = questionText.replace(/_{2,}|\.{3,}/g, " " + correctAnswerStr + " ");
         } else {
-            const chuDeLower = (item.chuDe || '').toLowerCase();
-            const isVietAnh = chuDeLower.includes('việt anh') || chuDeLower.includes('viet anh');
-            
-            if (isVietAnh && item.correct) {
-                textToRead = item.correct;
-            } else {
-                let correctKeys = item._correctKeys || getCorrectKeys(item);
-                if (correctKeys.length > 0 && item[correctKeys[0]]) {
-                    textToRead = cleanOptionText(item[correctKeys[0]]);
-                } else if (item.correct) {
-                    textToRead = cleanOptionText(item.correct);
-                } else {
-                    textToRead = item.question;
-                }
-            }
+            // Nếu đề bài không có chỗ trống (vd: câu hỏi WH-), thì đọc câu hỏi kèm đáp án ở cuối
+            textToRead = questionText + ". " + correctAnswerStr;
         }
     }
     
-    // Nếu textToRead chứa liên kết âm thanh online (mp3, wav, Google Drive audio)
+    // 4. Ưu tiên phát file âm thanh online (nếu đề bài là link mp3, wav...)
     if (textToRead && (textToRead.startsWith('http://') || textToRead.startsWith('https://')) && 
         (textToRead.endsWith('.mp3') || textToRead.endsWith('.wav') || textToRead.endsWith('.m4a') || textToRead.includes('drive.google.com'))) {
         new Audio(textToRead).play().catch(() => alert("Không thể phát file âm thanh."));
         return;
     }
     
+    // 5. Phát âm bằng Web Speech API
     if (textToRead && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
         
-        // XỬ LÝ TRIỆT ĐỂ LỖI ĐỌC UNDERSCORE TRƯỚC KHI ĐƯA VÀO SPEECH
+        // TRIỆT ĐỂ: Dọn dẹp lại toàn bộ dấu gạch dưới còn sót lại (khi chưa trả lời)
+        // và chuẩn hóa khoảng trắng để AI đọc tự nhiên nhất
         let finalCleanText = textToRead.replace(/_/g, ' ')
                                        .replace(/\s+/g, ' ')
                                        .trim();
                                        
         const utterance = new SpeechSynthesisUtterance(finalCleanText);
         utterance.lang = 'en-US';
-        utterance.rate = isListeningType ? 0.85 : 0.9;
+        // Có thể chỉnh tốc độ ở đây (0.9 là tốc độ khá tự nhiên)
+        utterance.rate = 0.9; 
         window.speechSynthesis.speak(utterance);
     }
 };
