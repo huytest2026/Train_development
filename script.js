@@ -1378,21 +1378,26 @@ window.submitQuiz = function() {
         };
     });
     if (maHS && mon) {
-        fetch(API_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                maHS: maHS, 
-                mon: mon, 
-                score: score, 
-                level: level, 
-                chuDe: selectedTopicsStr,
-                made: selectedMade,
-                details: details 
-            })
-        }).catch(err => console.log('Lỗi gửi kết quả:', err));
-    }
+        fetch(WEB_APP_URL)
+  .then(response => response.json())
+  .then(data => {
+      // 1. Kiểm tra xem dữ liệu có trả về đúng object không
+      if (data && data.questions) {
+          AppState.currentQuizData = data.questions; // Gán đúng mảng câu hỏi
+          AppState.permissions = data.permissions || []; // Gán phân quyền nếu có
+          AppState.rankings = data.rankings || []; // Gán bảng xếp hạng nếu có
+          
+          // 2. Gọi tiếp hàm khởi tạo giao diện/hiển thị môn học, chủ đề ở đây
+          // Ví dụ: renderSubjectOptions();
+          console.log("Tải dữ liệu thành công:", data.questions.length, "câu hỏi.");
+      } else {
+          throw new Error("Cấu trúc dữ liệu trả về không hợp lệ.");
+      }
+  })
+  .catch(error => {
+      console.error("Lỗi:", error);
+      // Hiển thị lỗi ra ô giao diện nếu cần
+  });
     let quizScreen = document.getElementById('quiz-screen');
     if (quizScreen) quizScreen.style.display = 'none';
     let resultContainer = document.getElementById('result-container');
