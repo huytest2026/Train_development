@@ -1635,47 +1635,80 @@ document.addEventListener('DOMContentLoaded', function() {
         btnCalc.addEventListener('click', window.openCalculatorModal);
     }
 });
-// Biến lưu trữ file audio đang phát
+// Biến lưu trữ đối tượng Audio đang phát
 let currentAudio = null;
 
-function playAudio(audioUrl) {
-    // Nếu đang phát một đoạn âm thanh khác thì dừng lại trước
-    if (currentAudio) {
-        currentAudio.pause();
-        currentAudio.currentTime = 0;
-    }
-
-    // Tạo đối tượng âm thanh mới và phát
-    currentAudio = new Audio(audioUrl);
-    
-    currentAudio.play().catch(error => {
-        console.error("Lỗi phát âm thanh:", error);
-        alert("Không thể phát âm thanh! Hãy kiểm tra lại link hoặc quyền chia sẻ file trên Google Drive.");
-    });
-}
-// Hàm tự động chuẩn hóa đường dẫn Google Drive thành link nghe trực tiếp
+/**
+ * 1. Hàm tự động chuẩn hóa link Google Drive
+ */
 function formatDriveAudioUrl(url) {
     if (!url) return '';
-    
     let fileId = '';
     
-    // Tách ID nếu link dạng: /d/FILE_ID/...
     let match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
     if (match && match[1]) {
         fileId = match[1];
-    } 
-    // Tách ID nếu link dạng: ?id=FILE_ID
-    else {
+    } else {
         match = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
         if (match && match[1]) {
             fileId = match[1];
         }
     }
 
-    // Trả về đường dẫn phát trực tiếp chuẩn cho thẻ Audio
     if (fileId) {
         return `https://docs.google.com/uc?export=open&id=${fileId}`;
     }
-    
     return url.trim();
+}
+
+/**
+ * 2. Hàm đọc văn bản tự động (TTS) - ĐÃ KHẮC PHỤC LỖI ĐỌC UNDERSCORE
+ */
+function speakText(text) {
+    if (!text || !('speechSynthesis' in window)) return;
+
+    // XỬ LÝ TRIỆT ĐỂ: Thay thế tất cả dấu '_' thành khoảng trắng và xóa khoảng trắng thừa
+    let cleanText = text
+        .replace(/_/g, ' ')       // Đổi '_' thành ' ' để máy KHÔNG đọc "underscore"
+        .replace(/\s+/g, ' ')     // Rút gọn khoảng trắng
+        .trim();
+
+    if (!cleanText) return;
+
+    // Khởi tạo giọng đọc
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = 'en-US'; // Hoặc 'vi-VN' tùy theo môn học
+    utterance.rate = 0.9;     // Tốc độ đọc vừa phải
+
+    window.speechSynthesis.speak(utterance);
+}
+
+/**
+ * 3. Hàm tổng hợp xử lý khi bấm nút LOA (Kết hợp MP3 + Giọng đọc cũ)
+ */
+function playAudio(mp3Url, fallbackText) {
+    // Dừng mọi âm thanh / giọng đọc đang phát trước đó
+    if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+    }
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+    }
+
+    // Trường hợp 1: Có link MP3 -> Ưu tiên phát MP3
+    if (mp3Url && mp3Url.trim() !== '' && mp3Url !== 'undefined' && mp3Url !== 'null') {
+        const playableUrl = formatDriveAudioUrl(mp3Url);
+        currentAudio = new Audio(playableUrl);
+        
+        currentAudio.play().catch(error => {
+            console.warn("Không phát được file MP3, tự động chuyển sang đọc văn bản:", error);
+            // Nếu link MP3 bị lỗi -> Tự động chuyển sang đọc chữ (TTS)
+            speakText(fallbackText);
+        });
+        return;
+    }
+
+    // Trường hợp 2: Không có file MP3 -> Đọc bằng giọng nói tự động (TTS) đã lọc dấu '_'
+    speakText(fallbackText);
 }
