@@ -1776,7 +1776,7 @@ window.calcCalculate = function() {
     }
 };
 //--------------------------------------------------------
-   document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', () => {
     const btnTaoDeToan = document.getElementById('btn-tao-de-toan');
     
     if (btnTaoDeToan) {
@@ -1794,26 +1794,39 @@ window.calcCalculate = function() {
                 selectMonHoc.dispatchEvent(new Event('change'));
             }
 
-            // 2. Tự động bấm giả lập nút "Xác nhận Mã & Tải đề" gốc của trang để hệ thống tự tải dữ liệu về bộ nhớ
-            const originalLoadBtn = Array.from(document.querySelectorAll('button, .btn')).find(b => b.textContent.includes('Xác nhận Mã'));
-            if (originalLoadBtn) {
-                originalLoadBtn.click();
-            }
+            try {
+                newBtn.innerText = "Đang tải dữ liệu trực tiếp...";
+                newBtn.disabled = true;
 
-            newBtn.innerText = "Đang xử lý tạo đề...";
-            newBtn.disabled = true;
+                // 2. Tự động lấy URL Google Apps Script đang được cấu hình sẵn trong trang (hoặc gán trực tiếp vào đây nếu có)
+                let scriptUrl = window.WEB_APP_URL || window.scriptUrl || "";
+                
+                // Nếu trang web có sẵn hàm tải dữ liệu gốc, kích hoạt nó trước
+                if (typeof window.taiDuLieu === 'function') {
+                    await window.taiDuLieu();
+                } else {
+                    // Tìm nút xác nhận mã gốc để bấm kích hoạt dữ liệu nếu chưa có URL
+                    const originalLoadBtn = Array.from(document.querySelectorAll('button, .btn')).find(b => b.textContent.includes('Xác nhận Mã'));
+                    if (originalLoadBtn) {
+                        originalLoadBtn.click();
+                    }
+                }
 
-            // 3. Chờ 1.5 giây để dữ liệu từ Google Sheets kịp đổ về bộ nhớ trình duyệt
-            setTimeout(() => {
-                let dataList = window.questions || window.allQuestions || window.danhSachCauHoi || [];
+                // Chờ một chút để dữ liệu được nạp vào bộ nhớ trình duyệt
+                let dataList = null;
+                for (let i = 0; i < 15; i++) {
+                    dataList = window.questions || window.allQuestions || window.danhSachCauHoi || window.cauHoiList;
+                    if (dataList && dataList.length > 1) break;
+                    await new Promise(r => setTimeout(r, 300));
+                }
 
                 if (!dataList || dataList.length <= 1) {
-                    alert("Chưa tải được dữ liệu. Vui lòng bấm nút 'Xác nhận Mã & Tải đề' một lần, sau đó bấm lại nút này nhé!");
+                    alert("Không thể tải được dữ liệu câu hỏi từ Google Sheets. Vui lòng kiểm tra lại kết nối mạng!");
                     resetBtn();
                     return;
                 }
 
-                // Nếu dữ liệu đang ở dạng mảng 2 chiều (Google Sheets), chuyển thành Object
+                // Nếu dữ liệu đang ở dạng mảng 2 chiều, chuyển đổi sang mảng Object
                 if (Array.isArray(dataList[0])) {
                     let headers = dataList[0];
                     let formattedList = [];
@@ -1828,7 +1841,7 @@ window.calcCalculate = function() {
                     dataList = formattedList;
                 }
 
-                // 4. Cấu hình đúng chuẩn 21 câu hỏi theo yêu cầu của bạn
+                // 3. Cấu hình đúng chuẩn 21 câu hỏi theo yêu cầu của bạn
                 let cauHinh = {
                     'Hình học': 2,
                     'Đổi đơn vị': 6,
@@ -1881,7 +1894,12 @@ window.calcCalculate = function() {
                 }
 
                 resetBtn();
-            }, 1500);
+
+            } catch (err) {
+                console.error(err);
+                alert("Lỗi xử lý dữ liệu từ Google Sheets.");
+                resetBtn();
+            }
         });
     }
 
