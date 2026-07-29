@@ -809,3 +809,75 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+// ==========================================
+// BỔ SUNG HIỂN THỊ CHỦ ĐỀ AN TOÀN (KHÔNG ẢNH HƯỞNG CODE CŨ)
+// ==========================================
+window.showTopicSelection = function() {
+    let startScreen = document.getElementById('start-screen');
+    if (startScreen) startScreen.style.display = 'block';
+
+    if (window.AppState && AppState.currentQuizData && AppState.currentQuizData.length > 0) {
+        let topicsSet = new Set();
+        AppState.currentQuizData.forEach(item => {
+            let topic = item.chuDe || item.chude || item.topic || '';
+            if (topic) topicsSet.add(topic.trim());
+        });
+
+        let topicsList = Array.from(topicsSet);
+        AppState.availableTopics = topicsList;
+
+        // Tự động tìm ô đang hiển thị "Chưa tải dữ liệu..." trên giao diện
+        let targetElement = null;
+        let allElements = document.querySelectorAll('input, div, span, p');
+        for (let el of allElements) {
+            let text = el.textContent || el.value || el.placeholder || '';
+            if (text.includes('Chưa tải dữ liệu')) {
+                targetElement = el;
+                break;
+            }
+        }
+
+        if (targetElement) {
+            let parent = targetElement.parentNode;
+            if (targetElement.tagName === 'INPUT') {
+                targetElement.style.display = 'none';
+            } else {
+                targetElement.innerHTML = ''; // Xóa chữ cũ
+            }
+
+            // Tạo khung chứa danh sách chủ đề dạng checkbox
+            let container = document.getElementById('safe-topic-list');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'safe-topic-list';
+                container.style.maxHeight = '140px';
+                container.style.overflowY = 'auto';
+                container.style.border = '1px solid #ccc';
+                container.style.padding = '6px';
+                container.style.borderRadius = '4px';
+                parent.appendChild(container);
+            }
+
+            container.innerHTML = '';
+            if (topicsList.length > 0) {
+                topicsList.forEach((topic) => {
+                    let label = document.createElement('label');
+                    label.style.display = 'block';
+                    label.style.marginBottom = '3px';
+                    label.style.cursor = 'pointer';
+                    label.innerHTML = `<input type="checkbox" name="safe_topic" value="${escapeHTML(topic)}" checked onchange="updateSafeTopics()"> ${escapeHTML(topic)}`;
+                    container.appendChild(label);
+                });
+                AppState.selectedTopics = [...topicsList];
+            } else {
+                container.innerHTML = '<span style="color: #666; font-style: italic;">Không tìm thấy chủ đề trong dữ liệu.</span>';
+                AppState.selectedTopics = [];
+            }
+        }
+    }
+};
+
+window.updateSafeTopics = function() {
+    let checkboxes = document.querySelectorAll('input[name="safe_topic"]:checked');
+    AppState.selectedTopics = Array.from(checkboxes).map(cb => cb.value);
+};
