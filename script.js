@@ -339,11 +339,27 @@ window.speakQuestion = function(index) {
                       item._isAnswered;
     }
 
-    // 3. CHUẨN BỊ TEXT CÂU HỎI VÀ ĐÁP ÁN
-    // QUAN TRỌNG: Chỉ lấy nội dung `item.question`, tuyệt đối không cộng thêm chữ "Câu X." hay nhãn đề
-    let questionText = item.question || item.passage || '';
-    let correctAnswerStr = '';
+    // 3. XỬ LÝ LẤY ĐÚNG NỘI DUNG CÂU HỎI (TRÁNH BỊ LẪN VỚI ĐOẠN VĂN / HƯỚNG DẪN CHUNG CỦA MADE)
+    let questionText = '';
     
+    // Ưu tiên lấy từ DOM của thẻ câu hỏi hiện tại trên màn hình nếu có (đảm bảo đọc chính xác câu đang hiển thị)
+    if (quizCards[index]) {
+        const qElement = quizCards[index].querySelector('.question-content') || quizCards[index].querySelector('.question-text');
+        if (qElement && qElement.innerText.trim()) {
+            questionText = qElement.innerText.trim();
+        }
+    }
+    
+    // Nếu không lấy được từ DOM, lọc từ item dữ liệu (tránh lấy nhầm passage hướng dẫn)
+    if (!questionText) {
+        questionText = item.question || '';
+        // Nếu item.question bị trùng với đoạn văn/hướng dẫn chung, cố gắng tìm trường khác hoặc dùng tạm
+        if (!questionText && item.passage && !item.passage.includes("Chọn phần gạch chân")) {
+            questionText = item.passage;
+        }
+    }
+
+    let correctAnswerStr = '';
     let correctKeys = item._correctKeys || (typeof getCorrectKeys === 'function' ? getCorrectKeys(item) : []);
     if (correctKeys.length > 0 && item[correctKeys[0]]) {
         correctAnswerStr = typeof cleanOptionText === 'function' ? cleanOptionText(item[correctKeys[0]]) : item[correctKeys[0]].replace(/^[A-D][\.\)]\s*/, '');
