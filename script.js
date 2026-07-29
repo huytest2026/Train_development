@@ -67,8 +67,10 @@ window.speakQuestion = function(index) {
     const item = AppState.currentQuizData[index];
     if (!item) return;
 
-    let textToSpeak = "Câu " + (index + 1) + ". " + item.question;
+    // ĐÃ LOẠI BỎ PHẦN ĐỌC "Câu X." Ở ĐÂY, CHỈ ĐỌC NỘI DUNG CÂU HỎI VÀ ĐÁP ÁN
+    let textToSpeak = item.question; 
     let hasOptions = item.a || item.b || item.c || item.d;
+    
     if (hasOptions) {
         let keysToRender = item._shuffledKeys || ['a', 'b', 'c', 'd'].filter(k => item[k]);
         keysToRender.forEach((optKey, displayIndex) => {
