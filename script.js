@@ -1790,9 +1790,19 @@ document.addEventListener('DOMContentLoaded', () => {
             newBtn.innerText = "Đang tạo đề 21 câu...";
             newBtn.disabled = true;
 
-            // Lấy dữ liệu từ bộ nhớ trang web sau khi đã bấm nút tải dữ liệu
-            let dataList = window.questions || window.allQuestions || window.danhSachCauHoi || window.cauHoiList;
+            // Tìm kiếm tất cả các nguồn dữ liệu có thể có trong trang (toàn bộ biến toàn cục hoặc localStorage)
+            let dataList = null;
+            
+            // 1. Quét các biến global phổ biến
+            let possibleKeys = ['questions', 'allQuestions', 'danhSachCauHoi', 'cauHoiList', 'data', 'listCauHoi'];
+            for (let k of possibleKeys) {
+                if (window[k] && Array.isArray(window[k]) && window[k].length > 1) {
+                    dataList = window[k];
+                    break;
+                }
+            }
 
+            // 2. Nếu chưa có, quét trong localStorage
             if (!dataList || dataList.length <= 1) {
                 try {
                     for (let key of Object.keys(localStorage)) {
@@ -1805,13 +1815,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 } catch(err) {}
             }
 
+            // 3. Nếu vẫn không thấy, tự động kích hoạt click giả lập vào nút "Xác nhận Mã & Tải đề" gốc của trang rồi đợi 1 giây
             if (!dataList || dataList.length <= 1) {
-                alert("Bạn vui lòng bấm nút 'Xác nhận Mã & Tải đề' ở phía trên 1 lần trước, sau đó bấm lại nút Tạo đề nhé!");
+                let originalLoadBtn = Array.from(document.querySelectorAll('button, .btn')).find(b => b.textContent.includes('Xác nhận Mã'));
+                if (originalLoadBtn) {
+                    originalLoadBtn.click();
+                    await new Promise(r => setTimeout(r, 1200)); // Đợi dữ liệu đổ về
+                    
+                    // Thử quét lại lần nữa sau khi bấm
+                    for (let k of possibleKeys) {
+                        if (window[k] && Array.isArray(window[k]) && window[k].length > 1) {
+                            dataList = window[k];
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!dataList || dataList.length <= 1) {
+                alert("Vui lòng bấm nút 'Xác nhận Mã & Tải đề' màu tím ở trên 1 lần, sau đó bấm lại nút Tạo đề nhé!");
                 resetBtn();
                 return;
             }
 
-            // Chuẩn hóa dữ liệu nếu là mảng 2 chiều
+            // Chuẩn hóa dữ liệu nếu là mảng 2 chiều (Google Sheets dạng mảng dòng/cột)
             if (Array.isArray(dataList[0])) {
                 let headers = dataList[0];
                 let formattedList = [];
@@ -1826,7 +1853,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 dataList = formattedList;
             }
 
-            // BẮT BUỘC LỌC CHÍNH XÁC MÔN TOÁN ĐỂ KHÔNG BỊ LẪN MÔN KHÁC
+            // Lọc chính xác môn Toán, tuyệt đối không lấy môn khác (như Tiếng Anh)
             let filteredPool = dataList.filter(q => {
                 let m = q['Môn'] || q['mon'] || "";
                 return m.toString().trim().toLowerCase() === "toán";
@@ -1836,7 +1863,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 filteredPool = dataList; // Phòng hờ nếu tên cột môn khác
             }
 
-            // Phân bổ cấu trúc chính xác 21 câu cho môn Toán
+            // Phân bổ cấu trúc chính xác 21 câu theo đúng yêu cầu môn Toán
             let cauHinh = {
                 'Hình học': 2,
                 'Đổi đơn vị': 6,
