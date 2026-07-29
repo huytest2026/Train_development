@@ -1787,58 +1787,29 @@ document.addEventListener('DOMContentLoaded', () => {
             e.stopPropagation();
             e.stopImmediatePropagation();
 
-            newBtn.innerText = "Đang tạo đề 21 câu...";
+            newBtn.innerText = "Đang tải dữ liệu trực tiếp...";
             newBtn.disabled = true;
 
-            // Tìm kiếm tất cả các nguồn dữ liệu có thể có trong trang (toàn bộ biến toàn cục hoặc localStorage)
             let dataList = null;
-            
-            // 1. Quét các biến global phổ biến
-            let possibleKeys = ['questions', 'allQuestions', 'danhSachCauHoi', 'cauHoiList', 'data', 'listCauHoi'];
-            for (let k of possibleKeys) {
-                if (window[k] && Array.isArray(window[k]) && window[k].length > 1) {
-                    dataList = window[k];
-                    break;
-                }
-            }
 
-            // 2. Nếu chưa có, quét trong localStorage
-            if (!dataList || dataList.length <= 1) {
-                try {
-                    for (let key of Object.keys(localStorage)) {
-                        let val = JSON.parse(localStorage.getItem(key));
-                        if (Array.isArray(val) && val.length > 1) {
-                            dataList = val;
-                            break;
-                        }
-                    }
-                } catch(err) {}
-            }
-
-            // 3. Nếu vẫn không thấy, tự động kích hoạt click giả lập vào nút "Xác nhận Mã & Tải đề" gốc của trang rồi đợi 1 giây
-            if (!dataList || dataList.length <= 1) {
-                let originalLoadBtn = Array.from(document.querySelectorAll('button, .btn')).find(b => b.textContent.includes('Xác nhận Mã'));
-                if (originalLoadBtn) {
-                    originalLoadBtn.click();
-                    await new Promise(r => setTimeout(r, 1200)); // Đợi dữ liệu đổ về
-                    
-                    // Thử quét lại lần nữa sau khi bấm
-                    for (let k of possibleKeys) {
-                        if (window[k] && Array.isArray(window[k]) && window[k].length > 1) {
-                            dataList = window[k];
-                            break;
-                        }
-                    }
-                }
+            try {
+                // THAY LINK WEB APP GOOGLE SHEETS CỦA BẠN VÀO ĐÂY
+                let webAppUrl = "https://script.google.com/macros/s/AKfycbzKhjTj95GBob8cPfSikXMUVg2S0vJ0BkEOTk2da1IY9xUFFGa8HvrM3FGLO-AJ6tvJ/exec"; 
+                
+                let response = await fetch(webAppUrl);
+                let result = await response.json();
+                dataList = result.questions || result.data || result;
+            } catch (err) {
+                console.error("Lỗi fetch:", err);
             }
 
             if (!dataList || dataList.length <= 1) {
-                alert("Vui lòng bấm nút 'Xác nhận Mã & Tải đề' màu tím ở trên 1 lần, sau đó bấm lại nút Tạo đề nhé!");
+                alert("Không thể tải được dữ liệu trực tiếp. Hãy kiểm tra lại link Web App Google Sheets trong code!");
                 resetBtn();
                 return;
             }
 
-            // Chuẩn hóa dữ liệu nếu là mảng 2 chiều (Google Sheets dạng mảng dòng/cột)
+            // Chuẩn hóa dữ liệu nếu là mảng 2 chiều
             if (Array.isArray(dataList[0])) {
                 let headers = dataList[0];
                 let formattedList = [];
@@ -1853,17 +1824,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 dataList = formattedList;
             }
 
-            // Lọc chính xác môn Toán, tuyệt đối không lấy môn khác (như Tiếng Anh)
+            // Lọc chính xác chỉ lấy môn Toán, loại bỏ hoàn toàn môn khác
             let filteredPool = dataList.filter(q => {
                 let m = q['Môn'] || q['mon'] || "";
                 return m.toString().trim().toLowerCase() === "toán";
             });
 
             if (filteredPool.length === 0) {
-                filteredPool = dataList; // Phòng hờ nếu tên cột môn khác
+                filteredPool = dataList;
             }
 
-            // Phân bổ cấu trúc chính xác 21 câu theo đúng yêu cầu môn Toán
+            // Phân bổ chính xác cấu trúc 21 câu
             let cauHinh = {
                 'Hình học': 2,
                 'Đổi đơn vị': 6,
@@ -1891,7 +1862,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
 
-            // Tự động bù thêm nếu chủ đề nào thiếu để luôn đủ 21 câu (chỉ lấy trong kho Toán)
+            // Bù thêm nếu thiếu để luôn chẵn đủ 21 câu
             if (selectedQuestions.length < 21) {
                 let remainingPool = filteredPool.filter(q => !usedIds.has(q)).sort(() => Math.random() - 0.5);
                 let neededMore = 21 - selectedQuestions.length;
@@ -1901,7 +1872,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             selectedQuestions = selectedQuestions.sort(() => Math.random() - 0.5);
 
-            // Ẩn màn hình cài đặt, dựng giao diện làm bài
+            // Ẩn màn hình chọn, dựng giao diện làm bài
             let setupScreen = document.querySelector('.setup-screen, #setup-section, form');
             if (setupScreen) setupScreen.style.display = 'none';
 
@@ -1963,8 +1934,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.getElementById('custom-submit-btn')?.click();
                 }
             }, 1000);
-
-            resetBtn();
         });
     }
 
