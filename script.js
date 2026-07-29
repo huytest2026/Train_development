@@ -1793,7 +1793,6 @@ document.addEventListener('DOMContentLoaded', () => {
             let dataList = null;
 
             try {
-                // THAY LINK WEB APP GOOGLE SHEETS CỦA BẠN VÀO ĐÂY
                 let webAppUrl = "https://script.google.com/macros/s/AKfycbzKhjTj95GBob8cPfSikXMUVg2S0vJ0BkEOTk2da1IY9xUFFGa8HvrM3FGLO-AJ6tvJ/exec"; 
                 
                 let response = await fetch(webAppUrl);
@@ -1809,7 +1808,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Chuẩn hóa dữ liệu nếu là mảng 2 chiều
             if (Array.isArray(dataList[0])) {
                 let headers = dataList[0];
                 let formattedList = [];
@@ -1824,7 +1822,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 dataList = formattedList;
             }
 
-            // Lọc chính xác chỉ lấy môn Toán, loại bỏ hoàn toàn môn khác
             let filteredPool = dataList.filter(q => {
                 let m = q['Môn'] || q['mon'] || "";
                 return m.toString().trim().toLowerCase() === "toán";
@@ -1834,7 +1831,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 filteredPool = dataList;
             }
 
-            // Phân bổ chính xác cấu trúc 21 câu
             let cauHinh = {
                 'Hình học': 2,
                 'Đổi đơn vị': 6,
@@ -1862,7 +1858,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
 
-            // Bù thêm nếu thiếu để luôn chẵn đủ 21 câu
             if (selectedQuestions.length < 21) {
                 let remainingPool = filteredPool.filter(q => !usedIds.has(q)).sort(() => Math.random() - 0.5);
                 let neededMore = 21 - selectedQuestions.length;
@@ -1872,12 +1867,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             selectedQuestions = selectedQuestions.sort(() => Math.random() - 0.5);
 
-            // Ẩn màn hình chọn, dựng giao diện làm bài
             let setupScreen = document.querySelector('.setup-screen, #setup-section, form');
             if (setupScreen) setupScreen.style.display = 'none';
 
+            // Giao diện có tích hợp đồng hồ đếm ngược ở trên cùng
             let htmlContent = `<div style="max-width: 800px; margin: 0 auto; padding: 20px; background: #f9f9f9;">
-                <h2 style="text-align: center; color: #b71c1c; margin-bottom: 20px;">ĐỀ KIỂM TRA TỔNG HỢP TOÁN (21 CÂU - 30 PHÚT)</h2>`;
+                <div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 15px 20px; border-radius: 8px; border: 2px solid #b71c1c; margin-bottom: 20px; position: sticky; top: 10px; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <h2 style="color: #b71c1c; margin: 0; font-size: 20px;">ĐỀ TỔNG HỢP TOÁN (21 CÂU)</h2>
+                    <div style="font-size: 18px; font-weight: bold; color: #d32f2f; background: #ffebee; padding: 8px 15px; border-radius: 6px;">⏱ Thời gian: <span id="timer">30:00</span></div>
+                </div>`;
 
             selectedQuestions.forEach((q, index) => {
                 let qText = q['Nội dung câu hỏi'] || q['Câu hỏi'] || q['question'] || "";
@@ -1887,24 +1885,52 @@ document.addEventListener('DOMContentLoaded', () => {
                 let d = q['Đáp án D'] || "";
 
                 htmlContent += `
-                    <div style="background: white; border: 2px solid #dcdcdc; border-radius: 8px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <div class="question-card" id="q_card_${index}" style="background: white; border: 2px solid #dcdcdc; border-radius: 8px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                         <p style="font-weight: bold; font-size: 16px; color: #333;">Câu ${index + 1}: ${qText}</p>
                         <div style="margin-left: 15px;">
-                            <label style="display: block; margin: 8px 0; cursor: pointer;"><input type="radio" name="question_${index}" value="A"> A. ${a}</label>
-                            <label style="display: block; margin: 8px 0; cursor: pointer;"><input type="radio" name="question_${index}" value="B"> B. ${b}</label>
-                            <label style="display: block; margin: 8px 0; cursor: pointer;"><input type="radio" name="question_${index}" value="C"> C. ${c}</label>
-                            <label style="display: block; margin: 8px 0; cursor: pointer;"><input type="radio" name="question_${index}" value="D"> D. ${d}</label>
+                            <label class="ans-label ans_${index}" data-ans="A" style="display: block; margin: 8px 0; padding: 6px 10px; border-radius: 4px; cursor: pointer;"><input type="radio" name="question_${index}" value="A"> A. ${a}</label>
+                            <label class="ans-label ans_${index}" data-ans="B" style="display: block; margin: 8px 0; padding: 6px 10px; border-radius: 4px; cursor: pointer;"><input type="radio" name="question_${index}" value="B"> B. ${b}</label>
+                            <label class="ans-label ans_${index}" data-ans="C" style="display: block; margin: 8px 0; padding: 6px 10px; border-radius: 4px; cursor: pointer;"><input type="radio" name="question_${index}" value="C"> C. ${c}</label>
+                            <label class="ans-label ans_${index}" data-ans="D" style="display: block; margin: 8px 0; padding: 6px 10px; border-radius: 4px; cursor: pointer;"><input type="radio" name="question_${index}" value="D"> D. ${d}</label>
                         </div>
                     </div>`;
             });
 
-            htmlContent += `<button id="custom-submit-btn" style="display: block; width: 100%; padding: 12px; background: #2e7d32; color: white; font-size: 18px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 20px;">Nộp bài</button></div>`;
+            htmlContent += `<button id="custom-submit-btn" style="display: block; width: 100%; padding: 12px; background: #2e7d32; color: white; font-size: 18px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 20px;">Nộp bài tổng kết</button></div>`;
 
             let containerTarget = document.querySelector('#quiz-view') || document.body;
             containerTarget.innerHTML = htmlContent;
 
-            // Xử lý nộp bài
+            // Xử lý sự kiện chọn đáp án (Khóa luôn, tô xanh/đỏ trực tiếp)
+            selectedQuestions.forEach((q, index) => {
+                let correctAns = (q['Đáp án đúng'] || "").toString().trim().toUpperCase();
+                let radios = document.querySelectorAll(`input[name="question_${index}"]`);
+
+                radios.forEach(radio => {
+                    radio.addEventListener('change', function() {
+                        // Khóa toàn bộ các radio của câu này lại không cho đổi nữa
+                        radios.forEach(r => r.disabled = true);
+
+                        let chosenVal = this.value;
+                        let labels = document.querySelectorAll(`.ans_${index}`);
+
+                        labels.forEach(lbl => {
+                            let lblAns = lbl.getAttribute('data-ans');
+                            if (lblAns === correctAns) {
+                                lbl.style.background = "#c8e6c9"; // Tô xanh đáp án đúng
+                                lbl.style.fontWeight = "bold";
+                            }
+                            if (lblAns === chosenVal && chosenVal !== correctAns) {
+                                lbl.style.background = "#ffcdd2"; // Tô đỏ nếu chọn sai
+                            }
+                        });
+                    });
+                });
+            });
+
+            // Xử lý nút nộp bài
             document.getElementById('custom-submit-btn').addEventListener('click', () => {
+                if (window.timerInterval) clearInterval(window.timerInterval);
                 let score = 0;
                 selectedQuestions.forEach((q, index) => {
                     let selectedOption = document.querySelector(`input[name="question_${index}"]:checked`);
@@ -1924,7 +1950,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 timeLeft--;
                 let m = Math.floor(timeLeft / 60);
                 let s = timeLeft % 60;
-                let timerDisplay = document.getElementById('timer') || document.querySelector('.timer');
+                let timerDisplay = document.getElementById('timer');
                 if (timerDisplay) {
                     timerDisplay.innerText = `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
                 }
