@@ -1822,7 +1822,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 dataList = formattedList;
             }
 
-            // Kiểm tra môn học đang được chọn trên giao diện
+            // Kiểm tra chính xác môn học đang được chọn trên giao diện
             let monHocSelect = document.querySelector('select#mon-hoc, select[name="mon"], select');
             let selectedMon = monHocSelect ? monHocSelect.value.trim().toLowerCase() : "toán";
             let isMath = selectedMon.includes("toán") || selectedMon === "";
@@ -1875,14 +1875,14 @@ document.addEventListener('DOMContentLoaded', () => {
             let setupScreen = document.querySelector('.setup-screen, #setup-section, form');
             if (setupScreen) setupScreen.style.display = 'none';
 
-            // Tạo thanh công cụ tuỳ thuộc vào môn học
+            // Xây dựng thanh công cụ dựa vào môn học
             let toolsHtml = `<button id="btn-home" style="background: #607d8b; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px;">🏠 Trang chủ</button>`;
             
             if (isMath) {
-                // Chỉ hiện nút Calculator nếu là môn Toán
+                // Chỉ hiện Calculator nếu là môn Toán, KHÔNG hiện tra từ hay ĐT bất quy tắc
                 toolsHtml += `<button id="btn-calc-toggle" style="background: #ff9800; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px;">🧮 Calculator</button>`;
             } else {
-                // Hiện nút Tiếng Anh nếu không phải Toán
+                // Hiện công cụ Tiếng Anh nếu là môn khác
                 toolsHtml += `<button id="btn-tratru" style="background: #0288d1; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">📖 Tra từ</button>
                               <button id="btn-dtbqt" style="background: #7b1fa2; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">📚 ĐT Bất Quy Tắc</button>`;
             }
