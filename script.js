@@ -1780,7 +1780,6 @@ window.calcCalculate = function() {
     const btnTaoDeToan = document.getElementById('btn-tao-de-toan');
     
     if (btnTaoDeToan) {
-        // Clone và thay thế nút để xóa sạch các sự kiện cũ đang bị chặn
         const newBtn = btnTaoDeToan.cloneNode(true);
         btnTaoDeToan.parentNode.replaceChild(newBtn, btnTaoDeToan);
 
@@ -1795,52 +1794,41 @@ window.calcCalculate = function() {
                 selectMonHoc.dispatchEvent(new Event('change'));
             }
 
-            try {
-                newBtn.innerText = "Đang tải dữ liệu từ Google Sheets...";
-                newBtn.disabled = true;
+            // 2. Tự động bấm giả lập nút "Xác nhận Mã & Tải đề" gốc của trang để hệ thống tự tải dữ liệu về bộ nhớ
+            const originalLoadBtn = Array.from(document.querySelectorAll('button, .btn')).find(b => b.textContent.includes('Xác nhận Mã'));
+            if (originalLoadBtn) {
+                originalLoadBtn.click();
+            }
 
-                // 2. Tự động gọi thẳng đến Web App Google Apps Script của bạn để lấy dữ liệu câu hỏi
-                // (Hãy thay thế URL bên dưới bằng URL Web App thực tế của bạn nếu chưa có biến toàn cục)
-                let webAppUrl = window.WEB_APP_URL || window.scriptUrl || ""; 
-                
-                if (!webAppUrl) {
-                    // Nếu trang web có sẵn hàm tải dữ liệu gốc, kích hoạt nó ngầm
-                    if (typeof window.taiDuLieu === 'function') {
-                        await window.taiDuLieu();
-                    } else if (typeof window.loadData === 'function') {
-                        await window.loadData();
-                    }
-                }
+            newBtn.innerText = "Đang xử lý tạo đề...";
+            newBtn.disabled = true;
 
-                // Lấy dữ liệu câu hỏi từ biến toàn cục của trang sau khi đã nạp
-                let rawList = window.questions || window.allQuestions || window.cauHoiList;
+            // 3. Chờ 1.5 giây để dữ liệu từ Google Sheets kịp đổ về bộ nhớ trình duyệt
+            setTimeout(() => {
+                let dataList = window.questions || window.allQuestions || window.danhSachCauHoi || [];
 
-                // Nếu vẫn chưa có dữ liệu trong bộ nhớ, fetch trực tiếp qua Web App URL
-                if ((!rawList || rawList.length === 0) && webAppUrl) {
-                    let res = await fetch(webAppUrl);
-                    let resultJson = await res.json();
-                    rawList = resultJson.questions || [];
-                }
-
-                if (!rawList || rawList.length <= 1) {
-                    alert("Không thể lấy được dữ liệu câu hỏi. Vui lòng kiểm tra lại kết nối hoặc bấm nút 'Xác nhận Mã' 1 lần duy nhất để khởi động bộ nhớ!");
+                if (!dataList || dataList.length <= 1) {
+                    alert("Chưa tải được dữ liệu. Vui lòng bấm nút 'Xác nhận Mã & Tải đề' một lần, sau đó bấm lại nút này nhé!");
                     resetBtn();
                     return;
                 }
 
-                // Chuyển đổi dữ liệu từ mảng 2 chiều Google Sheets sang dạng Object dễ xử lý
-                let headers = rawList[0];
-                let dataList = [];
-                for (let i = 1; i < rawList.length; i++) {
-                    let row = rawList[i];
-                    let obj = {};
-                    for (let j = 0; j < headers.length; j++) {
-                        obj[headers[j]] = row[j];
+                // Nếu dữ liệu đang ở dạng mảng 2 chiều (Google Sheets), chuyển thành Object
+                if (Array.isArray(dataList[0])) {
+                    let headers = dataList[0];
+                    let formattedList = [];
+                    for (let i = 1; i < dataList.length; i++) {
+                        let row = dataList[i];
+                        let obj = {};
+                        for (let j = 0; j < headers.length; j++) {
+                            obj[headers[j]] = row[j];
+                        }
+                        formattedList.push(obj);
                     }
-                    dataList.push(obj);
+                    dataList = formattedList;
                 }
 
-                // 3. Cấu hình đúng chuẩn 21 câu hỏi theo yêu cầu của bạn
+                // 4. Cấu hình đúng chuẩn 21 câu hỏi theo yêu cầu của bạn
                 let cauHinh = {
                     'Hình học': 2,
                     'Đổi đơn vị': 6,
@@ -1864,7 +1852,7 @@ window.calcCalculate = function() {
                 }
 
                 if (selectedQuestions.length === 0) {
-                    alert("Không tìm thấy câu hỏi khớp với các chủ đề Toán yêu cầu trong Google Sheets!");
+                    alert("Không tìm thấy câu hỏi khớp với các chủ đề Toán yêu cầu!");
                     resetBtn();
                     return;
                 }
@@ -1892,11 +1880,8 @@ window.calcCalculate = function() {
                     alert("Đã tạo đề thành công nhưng thiếu hàm khởi tạo giao diện quiz.");
                 }
 
-            } catch (err) {
-                console.error(err);
-                alert("Lỗi kết nối tới Google Sheets Web App.");
                 resetBtn();
-            }
+            }, 1500);
         });
     }
 
