@@ -1776,10 +1776,11 @@ window.calcCalculate = function() {
     }
 };
 //--------------------------------------------------------
-    document.addEventListener('DOMContentLoaded', () => {
+   document.addEventListener('DOMContentLoaded', () => {
     const btnTaoDeToan = document.getElementById('btn-tao-de-toan');
     
     if (btnTaoDeToan) {
+        // Clone và thay thế nút để xóa sạch các sự kiện cũ đang bị chặn
         const newBtn = btnTaoDeToan.cloneNode(true);
         btnTaoDeToan.parentNode.replaceChild(newBtn, btnTaoDeToan);
 
@@ -1795,49 +1796,51 @@ window.calcCalculate = function() {
             }
 
             try {
-                newBtn.innerText = "Đang tải dữ liệu từ Google Sheet...";
+                newBtn.innerText = "Đang tải dữ liệu từ Google Sheets...";
                 newBtn.disabled = true;
 
-                // 2. Tìm kiếm hàm tải dữ liệu gốc hoặc đường dẫn Google Sheet có sẵn trong mã của trang
-                let dataList = null;
-
-                // Cách A: Thử gọi hàm tải dữ liệu gốc của trang web nếu có
-                if (typeof window.loadQuizData === 'function') {
-                    await window.loadQuizData();
-                } else if (typeof window.loadData === 'function') {
-                    await window.loadData();
-                }
-
-                // Quét lại các biến toàn cục xem dữ liệu đã về chưa
-                for (let key in window) {
-                    if (Array.isArray(window[key]) && window[key].length > 0) {
-                        let item = window[key][0];
-                        if (item && (item.chuDe || item.Chủ_đề || item.topic || item.noiDungCauHoi)) {
-                            dataList = window[key];
-                            break;
-                        }
+                // 2. Tự động gọi thẳng đến Web App Google Apps Script của bạn để lấy dữ liệu câu hỏi
+                // (Hãy thay thế URL bên dưới bằng URL Web App thực tế của bạn nếu chưa có biến toàn cục)
+                let webAppUrl = window.WEB_APP_URL || window.scriptUrl || ""; 
+                
+                if (!webAppUrl) {
+                    // Nếu trang web có sẵn hàm tải dữ liệu gốc, kích hoạt nó ngầm
+                    if (typeof window.taiDuLieu === 'function') {
+                        await window.taiDuLieu();
+                    } else if (typeof window.loadData === 'function') {
+                        await window.loadData();
                     }
                 }
 
-                // Cách B: Nếu vẫn chưa có, ta tự fetch trực tiếp từ Google Sheets (dựa trên link Sheet công khai của bạn)
-                if (!dataList || dataList.length === 0) {
-                    // Thay link CSV Google Sheet của bạn vào đây nếu trang web dùng chung link này
-                    const sheetCSVUrl = 'https://docs.google.com/spreadsheets/d/1_YOUR_SHEET_ID_HERE/gviz/tq?tqx=out:csv&sheet=BT'; 
-                    
-                    let response = await fetch(sheetCSVUrl);
-                    let csvText = await response.text();
-                    
-                    // Chuyển đổi dữ liệu CSV từ Google Sheet thành mảng object
-                    dataList = parseCSV(csvText);
+                // Lấy dữ liệu câu hỏi từ biến toàn cục của trang sau khi đã nạp
+                let rawList = window.questions || window.allQuestions || window.cauHoiList;
+
+                // Nếu vẫn chưa có dữ liệu trong bộ nhớ, fetch trực tiếp qua Web App URL
+                if ((!rawList || rawList.length === 0) && webAppUrl) {
+                    let res = await fetch(webAppUrl);
+                    let resultJson = await res.json();
+                    rawList = resultJson.questions || [];
                 }
 
-                if (!dataList || dataList.length === 0) {
-                    alert("Không thể tải được dữ liệu từ Google Sheet. Vui lòng kiểm tra lại kết nối mạng!");
+                if (!rawList || rawList.length <= 1) {
+                    alert("Không thể lấy được dữ liệu câu hỏi. Vui lòng kiểm tra lại kết nối hoặc bấm nút 'Xác nhận Mã' 1 lần duy nhất để khởi động bộ nhớ!");
                     resetBtn();
                     return;
                 }
 
-                // 3. Cấu hình đúng chuẩn 21 câu hỏi theo yêu cầu
+                // Chuyển đổi dữ liệu từ mảng 2 chiều Google Sheets sang dạng Object dễ xử lý
+                let headers = rawList[0];
+                let dataList = [];
+                for (let i = 1; i < rawList.length; i++) {
+                    let row = rawList[i];
+                    let obj = {};
+                    for (let j = 0; j < headers.length; j++) {
+                        obj[headers[j]] = row[j];
+                    }
+                    dataList.push(obj);
+                }
+
+                // 3. Cấu hình đúng chuẩn 21 câu hỏi theo yêu cầu của bạn
                 let cauHinh = {
                     'Hình học': 2,
                     'Đổi đơn vị': 6,
@@ -1851,7 +1854,7 @@ window.calcCalculate = function() {
                 for (let chuDe in cauHinh) {
                     let countNeeded = cauHinh[chuDe];
                     let pool = dataList.filter(q => {
-                        let c = q.chuDe || q.Chủ_đề || q.topic || q.subject || "";
+                        let c = q['Chủ đề'] || q['chuDe'] || q['topic'] || "";
                         return c.trim().toLowerCase() === chuDe.toLowerCase();
                     });
 
@@ -1861,7 +1864,7 @@ window.calcCalculate = function() {
                 }
 
                 if (selectedQuestions.length === 0) {
-                    alert("Không tìm thấy câu hỏi khớp với các chủ đề Toán yêu cầu!");
+                    alert("Không tìm thấy câu hỏi khớp với các chủ đề Toán yêu cầu trong Google Sheets!");
                     resetBtn();
                     return;
                 }
@@ -1891,29 +1894,10 @@ window.calcCalculate = function() {
 
             } catch (err) {
                 console.error(err);
-                alert("Lỗi kết nối tới Google Sheet. Hãy chắc chắn Google Sheet ở chế độ công khai (Anyone with the link can view).");
+                alert("Lỗi kết nối tới Google Sheets Web App.");
                 resetBtn();
             }
         });
-    }
-
-    // Hàm phụ trợ đọc dữ liệu CSV từ Google Sheet
-    function parseCSV(text) {
-        let lines = text.split("\n");
-        let result = [];
-        let headers = lines[0].split(",").map(h => h.replace(/^"|"$/g, '').trim());
-
-        for (let i = 1; i < lines.length; i++) {
-            if (!lines[i].trim()) continue;
-            let currentline = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-            let obj = {};
-            for (let j = 0; j < headers.length; j++) {
-                let val = currentline[j] ? currentline[j].replace(/^"|"$/g, '').trim() : "";
-                obj[headers[j]] = val;
-            }
-            result.push(obj);
-        }
-        return result;
     }
 
     function resetBtn() {
