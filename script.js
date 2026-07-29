@@ -1870,12 +1870,14 @@ document.addEventListener('DOMContentLoaded', () => {
             let setupScreen = document.querySelector('.setup-screen, #setup-section, form');
             if (setupScreen) setupScreen.style.display = 'none';
 
-            // Giao diện có tích hợp đồng hồ đếm ngược ở trên cùng
+            // Giao diện gồm nút Trang chủ, Đồng hồ, Bộ đếm Đúng/Sai
             let htmlContent = `<div style="max-width: 800px; margin: 0 auto; padding: 20px; background: #f9f9f9;">
-                <div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 15px 20px; border-radius: 8px; border: 2px solid #b71c1c; margin-bottom: 20px; position: sticky; top: 10px; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                    <h2 style="color: #b71c1c; margin: 0; font-size: 20px;">ĐỀ TỔNG HỢP TOÁN (21 CÂU)</h2>
-                    <div style="font-size: 18px; font-weight: bold; color: #d32f2f; background: #ffebee; padding: 8px 15px; border-radius: 6px;">⏱ Thời gian: <span id="timer">30:00</span></div>
-                </div>`;
+                <div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 12px 15px; border-radius: 8px; border: 2px solid #b71c1c; margin-bottom: 20px; position: sticky; top: 10px; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex-wrap: wrap; gap: 10px;">
+                    <button id="btn-home" style="background: #607d8b; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px;">🏠 Trang chủ</button>
+                    <div style="font-size: 15px; font-weight: bold; color: #333;">Đúng: <span id="count-dung" style="color: green; font-size: 18px;">0</span> | Sai: <span id="count-sai" style="color: red; font-size: 18px;">0</span></div>
+                    <div style="font-size: 15px; font-weight: bold; color: #d32f2f; background: #ffebee; padding: 6px 12px; border-radius: 6px;">⏱ <span id="timer">30:00</span></div>
+                </div>
+                <h2 style="text-align: center; color: #b71c1c; margin-bottom: 20px;">ĐỀ TỔNG HỢP TOÁN (21 CÂU)</h2>`;
 
             selectedQuestions.forEach((q, index) => {
                 let qText = q['Nội dung câu hỏi'] || q['Câu hỏi'] || q['question'] || "";
@@ -1901,45 +1903,52 @@ document.addEventListener('DOMContentLoaded', () => {
             let containerTarget = document.querySelector('#quiz-view') || document.body;
             containerTarget.innerHTML = htmlContent;
 
-            // Xử lý sự kiện chọn đáp án (Khóa luôn, tô xanh/đỏ trực tiếp)
+            // Xử lý nút Trang chủ
+            document.getElementById('btn-home').addEventListener('click', () => {
+                location.reload();
+            });
+
+            let scoreDung = 0;
+            let scoreSai = 0;
+
+            // Xử lý chọn đáp án (Khóa, tô màu, đếm đúng/sai trực tiếp)
             selectedQuestions.forEach((q, index) => {
                 let correctAns = (q['Đáp án đúng'] || "").toString().trim().toUpperCase();
                 let radios = document.querySelectorAll(`input[name="question_${index}"]`);
 
                 radios.forEach(radio => {
                     radio.addEventListener('change', function() {
-                        // Khóa toàn bộ các radio của câu này lại không cho đổi nữa
                         radios.forEach(r => r.disabled = true);
 
                         let chosenVal = this.value;
                         let labels = document.querySelectorAll(`.ans_${index}`);
 
+                        if (chosenVal === correctAns) {
+                            scoreDung++;
+                            document.getElementById('count-dung').innerText = scoreDung;
+                        } else {
+                            scoreSai++;
+                            document.getElementById('count-sai').innerText = scoreSai;
+                        }
+
                         labels.forEach(lbl => {
                             let lblAns = lbl.getAttribute('data-ans');
                             if (lblAns === correctAns) {
-                                lbl.style.background = "#c8e6c9"; // Tô xanh đáp án đúng
+                                lbl.style.background = "#c8e6c9";
                                 lbl.style.fontWeight = "bold";
                             }
                             if (lblAns === chosenVal && chosenVal !== correctAns) {
-                                lbl.style.background = "#ffcdd2"; // Tô đỏ nếu chọn sai
+                                lbl.style.background = "#ffcdd2";
                             }
                         });
                     });
                 });
             });
 
-            // Xử lý nút nộp bài
+            // Xử lý nút nộp bài tổng kết
             document.getElementById('custom-submit-btn').addEventListener('click', () => {
                 if (window.timerInterval) clearInterval(window.timerInterval);
-                let score = 0;
-                selectedQuestions.forEach((q, index) => {
-                    let selectedOption = document.querySelector(`input[name="question_${index}"]:checked`);
-                    let correctAns = (q['Đáp án đúng'] || "").toString().trim().toUpperCase();
-                    if (selectedOption && selectedOption.value === correctAns) {
-                        score++;
-                    }
-                });
-                alert(`Bạn đã hoàn thành bài thi! Số câu đúng: ${score}/21 câu.`);
+                alert(`Bạn đã hoàn thành bài thi!\n- Số câu đúng: ${scoreDung}\n- Số câu sai: ${scoreSai}`);
                 location.reload();
             });
 
