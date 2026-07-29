@@ -1798,27 +1798,40 @@ window.calcCalculate = function() {
                 newBtn.innerText = "Đang tải dữ liệu từ Google Sheets...";
                 newBtn.disabled = true;
 
-                // THAY LINK GOOGLE APPS SCRIPT WEB APP CỦA BẠN VÀO DƯỚI ĐÂY
-                let MY_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzKhjTj95GBob8cPfSikXMUVg2S0vJ0BkEOTk2da1IY9xUFFGa8HvrM3FGLO-AJ6tvJ/exec"; 
+                // Tự động tìm link Web App đang được cấu hình trong trang gốc
+                let webAppUrl = window.WEB_APP_URL || window.scriptUrl || window.API_URL || "";
                 
-                // Nếu bạn lưu URL ở biến toàn cục nào đó trong trang, hãy gán nó vào đây
-                if (MY_WEB_APP_URL.includes("ĐIỀN_URL")) {
-                    MY_WEB_APP_URL = window.WEB_APP_URL || window.scriptUrl || window.API_URL || "";
+                // Nếu chưa tìm thấy qua biến, quét trong toàn bộ các thẻ script của trang web
+                if (!webAppUrl) {
+                    const scripts = document.querySelectorAll('script');
+                    for (let s of scripts) {
+                        let content = s.textContent || s.src || "";
+                        let match = content.match(/https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/exec/);
+                        if (match) {
+                            webAppUrl = match[0];
+                            break;
+                        }
+                    }
                 }
 
-                if (!MY_WEB_APP_URL) {
-                    alert("Chưa cấu hình URL Google Apps Script trong code! Hãy điền link Web App vào file script.js");
+                // Nếu vẫn không tìm thấy, hãy dán cứng link Web App của bạn vào đây trong ngoặc kép
+                if (!webAppUrl) {
+                    webAppUrl = "https://script.google.com/macros/s/AKfycbzKhjTj95GBob8cPfSikXMUVg2S0vJ0BkEOTk2da1IY9xUFFGa8HvrM3FGLO-AJ6tvJ/exec"; 
+                }
+
+                if (!webAppUrl || webAppUrl.includes("ĐIỀN_LINK")) {
+                    alert("Không tìm thấy URL Google Apps Script. Vui lòng kiểm tra lại mã nguồn.");
                     resetBtn();
                     return;
                 }
 
-                // 2. Fetch trực tiếp dữ liệu từ Google Sheets qua Web App
-                let response = await fetch(MY_WEB_APP_URL);
+                // 2. Fetch dữ liệu trực tiếp từ Google Sheets
+                let response = await fetch(webAppUrl);
                 let result = await response.json();
-                let rawList = result.questions || [];
+                let rawList = result.questions || result.data || result;
 
                 if (!rawList || rawList.length <= 1) {
-                    alert("Không lấy được dữ liệu câu hỏi từ Google Sheets. Vui lòng kiểm tra lại Web App!");
+                    alert("Dữ liệu trả về từ Google Sheets trống!");
                     resetBtn();
                     return;
                 }
