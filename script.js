@@ -1783,156 +1783,147 @@ document.addEventListener('DOMContentLoaded', () => {
         const newBtn = btnTaoDeToan.cloneNode(true);
         btnTaoDeToan.parentNode.replaceChild(newBtn, btnTaoDeToan);
 
-        newBtn.addEventListener('click', function(e) {
+        newBtn.addEventListener('click', async function(e) {
             e.stopPropagation();
             e.stopImmediatePropagation();
 
-            // 1. Lấy dữ liệu trực tiếp từ các biến toàn cục hoặc localStorage của trang sau khi bạn đã bấm tải đề
-            let dataList = window.questions || window.allQuestions || window.danhSachCauHoi || window.cauHoiList;
+            newBtn.innerText = "Đang tải dữ liệu trực tiếp...";
+            newBtn.disabled = true;
 
-            if (!dataList || dataList.length <= 1) {
-                try {
-                    for (let key of Object.keys(localStorage)) {
-                        let val = JSON.parse(localStorage.getItem(key));
-                        if (Array.isArray(val) && val.length > 1) {
-                            dataList = val;
-                            break;
+            try {
+                // Thay link Web App Google Apps Script của bạn vào đây
+                let webAppUrl = "https://script.google.com/macros/s/AKfycbzKhjTj95GBob8cPfSikXMUVg2S0vJ0BkEOTk2da1IY9xUFFGa8HvrM3FGLO-AJ6tvJ/exec";
+
+                let response = await fetch(webAppUrl);
+                let result = await response.json();
+                let dataList = result.questions || result.data || result;
+
+                if (!dataList || dataList.length <= 1) {
+                    alert("Không thể tải được dữ liệu từ Google Sheets!");
+                    resetBtn();
+                    return;
+                }
+
+                if (Array.isArray(dataList[0])) {
+                    let headers = dataList[0];
+                    let formattedList = [];
+                    for (let i = 1; i < dataList.length; i++) {
+                        let row = dataList[i];
+                        let obj = {};
+                        for (let j = 0; j < headers.length; j++) {
+                            obj[headers[j]] = row[j];
                         }
+                        formattedList.push(obj);
                     }
-                } catch(err) {}
-            }
-
-            if (!dataList || dataList.length <= 1) {
-                alert("Bạn hãy bấm nút 'Xác nhận Mã & Tải đề' ở phía trên trước, sau đó mới bấm nút Tạo đề tổng hợp nhé!");
-                return;
-            }
-
-            if (Array.isArray(dataList[0])) {
-                let headers = dataList[0];
-                let formattedList = [];
-                for (let i = 1; i < dataList.length; i++) {
-                    let row = dataList[i];
-                    let obj = {};
-                    for (let j = 0; j < headers.length; j++) {
-                        obj[headers[j]] = row[j];
-                    }
-                    formattedList.push(obj);
+                    dataList = formattedList;
                 }
-                dataList = formattedList;
-            }
 
-            // 2. Lọc đúng chuẩn 21 câu theo cấu hình yêu cầu
-            let cauHinh = {
-                'Hình học': 2,
-                'Đổi đơn vị': 6,
-                'Phân số': 4,
-                'Phép tính số thập phân': 4,
-                'So sánh phân số': 6
-            };
+                // Lọc đúng chuẩn 21 câu theo cấu hình yêu cầu
+                let cauHinh = {
+                    'Hình học': 2,
+                    'Đổi đơn vị': 6,
+                    'Phân số': 4,
+                    'Phép tính số thập phân': 4,
+                    'So sánh phân số': 6
+                };
 
-            let selectedQuestions = [];
+                let selectedQuestions = [];
 
-            for (let chuDe in cauHinh) {
-                let countNeeded = cauHinh[chuDe];
-                let pool = dataList.filter(q => {
-                    let c = q['Chủ đề'] || q['chuDe'] || q['topic'] || "";
-                    return c.trim().toLowerCase() === chuDe.toLowerCase();
-                });
+                for (let chuDe in cauHinh) {
+                    let countNeeded = cauHinh[chuDe];
+                    let pool = dataList.filter(q => {
+                        let c = q['Chủ đề'] || q['chuDe'] || q['topic'] || "";
+                        return c.trim().toLowerCase() === chuDe.toLowerCase();
+                    });
 
-                pool = (typeof shuffleArray === 'function') ? shuffleArray(pool) : pool.sort(() => Math.random() - 0.5);
-                let picked = pool.slice(0, countNeeded);
-                selectedQuestions = selectedQuestions.concat(picked);
-            }
+                    pool = pool.sort(() => Math.random() - 0.5);
+                    let picked = pool.slice(0, countNeeded);
+                    selectedQuestions = selectedQuestions.concat(picked);
+                }
 
-            if (selectedQuestions.length === 0) {
-                alert("Không tìm thấy câu hỏi khớp với các chủ đề Toán yêu cầu!");
-                return;
-            }
+                if (selectedQuestions.length === 0) {
+                    alert("Không tìm thấy câu hỏi khớp với các chủ đề Toán yêu cầu!");
+                    resetBtn();
+                    return;
+                }
 
-            selectedQuestions = (typeof shuffleArray === 'function') ? shuffleArray(selectedQuestions) : selectedQuestions.sort(() => Math.random() - 0.5);
+                selectedQuestions = selectedQuestions.sort(() => Math.random() - 0.5);
 
-            // Lưu vào biến toàn cục
-            window.currentQuestions = selectedQuestions;
-            window.questions = selectedQuestions;
+                // Ẩn màn hình chọn, hiện giao diện làm bài
+                let setupScreen = document.querySelector('.setup-screen, #setup-section, form');
+                if (setupScreen) setupScreen.style.display = 'none';
 
-            // Chuyển giao diện sang môn Toán
-            const selectMonHoc = document.getElementById('subject-select');
-            if (selectMonHoc) {
-                selectMonHoc.value = "Toán";
-                selectMonHoc.dispatchEvent(new Event('change'));
-            }
+                let htmlContent = `<div style="max-width: 800px; margin: 0 auto; padding: 20px; background: #f9f9f9;">
+                    <h2 style="text-align: center; color: #b71c1c; margin-bottom: 20px;">ĐỀ KIỂM TRA TỔNG HỢP TOÁN (21 CÂU - 30 PHÚT)</h2>`;
 
-            // Bật máy tính, ẩn các nút khác
-            const btnCalc = document.getElementById('btn-calc');
-            const btnDict = document.getElementById('btn-dict');
-            const btnVerbs = document.getElementById('btn-verbs');
-            if (btnCalc) btnCalc.style.display = 'block';
-            if (btnDict) btnDict.style.display = 'none';
-            if (btnVerbs) btnVerbs.style.display = 'none';
-
-            // 3. TỰ RENDER GIAO DIỆN HIỂN THỊ ĐỦ 21 CÂU VÀ NỘP BÀI
-            let quizArea = document.querySelector('#quiz-content, .quiz-container, main') || document.body;
-            
-            let setupScreen = document.querySelector('.setup-screen, #setup-section, form');
-            if (setupScreen) setupScreen.style.display = 'none';
-
-            let htmlContent = `<div style="max-width: 800px; margin: 0 auto; padding: 20px;">
-                <h2 style="text-align: center; color: #b71c1c; margin-bottom: 20px;">ĐỀ KIỂM TRA TỔNG HỢP TOÁN (21 CÂU - 30 PHÚT)</h2>`;
-
-            selectedQuestions.forEach((q, index) => {
-                let qText = q['Câu hỏi'] || q['question'] || q['Nội dung'] || "";
-                let a = q['Đáp án A'] || q['A'] || "";
-                let b = q['Đáp án B'] || q['B'] || "";
-                let c = q['Đáp án C'] || q['C'] || "";
-                let d = q['Đáp án D'] || q['D'] || "";
-
-                htmlContent += `
-                    <div class="custom-q-card" style="background: white; border: 2px solid #dcdcdc; border-radius: 8px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                        <p style="font-weight: bold; font-size: 16px; color: #333;">Câu ${index + 1}: ${qText}</p>
-                        <div style="margin-left: 15px;">
-                            <label style="display: block; margin: 8px 0; cursor: pointer;"><input type="radio" name="question_${index}" value="A"> A. ${a}</label>
-                            <label style="display: block; margin: 8px 0; cursor: pointer;"><input type="radio" name="question_${index}" value="B"> B. ${b}</label>
-                            <label style="display: block; margin: 8px 0; cursor: pointer;"><input type="radio" name="question_${index}" value="C"> C. ${c}</label>
-                            <label style="display: block; margin: 8px 0; cursor: pointer;"><input type="radio" name="question_${index}" value="D"> D. ${d}</label>
-                        </div>
-                    </div>`;
-            });
-
-            htmlContent += `<button id="custom-submit-btn" style="display: block; width: 100%; padding: 12px; background: #2e7d32; color: white; font-size: 18px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 20px;">Nộp bài</button></div>`;
-
-            let containerTarget = document.querySelector('#quiz-view') || document.body;
-            containerTarget.innerHTML = htmlContent;
-
-            document.getElementById('custom-submit-btn').addEventListener('click', () => {
-                let score = 0;
                 selectedQuestions.forEach((q, index) => {
-                    let selectedOption = document.querySelector(`input[name="question_${index}"]:checked`);
-                    let correctAns = (q['Đáp án đúng'] || q['correct'] || "").trim().toUpperCase();
-                    if (selectedOption && selectedOption.value === correctAns) {
-                        score++;
-                    }
-                });
-                alert(`Bạn đã hoàn thành bài thi! Số câu đúng: ${score}/21 câu.`);
-                location.reload();
-            });
+                    let qText = q['Câu hỏi'] || q['question'] || q['Nội dung'] || "";
+                    let a = q['Đáp án A'] || q['A'] || "";
+                    let b = q['Đáp án B'] || q['B'] || "";
+                    let c = q['Đáp án C'] || q['C'] || "";
+                    let d = q['Đáp án D'] || q['D'] || "";
 
-            // 4. Đồng hồ đếm ngược 30 phút
-            let timeLeft = 30 * 60;
-            if (window.timerInterval) clearInterval(window.timerInterval);
-            window.timerInterval = setInterval(() => {
-                timeLeft--;
-                let m = Math.floor(timeLeft / 60);
-                let s = timeLeft % 60;
-                let timerDisplay = document.getElementById('timer') || document.querySelector('.timer');
-                if (timerDisplay) {
-                    timerDisplay.innerText = `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
-                }
-                if (timeLeft <= 0) {
-                    clearInterval(window.timerInterval);
-                    alert("Hết thời gian làm bài!");
-                    document.getElementById('custom-submit-btn')?.click();
-                }
-            }, 1000);
+                    htmlContent += `
+                        <div style="background: white; border: 2px solid #dcdcdc; border-radius: 8px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                            <p style="font-weight: bold; font-size: 16px; color: #333;">Câu ${index + 1}: ${qText}</p>
+                            <div style="margin-left: 15px;">
+                                <label style="display: block; margin: 8px 0; cursor: pointer;"><input type="radio" name="question_${index}" value="A"> A. ${a}</label>
+                                <label style="display: block; margin: 8px 0; cursor: pointer;"><input type="radio" name="question_${index}" value="B"> B. ${b}</label>
+                                <label style="display: block; margin: 8px 0; cursor: pointer;"><input type="radio" name="question_${index}" value="C"> C. ${c}</label>
+                                <label style="display: block; margin: 8px 0; cursor: pointer;"><input type="radio" name="question_${index}" value="D"> D. ${d}</label>
+                            </div>
+                        </div>`;
+                });
+
+                htmlContent += `<button id="custom-submit-btn" style="display: block; width: 100%; padding: 12px; background: #2e7d32; color: white; font-size: 18px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 20px;">Nộp bài</button></div>`;
+
+                let containerTarget = document.querySelector('#quiz-view') || document.body;
+                containerTarget.innerHTML = htmlContent;
+
+                document.getElementById('custom-submit-btn').addEventListener('click', () => {
+                    let score = 0;
+                    selectedQuestions.forEach((q, index) => {
+                        let selectedOption = document.querySelector(`input[name="question_${index}"]:checked`);
+                        let correctAns = (q['Đáp án đúng'] || q['correct'] || "").trim().toUpperCase();
+                        if (selectedOption && selectedOption.value === correctAns) {
+                            score++;
+                        }
+                    });
+                    alert(`Bạn đã hoàn thành bài thi! Số câu đúng: ${score}/21 câu.`);
+                    location.reload();
+                });
+
+                // Đồng hồ đếm ngược 30 phút
+                let timeLeft = 30 * 60;
+                if (window.timerInterval) clearInterval(window.timerInterval);
+                window.timerInterval = setInterval(() => {
+                    timeLeft--;
+                    let m = Math.floor(timeLeft / 60);
+                    let s = timeLeft % 60;
+                    let timerDisplay = document.getElementById('timer') || document.querySelector('.timer');
+                    if (timerDisplay) {
+                        timerDisplay.innerText = `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+                    }
+                    if (timeLeft <= 0) {
+                        clearInterval(window.timerInterval);
+                        alert("Hết thời gian làm bài!");
+                        document.getElementById('custom-submit-btn')?.click();
+                    }
+                }, 1000);
+
+            } catch (err) {
+                console.error(err);
+                alert("Lỗi tải dữ liệu. Hãy kiểm tra lại link Web App trong code!");
+                resetBtn();
+            }
         });
+    }
+
+    function resetBtn() {
+        const btn = document.getElementById('btn-tao-de-toan');
+        if (btn) {
+            btn.innerText = "🎯 Tạo đề tổng hợp Toán (30 phút - 21 câu)";
+            btn.disabled = false;
+        }
     }
 });
