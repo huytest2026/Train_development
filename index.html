@@ -100,7 +100,7 @@
     </div>
     <div id="topic-container">Chưa tải dữ liệu...</div>
 
-    <!-- NÚT TẠO ĐỀ TỔNG HỢP MÔN TOÁN (BẤM VÀO TẠO NGAY KHÔNG CẦN BẤM BẮT ĐẦU) -->
+    <!-- NÚT TẠO ĐỀ TỔNG HỢP MÔN TOÁN -->
     <button type="button" id="btn-tao-de-toan" style="width: 100%; padding: 12px; background-color: #ffc107; color: #000; border: none; border-radius: 8px; font-weight: bold; font-size: 1em; margin-top: 10px; margin-bottom: 10px; cursor: pointer;">
     🎯 Tạo đề tổng hợp (30 phút - 21 câu)
 </button>
@@ -284,8 +284,6 @@
                     return;
                 }
 
-                // Cấu hình số lượng theo yêu cầu:
-                // 2 câu Hình học, 6 câu Đổi đơn vị, 4 câu Phân số, 4 câu Phép tính số thập phân, 6 câu So sánh phân số
                 let cauHinh = {
                     'Hình học': 2,
                     'Đổi đơn vị': 6,
@@ -302,7 +300,6 @@
                         q.chuDe && q.chuDe.trim().toLowerCase() === chuDe.toLowerCase()
                     );
 
-                    // Xáo trộn ngẫu nhiên kho câu hỏi của chủ đề
                     pool = (typeof shuffleArray === 'function') ? shuffleArray(pool) : pool.sort(() => Math.random() - 0.5);
 
                     let picked = pool.slice(0, countNeeded);
@@ -314,10 +311,9 @@
                     return;
                 }
 
-                // Xáo trộn toàn bộ danh sách 22 câu vừa gom được
                 selectedQuestions = (typeof shuffleArray === 'function') ? shuffleArray(selectedQuestions) : selectedQuestions.sort(() => Math.random() - 0.5);
 
-                // Tự động kích hoạt nút máy tính cho môn Toán khi vào thi
+                // Tự động kích hoạt nút máy tính cho môn Toán khi vào thi bằng nút tổng hợp
                 const btnCalc = document.getElementById('btn-calc');
                 const btnDict = document.getElementById('btn-dict');
                 const btnVerbs = document.getElementById('btn-verbs');
@@ -325,11 +321,9 @@
                 if (btnDict) btnDict.style.display = 'none';
                 if (btnVerbs) btnVerbs.style.display = 'none';
 
-                // Vào thẳng màn hình làm bài ngay lập tức không cần bấm nút Bắt Đầu
                 if (typeof initQuizApp === 'function') {
                     initQuizApp(selectedQuestions);
                     
-                    // Thiết lập thời gian 30 phút (30 * 60 giây)
                     if (typeof window.startTimerTotal === 'function') {
                         window.startTimerTotal(30 * 60);
                     }
