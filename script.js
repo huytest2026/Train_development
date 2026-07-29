@@ -1787,144 +1787,136 @@ document.addEventListener('DOMContentLoaded', () => {
             e.stopPropagation();
             e.stopImmediatePropagation();
 
-            // 1. Tự động chọn môn Toán trên giao diện
+            newBtn.innerText = "Đang lấy dữ liệu từ trang...";
+            newBtn.disabled = true;
+
+            // 1. Tự động bấm nút "Xác nhận Mã & Tải đề" của trang web gốc để kích hoạt cơ chế tải chuẩn của họ
+            const originalLoadBtn = Array.from(document.querySelectorAll('button, .btn')).find(b => b.textContent.includes('Xác nhận Mã'));
+            if (originalLoadBtn) {
+                originalLoadBtn.click();
+            }
+
+            // 2. Chờ dữ liệu đổ về bộ nhớ trình duyệt (kiểm tra liên tục trong tối đa 10 giây)
+            let dataList = null;
+            for (let i = 0; i < 30; i++) {
+                // Kiểm tra các biến toàn cục phổ biến mà mã nguồn gốc thường dùng để chứa câu hỏi
+                dataList = window.questions || window.allQuestions || window.danhSachCauHoi || window.cauHoiList;
+                if (dataList && dataList.length > 1) break;
+                await new Promise(r => setTimeout(r, 300));
+            }
+
+            // Nếu vẫn chưa có, thử lấy từ localStorage hoặc sessionStorage nếu trang web lưu ở đó
+            if (!dataList || dataList.length <= 1) {
+                try {
+                    for (let key of Object.keys(localStorage)) {
+                        let val = JSON.parse(localStorage.getItem(key));
+                        if (Array.isArray(val) && val.length > 1) {
+                            dataList = val;
+                            break;
+                        }
+                    }
+                } catch(err) {}
+            }
+
+            if (!dataList || dataList.length <= 1) {
+                alert("Vui lòng bấm nút 'Xác nhận Mã & Tải đề' thủ công 1 lần trước, sau đó mới bấm nút Tạo đề tổng hợp nhé!");
+                resetBtn();
+                return;
+            }
+
+            // Chuyển đổi nếu dữ liệu là mảng 2 chiều
+            if (Array.isArray(dataList[0])) {
+                let headers = dataList[0];
+                let formattedList = [];
+                for (let i = 1; i < dataList.length; i++) {
+                    let row = dataList[i];
+                    let obj = {};
+                    for (let j = 0; j < headers.length; j++) {
+                        obj[headers[j]] = row[j];
+                    }
+                    formattedList.push(obj);
+                }
+                dataList = formattedList;
+            }
+
+            // 3. Lọc đúng chuẩn cấu hình 21 câu hỏi Toán
+            let cauHinh = {
+                'Hình học': 2,
+                'Đổi đơn vị': 6,
+                'Phân số': 4,
+                'Phép tính số thập phân': 4,
+                'So sánh phân số': 6
+            };
+
+            let selectedQuestions = [];
+
+            for (let chuDe in cauHinh) {
+                let countNeeded = cauHinh[chuDe];
+                let pool = dataList.filter(q => {
+                    let c = q['Chủ đề'] || q['chuDe'] || q['topic'] || "";
+                    return c.trim().toLowerCase() === chuDe.toLowerCase();
+                });
+
+                pool = (typeof shuffleArray === 'function') ? shuffleArray(pool) : pool.sort(() => Math.random() - 0.5);
+                let picked = pool.slice(0, countNeeded);
+                selectedQuestions = selectedQuestions.concat(picked);
+            }
+
+            if (selectedQuestions.length === 0) {
+                alert("Không tìm thấy câu hỏi khớp với các chủ đề Toán yêu cầu!");
+                resetBtn();
+                return;
+            }
+
+            selectedQuestions = (typeof shuffleArray === 'function') ? shuffleArray(selectedQuestions) : selectedQuestions.sort(() => Math.random() - 0.5);
+
+            // 4. Gán danh sách câu hỏi vào hệ thống hiển thị của trang
+            window.currentQuestions = selectedQuestions;
+            window.questions = selectedQuestions;
+
+            // Đổi môn học trên giao diện thành Toán
             const selectMonHoc = document.getElementById('subject-select');
             if (selectMonHoc) {
                 selectMonHoc.value = "Toán";
                 selectMonHoc.dispatchEvent(new Event('change'));
             }
 
-            try {
-                newBtn.innerText = "Đang tạo đúng 21 câu (30 phút)...";
-                newBtn.disabled = true;
+            // Bật máy tính, ẩn các nút không liên quan
+            const btnCalc = document.getElementById('btn-calc');
+            const btnDict = document.getElementById('btn-dict');
+            const btnVerbs = document.getElementById('btn-verbs');
+            if (btnCalc) btnCalc.style.display = 'block';
+            if (btnDict) btnDict.style.display = 'none';
+            if (btnVerbs) btnVerbs.style.display = 'none';
 
-                let webAppUrl = window.WEB_APP_URL || window.scriptUrl || window.API_URL || "";
-                
-                if (!webAppUrl) {
-                    const scripts = document.querySelectorAll('script');
-                    for (let s of scripts) {
-                        let content = s.textContent || s.src || "";
-                        let match = content.match(/https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/exec/);
-                        if (match) {
-                            webAppUrl = match[0];
-                            break;
-                        }
-                    }
-                }
-
-                if (!webAppUrl) {
-                    webAppUrl = "https://script.google.com/macros/s/AKfycbzKhjTj95GBob8cPfSikXMUVg2S0vJ0BkEOTk2da1IY9xUFFGa8HvrM3FGLO-AJ6tvJ/exec"; 
-                }
-
-                // 2. Tải dữ liệu từ Google Sheets
-                let response = await fetch(webAppUrl);
-                let result = await response.json();
-                let rawList = result.questions || result.data || result;
-
-                if (!rawList || rawList.length <= 1) {
-                    alert("Dữ liệu trả về từ Google Sheets trống!");
-                    resetBtn();
-                    return;
-                }
-
-                let headers = rawList[0];
-                let dataList = [];
-                for (let i = 1; i < rawList.length; i++) {
-                    let row = rawList[i];
-                    let obj = {};
-                    for (let j = 0; j < headers.length; j++) {
-                        obj[headers[j]] = row[j];
-                    }
-                    dataList.push(obj);
-                }
-
-                // 3. Lọc đúng chuẩn cấu hình 21 câu
-                let cauHinh = {
-                    'Hình học': 2,
-                    'Đổi đơn vị': 6,
-                    'Phân số': 4,
-                    'Phép tính số thập phân': 4,
-                    'So sánh phân số': 6
-                };
-
-                let selectedQuestions = [];
-
-                for (let chuDe in cauHinh) {
-                    let countNeeded = cauHinh[chuDe];
-                    let pool = dataList.filter(q => {
-                        let c = q['Chủ đề'] || q['chuDe'] || q['topic'] || "";
-                        return c.trim().toLowerCase() === chuDe.toLowerCase();
-                    });
-
-                    pool = (typeof shuffleArray === 'function') ? shuffleArray(pool) : pool.sort(() => Math.random() - 0.5);
-                    let picked = pool.slice(0, countNeeded);
-                    selectedQuestions = selectedQuestions.concat(picked);
-                }
-
-                if (selectedQuestions.length === 0) {
-                    alert("Không tìm thấy câu hỏi khớp với các chủ đề Toán yêu cầu!");
-                    resetBtn();
-                    return;
-                }
-
-                selectedQuestions = (typeof shuffleArray === 'function') ? shuffleArray(selectedQuestions) : selectedQuestions.sort(() => Math.random() - 0.5);
-
-                // 4. Lưu trực tiếp danh sách câu hỏi vào biến toàn cục của trang để các hàm hiển thị đọc đúng danh sách này
-                window.currentQuestions = selectedQuestions;
-                window.questions = selectedQuestions;
-                if (window.quizData) window.quizData.questions = selectedQuestions;
-
-                // Bật máy tính, ẩn các nút không liên quan
-                const btnCalc = document.getElementById('btn-calc');
-                const btnDict = document.getElementById('btn-dict');
-                const btnVerbs = document.getElementById('btn-verbs');
-                if (btnCalc) btnCalc.style.display = 'block';
-                if (btnDict) btnDict.style.display = 'none';
-                if (btnVerbs) btnVerbs.style.display = 'none';
-
-                // 5. Kích hoạt giao diện làm bài
-                if (typeof initQuizApp === 'function') {
-                    // Thử gọi initQuizApp, nếu hàm này có cơ chế tự load lại thì ta ghi đè biến toàn cục trước đó
-                    initQuizApp(selectedQuestions);
-                } else if (typeof startQuiz === 'function') {
-                    startQuiz();
-                }
-
-                // Đảm bảo ép hiển thị toàn bộ các câu hỏi thay vì bị cắt trang (pagination nếu có)
-                setTimeout(() => {
-                    let questionContainers = document.querySelectorAll('.question-container, .quiz-question, [id^="question"]');
-                    questionContainers.forEach(el => el.style.display = 'block');
-                }, 200);
-
-                // 6. Cố định thời gian chuẩn 30 phút (1800 giây) và ép đồng hồ chạy đúng
-                if (typeof window.startTimerTotal === 'function') {
-                    window.startTimerTotal(30 * 60);
-                } else {
-                    // Tự chạy đồng hồ đếm ngược nếu trang web dùng biến đếm giờ riêng
-                    let timeLeft = 30 * 60;
-                    if (window.timerInterval) clearInterval(window.timerInterval);
-                    window.timerInterval = setInterval(() => {
-                        timeLeft--;
-                        let m = Math.floor(timeLeft / 60);
-                        let s = timeLeft % 60;
-                        let timerDisplay = document.getElementById('timer') || document.querySelector('.timer');
-                        if (timerDisplay) {
-                            timerDisplay.innerText = `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
-                        }
-                        if (timeLeft <= 0) {
-                            clearInterval(window.timerInterval);
-                            alert("Hết giờ làm bài!");
-                        }
-                    }, 1000);
-                }
-
-                resetBtn();
-
-            } catch (err) {
-                console.error(err);
-                alert("Lỗi xử lý dữ liệu.");
-                resetBtn();
+            // 5. Khởi tạo giao diện làm bài
+            if (typeof initQuizApp === 'function') {
+                initQuizApp(selectedQuestions);
+            } else if (typeof startQuiz === 'function') {
+                startQuiz();
             }
+
+            // 6. Ép thời gian đếm ngược chuẩn 30 phút (1800 giây)
+            if (typeof window.startTimerTotal === 'function') {
+                window.startTimerTotal(30 * 60);
+            } else {
+                let timeLeft = 30 * 60;
+                if (window.timerInterval) clearInterval(window.timerInterval);
+                window.timerInterval = setInterval(() => {
+                    timeLeft--;
+                    let m = Math.floor(timeLeft / 60);
+                    let s = timeLeft % 60;
+                    let timerDisplay = document.getElementById('timer') || document.querySelector('.timer');
+                    if (timerDisplay) {
+                        timerDisplay.innerText = `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+                    }
+                    if (timeLeft <= 0) {
+                        clearInterval(window.timerInterval);
+                    }
+                }, 1000);
+            }
+
+            resetBtn();
         });
     }
 
