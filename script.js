@@ -1822,9 +1822,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 dataList = formattedList;
             }
 
+            // Kiểm tra môn học đang được chọn trên giao diện
+            let monHocSelect = document.querySelector('select#mon-hoc, select[name="mon"], select');
+            let selectedMon = monHocSelect ? monHocSelect.value.trim().toLowerCase() : "toán";
+            let isMath = selectedMon.includes("toán") || selectedMon === "";
+
             let filteredPool = dataList.filter(q => {
                 let m = q['Môn'] || q['mon'] || "";
-                return m.toString().trim().toLowerCase() === "toán";
+                return m.toString().trim().toLowerCase() === (isMath ? "toán" : selectedMon);
             });
 
             if (filteredPool.length === 0) {
@@ -1870,9 +1875,22 @@ document.addEventListener('DOMContentLoaded', () => {
             let setupScreen = document.querySelector('.setup-screen, #setup-section, form');
             if (setupScreen) setupScreen.style.display = 'none';
 
-            // Giao diện có nút Trang chủ, Máy tính, Đúng/Sai, Đồng hồ và popup Máy tính ẩn/hiện
-            let htmlContent = `<div style="max-width: 800px; margin: 0 auto; padding: 20px; background: #f9f9f9; position: relative;">
-                
+            // Tạo thanh công cụ tuỳ thuộc vào môn học
+            let toolsHtml = `<button id="btn-home" style="background: #607d8b; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px;">🏠 Trang chủ</button>`;
+            
+            if (isMath) {
+                // Chỉ hiện nút Calculator nếu là môn Toán
+                toolsHtml += `<button id="btn-calc-toggle" style="background: #ff9800; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px;">🧮 Calculator</button>`;
+            } else {
+                // Hiện nút Tiếng Anh nếu không phải Toán
+                toolsHtml += `<button id="btn-tratru" style="background: #0288d1; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">📖 Tra từ</button>
+                              <button id="btn-dtbqt" style="background: #7b1fa2; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">📚 ĐT Bất Quy Tắc</button>`;
+            }
+
+            let htmlContent = `<div style="max-width: 800px; margin: 0 auto; padding: 20px; background: #f9f9f9; position: relative;">`;
+
+            if (isMath) {
+                htmlContent += `
                 <!-- Popup Máy tính -->
                 <div id="calc-modal" style="display: none; position: fixed; top: 80px; right: 20px; background: #333; padding: 15px; border-radius: 10px; z-index: 2000; box-shadow: 0 5px 15px rgba(0,0,0,0.3); width: 240px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
@@ -1901,16 +1919,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         <button class="calc-btn" data-val="3" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">3</button>
                         <button class="calc-btn" data-val="+" style="background: #ff9800; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">+</button>
                         
-                        <button class="calc-btn" data-val="0" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; grid-column: span 2; cursor:pointer;">0</button>
+                        <button class="calc-btn" data-val="0" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; grid-column: span 2; font-weight:bold; cursor:pointer;">0</button>
                         <button class="calc-btn" data-val="." style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">.</button>
                         <button class="calc-btn" data-val="=" style="background: #4caf50; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">=</button>
                     </div>
-                </div>
+                </div>`;
+            }
 
-                <!-- Thanh menu trên cùng -->
+            htmlContent += `
                 <div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 12px 15px; border-radius: 8px; border: 2px solid #b71c1c; margin-bottom: 20px; position: sticky; top: 10px; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex-wrap: wrap; gap: 10px;">
-                    <button id="btn-home" style="background: #607d8b; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px;">🏠 Trang chủ</button>
-                    <button id="btn-calc-toggle" style="background: #ff9800; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px;">🧮 Calculator</button>
+                    ${toolsHtml}
                     <div style="font-size: 15px; font-weight: bold; color: #333;">Đúng: <span id="count-dung" style="color: green; font-size: 18px;">0</span> | Sai: <span id="count-sai" style="color: red; font-size: 18px;">0</span></div>
                     <div style="font-size: 15px; font-weight: bold; color: #d32f2f; background: #ffebee; padding: 6px 12px; border-radius: 6px;">⏱ <span id="timer">30:00</span></div>
                 </div>
@@ -1945,33 +1963,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 location.reload();
             });
 
-            // Xử lý Bật/Tắt Máy tính
-            const calcModal = document.getElementById('calc-modal');
-            document.getElementById('btn-calc-toggle').addEventListener('click', () => {
-                calcModal.style.display = calcModal.style.display === 'none' ? 'block' : 'none';
-            });
-            document.getElementById('calc-close').addEventListener('click', () => {
-                calcModal.style.display = 'none';
-            });
-
-            // Logic tính toán cho Máy tính
-            const calcScreen = document.getElementById('calc-screen');
-            document.querySelectorAll('.calc-btn').forEach(button => {
-                button.addEventListener('click', () => {
-                    let val = button.getAttribute('data-val');
-                    if (val === 'C') {
-                        calcScreen.value = '';
-                    } else if (val === '=') {
-                        try {
-                            calcScreen.value = eval(calcScreen.value.replace(/×/g, '*').replace(/÷/g, '/'));
-                        } catch (err) {
-                            calcScreen.value = 'Lỗi';
-                        }
-                    } else {
-                        calcScreen.value += val;
-                    }
+            // Xử lý Máy tính nếu là môn Toán
+            if (isMath) {
+                const calcModal = document.getElementById('calc-modal');
+                document.getElementById('btn-calc-toggle').addEventListener('click', () => {
+                    calcModal.style.display = calcModal.style.display === 'none' ? 'block' : 'none';
                 });
-            });
+                document.getElementById('calc-close').addEventListener('click', () => {
+                    calcModal.style.display = 'none';
+                });
+
+                const calcScreen = document.getElementById('calc-screen');
+                document.querySelectorAll('.calc-btn').forEach(button => {
+                    button.addEventListener('click', () => {
+                        let val = button.getAttribute('data-val');
+                        if (val === 'C') {
+                            calcScreen.value = '';
+                        } else if (val === '=') {
+                            try {
+                                calcScreen.value = eval(calcScreen.value.replace(/×/g, '*').replace(/÷/g, '/'));
+                            } catch (err) {
+                                calcScreen.value = 'Lỗi';
+                            }
+                        } else {
+                            calcScreen.value += val;
+                        }
+                    });
+                });
+            }
 
             let scoreDung = 0;
             let scoreSai = 0;
