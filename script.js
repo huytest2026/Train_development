@@ -1,5 +1,5 @@
 // ==========================================
-// TOÀN BỘ MÃ NGUỒN HỆ THỐNG TRẮC NGHIỆM HOÀN CHỈNH & ĐỒNG BỘ
+// TOÀN BỘ MÃ NGUỒN HỆ THỐNG TRẮC NGHIỆM HOÀN CHỈNH (ĐÃ FIX LỖI PHÁT ÂM DẤU NHÁY ĐƠN)
 // ==========================================
 
 const API_URL = "https://script.google.com/macros/s/AKfycbzKhjTj95GBob8cPfSikXMUVg2S0vJ0BkEOTk2da1IY9xUFFGa8HvrM3FGLO-AJ6tvJ/exec"; // Thay thế bằng URL Google Apps Script của bạn
@@ -57,6 +57,14 @@ window.speakWord = function(text) {
     }
 };
 
+// Hàm đọc an toàn qua thuộc tính data-text (giúp không bị lỗi khi gặp dấu nháy đơn ')
+window.speakTextElement = function(buttonElement) {
+    let text = buttonElement.getAttribute('data-text');
+    if (text) {
+        window.speakWord(text);
+    }
+};
+
 window.handleBeforeUnload = function(e) {
     e.preventDefault();
     e.returnValue = '';
@@ -109,7 +117,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (typeof window.showTopicSelection === 'function') {
                             window.showTopicSelection();
                         } else {
-                            // Fallback nếu chưa định nghĩa màn hình chọn chủ đề riêng
                             window.startQuiz();
                         }
                     } else {
@@ -126,7 +133,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Hàm dự phòng nếu giao diện cần màn hình chọn chủ đề
 window.showTopicSelection = window.showTopicSelection || function() {
     let startScreen = document.getElementById('start-screen');
     if (startScreen) startScreen.style.display = 'block';
@@ -163,8 +169,13 @@ window.renderQuestions = function() {
         item._correctKeys = correctKeys;
         let isMulti = correctKeys.length > 1;
 
+        let qText = item.question || '';
+
         html += `<div class="question-card" style="background: #fff; border: 1px solid #ddd; padding: 16px; border-radius: 8px; margin-bottom: 15px;">` +
-                `<div style="font-weight: bold; margin-bottom: 10px;">Câu ${index + 1}: ${escapeHTML(item.question || '')}</div>`;
+                `<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">` +
+                    `<div style="font-weight: bold; flex: 1; padding-right: 10px;">Câu ${index + 1}: ${escapeHTML(qText)}</div>` +
+                    `<button type="button" data-text="${escapeHTML(qText)}" onclick="speakTextElement(this)" style="background: #ffc107; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.9em; white-space: nowrap;">🔊 Nghe</button>` +
+                `</div>`;
 
         if (hasOptions) {
             let options = ['a', 'b', 'c', 'd'];
@@ -347,7 +358,6 @@ window.startTimerTotal = function(durationSeconds) {
     }, 1000);
 };
 
-// Tạo Alias để tương thích với lời gọi startTimer ở phần đề tổng hợp
 window.startTimer = function(durationSeconds) {
     window.startTimerTotal(durationSeconds);
 };
