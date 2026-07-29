@@ -1787,42 +1787,34 @@ document.addEventListener('DOMContentLoaded', () => {
             e.stopPropagation();
             e.stopImmediatePropagation();
 
-            newBtn.innerText = "Đang tạo đề 21 câu...";
+            newBtn.innerText = "Đang tải và tạo đề 21 câu...";
             newBtn.disabled = true;
 
-            // 1. Tự động bấm nút tải dữ liệu gốc của trang
-            const originalLoadBtn = Array.from(document.querySelectorAll('button, .btn')).find(b => b.textContent.includes('Xác nhận Mã'));
-            if (originalLoadBtn) {
-                originalLoadBtn.click();
-            }
-
-            // 2. Chờ dữ liệu đổ về bộ nhớ
             let dataList = null;
-            for (let i = 0; i < 25; i++) {
+
+            try {
+                // Thay link Web App Google Apps Script của bạn vào đây
+                let webAppUrl = "https://script.google.com/macros/s/AKfycbzKhjTj95GBob8cPfSikXMUVg2S0vJ0BkEOTk2da1IY9xUFFGa8HvrM3FGLO-AJ6tvJ/exec"; 
+                
+                let response = await fetch(webAppUrl);
+                let result = await response.json();
+                dataList = result.questions || result.data || result;
+            } catch (err) {
+                console.log("Không tải trực tiếp được từ API, lấy từ bộ nhớ trang...");
+            }
+
+            // Nếu không dùng link trực tiếp, lấy dữ liệu từ biến của trang gốc
+            if (!dataList || dataList.length <= 1) {
                 dataList = window.questions || window.allQuestions || window.danhSachCauHoi || window.cauHoiList;
-                if (dataList && dataList.length > 1) break;
-                await new Promise(r => setTimeout(r, 200));
             }
 
             if (!dataList || dataList.length <= 1) {
-                try {
-                    for (let key of Object.keys(localStorage)) {
-                        let val = JSON.parse(localStorage.getItem(key));
-                        if (Array.isArray(val) && val.length > 1) {
-                            dataList = val;
-                            break;
-                        }
-                    }
-                } catch(err) {}
-            }
-
-            if (!dataList || dataList.length <= 1) {
-                alert("Vui lòng bấm nút 'Xác nhận Mã & Tải đề' 1 lần, sau đó bấm lại nút Tạo đề nhé!");
+                alert("Vui lòng bấm nút 'Xác nhận Mã & Tải đề' ở trên trước 1 lần, sau đó bấm lại nút Tạo đề nhé!");
                 resetBtn();
                 return;
             }
 
-            // Chuẩn hóa dữ liệu từ mảng 2 chiều sang mảng Object dựa vào dòng tiêu đề (Dòng 1)
+            // Chuẩn hóa dữ liệu từ mảng 2 chiều sang mảng Object
             if (Array.isArray(dataList[0])) {
                 let headers = dataList[0];
                 let formattedList = [];
@@ -1837,7 +1829,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 dataList = formattedList;
             }
 
-            // 3. Phân bổ đúng chuẩn 21 câu theo các chủ đề bạn yêu cầu
+            // Phân bổ đúng chuẩn 21 câu theo các chủ đề yêu cầu
             let cauHinh = {
                 'Hình học': 2,
                 'Đổi đơn vị': 6,
@@ -1865,7 +1857,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
 
-            // Nếu thiếu, tự động bù thêm câu ngẫu nhiên để luôn đủ chính xác 21 câu
+            // Bù thêm nếu thiếu để luôn đủ 21 câu
             if (selectedQuestions.length < 21) {
                 let remainingPool = dataList.filter(q => !usedIds.has(q)).sort(() => Math.random() - 0.5);
                 let neededMore = 21 - selectedQuestions.length;
@@ -1873,10 +1865,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 selectedQuestions = selectedQuestions.concat(extraPicked);
             }
 
-            // Xáo trộn ngẫu nhiên vị trí các câu hỏi
             selectedQuestions = selectedQuestions.sort(() => Math.random() - 0.5);
 
-            // 4. Ẩn màn hình cài đặt, dựng giao diện bài thi đầy đủ nội dung
+            // Ẩn màn hình cài đặt, dựng giao diện bài thi
             let setupScreen = document.querySelector('.setup-screen, #setup-section, form');
             if (setupScreen) setupScreen.style.display = 'none';
 
@@ -1884,7 +1875,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h2 style="text-align: center; color: #b71c1c; margin-bottom: 20px;">ĐỀ KIỂM TRA TỔNG HỢP TOÁN (21 CÂU - 30 PHÚT)</h2>`;
 
             selectedQuestions.forEach((q, index) => {
-                // Trỏ chuẩn xác đúng tên các cột theo file Google Sheets của bạn
                 let qText = q['Nội dung câu hỏi'] || q['Câu hỏi'] || q['question'] || "";
                 let a = q['Đáp án A'] || "";
                 let b = q['Đáp án B'] || "";
@@ -1908,7 +1898,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let containerTarget = document.querySelector('#quiz-view') || document.body;
             containerTarget.innerHTML = htmlContent;
 
-            // Xử lý nộp bài và chấm điểm
+            // Xử lý nộp bài
             document.getElementById('custom-submit-btn').addEventListener('click', () => {
                 let score = 0;
                 selectedQuestions.forEach((q, index) => {
@@ -1922,7 +1912,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 location.reload();
             });
 
-            // 5. Đồng hồ đếm ngược 30 phút
+            // Đồng hồ đếm ngược 30 phút
             let timeLeft = 30 * 60;
             if (window.timerInterval) clearInterval(window.timerInterval);
             window.timerInterval = setInterval(() => {
