@@ -1787,34 +1787,31 @@ document.addEventListener('DOMContentLoaded', () => {
             e.stopPropagation();
             e.stopImmediatePropagation();
 
-            newBtn.innerText = "Đang tải và tạo đề 21 câu...";
+            newBtn.innerText = "Đang tạo đề 21 câu...";
             newBtn.disabled = true;
 
-            let dataList = null;
+            // Lấy dữ liệu từ bộ nhớ trang web sau khi đã bấm nút tải dữ liệu
+            let dataList = window.questions || window.allQuestions || window.danhSachCauHoi || window.cauHoiList;
 
-            try {
-                // Thay link Web App Google Apps Script của bạn vào đây
-                let webAppUrl = "https://script.google.com/macros/s/AKfycbzKhjTj95GBob8cPfSikXMUVg2S0vJ0BkEOTk2da1IY9xUFFGa8HvrM3FGLO-AJ6tvJ/exec"; 
-                
-                let response = await fetch(webAppUrl);
-                let result = await response.json();
-                dataList = result.questions || result.data || result;
-            } catch (err) {
-                console.log("Không tải trực tiếp được từ API, lấy từ bộ nhớ trang...");
-            }
-
-            // Nếu không dùng link trực tiếp, lấy dữ liệu từ biến của trang gốc
             if (!dataList || dataList.length <= 1) {
-                dataList = window.questions || window.allQuestions || window.danhSachCauHoi || window.cauHoiList;
+                try {
+                    for (let key of Object.keys(localStorage)) {
+                        let val = JSON.parse(localStorage.getItem(key));
+                        if (Array.isArray(val) && val.length > 1) {
+                            dataList = val;
+                            break;
+                        }
+                    }
+                } catch(err) {}
             }
 
             if (!dataList || dataList.length <= 1) {
-                alert("Vui lòng bấm nút 'Xác nhận Mã & Tải đề' ở trên trước 1 lần, sau đó bấm lại nút Tạo đề nhé!");
+                alert("Bạn vui lòng bấm nút 'Xác nhận Mã & Tải đề' ở phía trên 1 lần trước, sau đó bấm lại nút Tạo đề nhé!");
                 resetBtn();
                 return;
             }
 
-            // Chuẩn hóa dữ liệu từ mảng 2 chiều sang mảng Object
+            // Chuẩn hóa dữ liệu nếu là mảng 2 chiều
             if (Array.isArray(dataList[0])) {
                 let headers = dataList[0];
                 let formattedList = [];
@@ -1829,7 +1826,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 dataList = formattedList;
             }
 
-            // Phân bổ đúng chuẩn 21 câu theo các chủ đề yêu cầu
+            // BẮT BUỘC LỌC CHÍNH XÁC MÔN TOÁN ĐỂ KHÔNG BỊ LẪN MÔN KHÁC
+            let filteredPool = dataList.filter(q => {
+                let m = q['Môn'] || q['mon'] || "";
+                return m.toString().trim().toLowerCase() === "toán";
+            });
+
+            if (filteredPool.length === 0) {
+                filteredPool = dataList; // Phòng hờ nếu tên cột môn khác
+            }
+
+            // Phân bổ cấu trúc chính xác 21 câu cho môn Toán
             let cauHinh = {
                 'Hình học': 2,
                 'Đổi đơn vị': 6,
@@ -1843,7 +1850,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             for (let chuDe in cauHinh) {
                 let countNeeded = cauHinh[chuDe];
-                let pool = dataList.filter(q => {
+                let pool = filteredPool.filter(q => {
                     let c = q['Chủ đề'] || q['chuDe'] || q['topic'] || "";
                     return c.toString().trim().toLowerCase() === chuDe.toLowerCase();
                 });
@@ -1857,9 +1864,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
 
-            // Bù thêm nếu thiếu để luôn đủ 21 câu
+            // Tự động bù thêm nếu chủ đề nào thiếu để luôn đủ 21 câu (chỉ lấy trong kho Toán)
             if (selectedQuestions.length < 21) {
-                let remainingPool = dataList.filter(q => !usedIds.has(q)).sort(() => Math.random() - 0.5);
+                let remainingPool = filteredPool.filter(q => !usedIds.has(q)).sort(() => Math.random() - 0.5);
                 let neededMore = 21 - selectedQuestions.length;
                 let extraPicked = remainingPool.slice(0, neededMore);
                 selectedQuestions = selectedQuestions.concat(extraPicked);
@@ -1867,7 +1874,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             selectedQuestions = selectedQuestions.sort(() => Math.random() - 0.5);
 
-            // Ẩn màn hình cài đặt, dựng giao diện bài thi
+            // Ẩn màn hình cài đặt, dựng giao diện làm bài
             let setupScreen = document.querySelector('.setup-screen, #setup-section, form');
             if (setupScreen) setupScreen.style.display = 'none';
 
