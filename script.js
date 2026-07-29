@@ -1787,16 +1787,16 @@ document.addEventListener('DOMContentLoaded', () => {
             e.stopPropagation();
             e.stopImmediatePropagation();
 
-            newBtn.innerText = "Đang tải dữ liệu từ trang...";
+            newBtn.innerText = "Đang tạo đề 21 câu...";
             newBtn.disabled = true;
 
-            // 1. Tự động bấm nút "Xác nhận Mã & Tải đề" gốc của trang web
+            // 1. Tự động bấm nút tải dữ liệu gốc của trang
             const originalLoadBtn = Array.from(document.querySelectorAll('button, .btn')).find(b => b.textContent.includes('Xác nhận Mã'));
             if (originalLoadBtn) {
                 originalLoadBtn.click();
             }
 
-            // 2. Chờ dữ liệu đổ vào bộ nhớ trình duyệt (kiểm tra liên tục trong 10 giây)
+            // 2. Chờ dữ liệu đổ về bộ nhớ
             let dataList = null;
             for (let i = 0; i < 35; i++) {
                 dataList = window.questions || window.allQuestions || window.danhSachCauHoi || window.cauHoiList;
@@ -1804,7 +1804,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 await new Promise(r => setTimeout(r, 300));
             }
 
-            // Nếu vẫn chưa có trong biến toàn cục, quét trong localStorage
             if (!dataList || dataList.length <= 1) {
                 try {
                     for (let key of Object.keys(localStorage)) {
@@ -1818,12 +1817,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (!dataList || dataList.length <= 1) {
-                alert("Không thể lấy được dữ liệu. Bạn hãy thử bấm nút 'Xác nhận Mã & Tải đề' thủ công 1 lần, sau đó bấm lại nút Tạo đề nhé!");
+                alert("Vui lòng bấm nút 'Xác nhận Mã & Tải đề' 1 lần, sau đó bấm lại nút Tạo đề nhé!");
                 resetBtn();
                 return;
             }
 
-            // Chuyển đổi mảng 2 chiều sang mảng Object nếu cần
             if (Array.isArray(dataList[0])) {
                 let headers = dataList[0];
                 let formattedList = [];
@@ -1869,10 +1867,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             selectedQuestions = (typeof shuffleArray === 'function') ? shuffleArray(selectedQuestions) : selectedQuestions.sort(() => Math.random() - 0.5);
 
-            // Cập nhật biến toàn cục
+            // Lưu vào biến toàn cục
             window.currentQuestions = selectedQuestions;
             window.questions = selectedQuestions;
-            if (window.quizData) window.quizData.questions = selectedQuestions;
 
             // Chuyển giao diện sang môn Toán
             const selectMonHoc = document.getElementById('subject-select');
@@ -1881,7 +1878,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 selectMonHoc.dispatchEvent(new Event('change'));
             }
 
-            // Bật máy tính, ẩn các nút không cần thiết
+            // Bật máy tính, ẩn các nút khác
             const btnCalc = document.getElementById('btn-calc');
             const btnDict = document.getElementById('btn-dict');
             const btnVerbs = document.getElementById('btn-verbs');
@@ -1889,41 +1886,84 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btnDict) btnDict.style.display = 'none';
             if (btnVerbs) btnVerbs.style.display = 'none';
 
-            // 4. Khởi tạo giao diện bài làm
-            if (typeof initQuizApp === 'function') {
-                initQuizApp(selectedQuestions);
-            } else if (typeof startQuiz === 'function') {
+            // 4. Kích hoạt giao diện làm bài của trang (nếu có thể)
+            if (typeof startQuiz === 'function') {
                 startQuiz();
             }
 
-            // Ép hiển thị toàn bộ các câu hỏi
+            // 5. TỰ TẠO VÀ RENDER TRỰC TIẾP ĐỦ 21 CÂU HỎI LÊN MÀN HÌNH BẤT CHẤP HÀM GỐC CỦA TRANG
             setTimeout(() => {
-                let allQElements = document.querySelectorAll('.question-container, .quiz-question, [id^="question"], .question-item');
-                allQElements.forEach(el => {
-                    el.style.display = 'block';
-                    el.style.visibility = 'visible';
+                // Tìm vùng chứa nội dung câu hỏi trên trang
+                let quizArea = document.querySelector('#quiz-content, .quiz-container, .question-box-wrapper, main, .container') || document.body;
+                
+                // Ẩn màn hình chọn đề, hiện màn hình làm bài
+                let setupScreen = document.querySelector('.setup-screen, #setup-section, form');
+                if (setupScreen) setupScreen.style.display = 'none';
+
+                let quizScreen = document.querySelector('.quiz-screen, #quiz-section, .quiz-wrapper');
+                if (quizScreen) quizScreen.style.display = 'block';
+
+                // Xây dựng giao diện hiển thị đủ 21 câu hỏi
+                let htmlContent = `<div style="max-width: 800px; margin: 0 auto; padding: 20px;">
+                    <h2 style="text-align: center; color: #b71c1c; margin-bottom: 20px;">ĐỀ KIỂM TRA TỔNG HỢP TOÁN (21 CÂU - 30 PHÚT)</h2>`;
+
+                selectedQuestions.forEach((q, index) => {
+                    let qText = q['Câu hỏi'] || q['question'] || q['Nội dung'] || "";
+                    let a = q['Đáp án A'] || q['A'] || "";
+                    let b = q['Đáp án B'] || q['B'] || "";
+                    let c = q['Đáp án C'] || q['C'] || "";
+                    let d = q['Đáp án D'] || q['D'] || "";
+
+                    htmlContent += `
+                        <div class="custom-q-card" data-index="${index}" style="background: white; border: 2px solid #dcdcdc; border-radius: 8px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                            <p style="font-weight: bold; font-size: 16px; color: #333;">Câu ${index + 1}: ${qText}</p>
+                            <div style="margin-left: 15px;">
+                                <label style="display: block; margin: 8px 0; cursor: pointer;"><input type="radio" name="question_${index}" value="A"> A. ${a}</label>
+                                <label style="display: block; margin: 8px 0; cursor: pointer;"><input type="radio" name="question_${index}" value="B"> B. ${b}</label>
+                                <label style="display: block; margin: 8px 0; cursor: pointer;"><input type="radio" name="question_${index}" value="C"> C. ${c}</label>
+                                <label style="display: block; margin: 8px 0; cursor: pointer;"><input type="radio" name="question_${index}" value="D"> D. ${d}</label>
+                            </div>
+                        </div>`;
+                });
+
+                htmlContent += `<button id="custom-submit-btn" style="display: block; width: 100%; padding: 12px; background: #2e7d32; color: white; font-size: 18px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 20px;">Nộp bài</button></div>`;
+
+                // Chèn vào trang
+                let containerTarget = document.querySelector('#quiz-view') || document.body;
+                containerTarget.innerHTML = htmlContent;
+
+                // Xử lý sự kiện nút Nộp bài tùy chỉnh
+                document.getElementById('custom-submit-btn').addEventListener('click', () => {
+                    let score = 0;
+                    selectedQuestions.forEach((q, index) => {
+                        let selectedOption = document.querySelector(`input[name="question_${index}"]:checked`);
+                        let correctAns = (q['Đáp án đúng'] || q['correct'] || "").trim().toUpperCase();
+                        if (selectedOption && selectedOption.value === correctAns) {
+                            score++;
+                        }
+                    });
+                    alert(`Bạn đã hoàn thành bài thi! Số câu đúng: ${score}/21 câu.`);
+                    location.reload();
                 });
             }, 300);
 
-            // 5. Cố định thời gian chuẩn 30 phút (1800 giây)
-            if (typeof window.startTimerTotal === 'function') {
-                window.startTimerTotal(30 * 60);
-            } else {
-                let timeLeft = 30 * 60;
-                if (window.timerInterval) clearInterval(window.timerInterval);
-                window.timerInterval = setInterval(() => {
-                    timeLeft--;
-                    let m = Math.floor(timeLeft / 60);
-                    let s = timeLeft % 60;
-                    let timerDisplay = document.getElementById('timer') || document.querySelector('.timer');
-                    if (timerDisplay) {
-                        timerDisplay.innerText = `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
-                    }
-                    if (timeLeft <= 0) {
-                        clearInterval(window.timerInterval);
-                    }
-                }, 1000);
-            }
+            // 6. Cố định thời gian chuẩn 30 phút (1800 giây) đếm ngược
+            let timeLeft = 30 * 60;
+            if (window.timerInterval) clearInterval(window.timerInterval);
+            window.timerInterval = setInterval(() => {
+                timeLeft--;
+                let m = Math.floor(timeLeft / 60);
+                let s = timeLeft % 60;
+                let timerDisplay = document.getElementById('timer') || document.querySelector('.timer');
+                if (timerDisplay) {
+                    timerDisplay.innerText = `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+                }
+                if (timeLeft <= 0) {
+                    clearInterval(window.timerInterval);
+                    alert("Hết thời gian làm bài!");
+                    document.getElementById('custom-submit-btn')?.click();
+                }
+            }, 1000);
 
             resetBtn();
         });
