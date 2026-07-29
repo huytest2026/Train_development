@@ -1775,3 +1775,70 @@ window.calcCalculate = function() {
         display.value = 'Lỗi';
     }
 };
+// Gắn sự kiện cho nút "Tạo đề tổng hợp (30 phút - 22 câu)"
+document.addEventListener('DOMContentLoaded', () => {
+    const btnTaoDeToan = document.getElementById('btn-tao-de-toan'); // Thay id này bằng id thực tế của nút trong HTML của bạn nếu khác
+    
+    if (btnTaoDeToan) {
+        btnTaoDeToan.addEventListener('click', function() {
+            // 1. Kiểm tra xem người dùng đã chọn môn Toán chưa
+            const selectMonHoc = document.getElementById('mon-hoc') || document.querySelector('select[name="monHoc"]');
+            if (selectMonHoc && selectMonHoc.value !== 'Toán' && selectMonHoc.value !== 'Toan') {
+                alert("Vui lòng chọn môn Toán trước khi sử dụng tính năng này!");
+                return;
+            }
+
+            // 2. Kiểm tra xem dữ liệu gốc của môn Toán đã được tải về chưa
+            if (!window.allQuizData || window.allQuizData.length === 0) {
+                alert("Đang tải dữ liệu, vui lòng đợi trong giây lát rồi thử lại!");
+                return;
+            }
+
+            // 3. Lọc câu hỏi theo đúng số lượng yêu cầu cho từng chủ đề môn Toán
+            let cauHinh = {
+                'Hình học': 2,
+                'Đổi đơn vị': 6,
+                'Phân số': 4,
+                'Phép tính số thập phân': 4,
+                'So sánh phân số': 6
+            };
+
+            let selectedQuestions = [];
+
+            for (let chuDe in cauHinh) {
+                let countNeeded = cauHinh[chuDe];
+                // Lọc các câu thuộc chủ đề tương ứng (có thể điều chỉnh điều kiện lọc chuDe cho khớp với data của bạn)
+                let pool = window.allQuizData.filter(q => 
+                    q.chuDe && q.chuDe.trim().toLowerCase() === chuDe.toLowerCase()
+                );
+
+                // Xáo trộn ngẫu nhiên kho câu hỏi của chủ đề đó
+                pool = shuffleArray(pool);
+
+                // Lấy đủ số lượng yêu cầu
+                let picked = pool.slice(0, countNeeded);
+                selectedQuestions = selectedQuestions.concat(picked);
+            }
+
+            if (selectedQuestions.length === 0) {
+                alert("Không tìm thấy dữ liệu câu hỏi phù hợp cho môn Toán!");
+                return;
+            }
+
+            // Xáo trộn toàn bộ danh sách 22 câu vừa gom được để đề thi ngẫu nhiên thứ tự
+            selectedQuestions = shuffleArray(selectedQuestions);
+
+            // 4. Bỏ qua bước nhập mã học sinh, vào thẳng màn hình làm bài ngay lập tức
+            if (typeof initQuizApp === 'function') {
+                initQuizApp(selectedQuestions);
+                
+                // Đặt thời gian làm bài là 30 phút (30 * 60 giây)
+                if (typeof window.startTimerTotal === 'function') {
+                    window.startTimerTotal(30 * 60);
+                }
+            } else {
+                console.error("Không tìm thấy hàm initQuizApp!");
+            }
+        });
+    }
+});
