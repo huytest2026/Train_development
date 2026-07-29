@@ -1813,7 +1813,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (!webAppUrl) {
-                    webAppUrl = "ĐIỀN_LINK_WEB_APP_CỦA_BẠN_VÀO_ĐÂY"; 
+                    webAppUrl = "https://script.google.com/macros/s/AKfycbzKhjTj95GBob8cPfSikXMUVg2S0vJ0BkEOTk2da1IY9xUFFGa8HvrM3FGLO-AJ6tvJ/exec"; 
                 }
 
                 // 2. Tải dữ liệu từ Google Sheets
