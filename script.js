@@ -1870,10 +1870,47 @@ document.addEventListener('DOMContentLoaded', () => {
             let setupScreen = document.querySelector('.setup-screen, #setup-section, form');
             if (setupScreen) setupScreen.style.display = 'none';
 
-            // Giao diện gồm nút Trang chủ, Đồng hồ, Bộ đếm Đúng/Sai
-            let htmlContent = `<div style="max-width: 800px; margin: 0 auto; padding: 20px; background: #f9f9f9;">
+            // Giao diện có nút Trang chủ, Máy tính, Đúng/Sai, Đồng hồ và popup Máy tính ẩn/hiện
+            let htmlContent = `<div style="max-width: 800px; margin: 0 auto; padding: 20px; background: #f9f9f9; position: relative;">
+                
+                <!-- Popup Máy tính -->
+                <div id="calc-modal" style="display: none; position: fixed; top: 80px; right: 20px; background: #333; padding: 15px; border-radius: 10px; z-index: 2000; box-shadow: 0 5px 15px rgba(0,0,0,0.3); width: 240px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <span style="color: white; font-weight: bold; font-size: 14px;">Máy tính</span>
+                        <button id="calc-close" style="background: red; color: white; border: none; border-radius: 3px; cursor: pointer; padding: 2px 6px;">✕</button>
+                    </div>
+                    <input type="text" id="calc-screen" readonly style="width: 100%; height: 35px; background: #fff; text-align: right; font-size: 18px; padding: 5px; margin-bottom: 10px; box-sizing: border-box; border-radius: 4px; border: none;" value="">
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px;">
+                        <button class="calc-btn" data-val="C" style="background: #d32f2f; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">C</button>
+                        <button class="calc-btn" data-val="(" style="background: #555; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">(</button>
+                        <button class="calc-btn" data-val=")" style="background: #555; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">)</button>
+                        <button class="calc-btn" data-val="/" style="background: #ff9800; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">÷</button>
+                        
+                        <button class="calc-btn" data-val="7" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">7</button>
+                        <button class="calc-btn" data-val="8" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">8</button>
+                        <button class="calc-btn" data-val="9" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">9</button>
+                        <button class="calc-btn" data-val="*" style="background: #ff9800; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">×</button>
+                        
+                        <button class="calc-btn" data-val="4" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">4</button>
+                        <button class="calc-btn" data-val="5" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">5</button>
+                        <button class="calc-btn" data-val="6" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">6</button>
+                        <button class="calc-btn" data-val="-" style="background: #ff9800; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">-</button>
+                        
+                        <button class="calc-btn" data-val="1" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">1</button>
+                        <button class="calc-btn" data-val="2" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">2</button>
+                        <button class="calc-btn" data-val="3" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">3</button>
+                        <button class="calc-btn" data-val="+" style="background: #ff9800; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">+</button>
+                        
+                        <button class="calc-btn" data-val="0" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; grid-column: span 2; cursor:pointer;">0</button>
+                        <button class="calc-btn" data-val="." style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">.</button>
+                        <button class="calc-btn" data-val="=" style="background: #4caf50; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">=</button>
+                    </div>
+                </div>
+
+                <!-- Thanh menu trên cùng -->
                 <div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 12px 15px; border-radius: 8px; border: 2px solid #b71c1c; margin-bottom: 20px; position: sticky; top: 10px; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex-wrap: wrap; gap: 10px;">
                     <button id="btn-home" style="background: #607d8b; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px;">🏠 Trang chủ</button>
+                    <button id="btn-calc-toggle" style="background: #ff9800; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px;">🧮 Calculator</button>
                     <div style="font-size: 15px; font-weight: bold; color: #333;">Đúng: <span id="count-dung" style="color: green; font-size: 18px;">0</span> | Sai: <span id="count-sai" style="color: red; font-size: 18px;">0</span></div>
                     <div style="font-size: 15px; font-weight: bold; color: #d32f2f; background: #ffebee; padding: 6px 12px; border-radius: 6px;">⏱ <span id="timer">30:00</span></div>
                 </div>
@@ -1908,10 +1945,38 @@ document.addEventListener('DOMContentLoaded', () => {
                 location.reload();
             });
 
+            // Xử lý Bật/Tắt Máy tính
+            const calcModal = document.getElementById('calc-modal');
+            document.getElementById('btn-calc-toggle').addEventListener('click', () => {
+                calcModal.style.display = calcModal.style.display === 'none' ? 'block' : 'none';
+            });
+            document.getElementById('calc-close').addEventListener('click', () => {
+                calcModal.style.display = 'none';
+            });
+
+            // Logic tính toán cho Máy tính
+            const calcScreen = document.getElementById('calc-screen');
+            document.querySelectorAll('.calc-btn').forEach(button => {
+                button.addEventListener('click', () => {
+                    let val = button.getAttribute('data-val');
+                    if (val === 'C') {
+                        calcScreen.value = '';
+                    } else if (val === '=') {
+                        try {
+                            calcScreen.value = eval(calcScreen.value.replace(/×/g, '*').replace(/÷/g, '/'));
+                        } catch (err) {
+                            calcScreen.value = 'Lỗi';
+                        }
+                    } else {
+                        calcScreen.value += val;
+                    }
+                });
+            });
+
             let scoreDung = 0;
             let scoreSai = 0;
 
-            // Xử lý chọn đáp án (Khóa, tô màu, đếm đúng/sai trực tiếp)
+            // Xử lý chọn đáp án
             selectedQuestions.forEach((q, index) => {
                 let correctAns = (q['Đáp án đúng'] || "").toString().trim().toUpperCase();
                 let radios = document.querySelectorAll(`input[name="question_${index}"]`);
@@ -1945,7 +2010,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
 
-            // Xử lý nút nộp bài tổng kết
+            // Xử lý nút nộp bài
             document.getElementById('custom-submit-btn').addEventListener('click', () => {
                 if (window.timerInterval) clearInterval(window.timerInterval);
                 alert(`Bạn đã hoàn thành bài thi!\n- Số câu đúng: ${scoreDung}\n- Số câu sai: ${scoreSai}`);
