@@ -1787,44 +1787,29 @@ document.addEventListener('DOMContentLoaded', () => {
             e.stopPropagation();
             e.stopImmediatePropagation();
 
-            newBtn.innerText = "Đang lấy dữ liệu từ trang...";
+            newBtn.innerText = "Đang tạo đề 21 câu (30 phút)...";
             newBtn.disabled = true;
 
-            // 1. Tự động bấm nút "Xác nhận Mã & Tải đề" của trang web gốc để kích hoạt cơ chế tải chuẩn của họ
+            // 1. Kích hoạt nút tải dữ liệu gốc để nạp dữ liệu câu hỏi vào bộ nhớ
             const originalLoadBtn = Array.from(document.querySelectorAll('button, .btn')).find(b => b.textContent.includes('Xác nhận Mã'));
             if (originalLoadBtn) {
                 originalLoadBtn.click();
             }
 
-            // 2. Chờ dữ liệu đổ về bộ nhớ trình duyệt (kiểm tra liên tục trong tối đa 10 giây)
+            // 2. Chờ dữ liệu câu hỏi sẵn sàng
             let dataList = null;
             for (let i = 0; i < 30; i++) {
-                // Kiểm tra các biến toàn cục phổ biến mà mã nguồn gốc thường dùng để chứa câu hỏi
                 dataList = window.questions || window.allQuestions || window.danhSachCauHoi || window.cauHoiList;
                 if (dataList && dataList.length > 1) break;
                 await new Promise(r => setTimeout(r, 300));
             }
 
-            // Nếu vẫn chưa có, thử lấy từ localStorage hoặc sessionStorage nếu trang web lưu ở đó
             if (!dataList || dataList.length <= 1) {
-                try {
-                    for (let key of Object.keys(localStorage)) {
-                        let val = JSON.parse(localStorage.getItem(key));
-                        if (Array.isArray(val) && val.length > 1) {
-                            dataList = val;
-                            break;
-                        }
-                    }
-                } catch(err) {}
-            }
-
-            if (!dataList || dataList.length <= 1) {
-                alert("Vui lòng bấm nút 'Xác nhận Mã & Tải đề' thủ công 1 lần trước, sau đó mới bấm nút Tạo đề tổng hợp nhé!");
+                alert("Vui lòng bấm 'Xác nhận Mã & Tải đề' 1 lần trước khi bấm Tạo đề nhé!");
                 resetBtn();
                 return;
             }
 
-            // Chuyển đổi nếu dữ liệu là mảng 2 chiều
             if (Array.isArray(dataList[0])) {
                 let headers = dataList[0];
                 let formattedList = [];
@@ -1839,7 +1824,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 dataList = formattedList;
             }
 
-            // 3. Lọc đúng chuẩn cấu hình 21 câu hỏi Toán
+            // 3. Lọc chính xác chuẩn 21 câu theo đúng phân bổ chủ đề yêu cầu
             let cauHinh = {
                 'Hình học': 2,
                 'Đổi đơn vị': 6,
@@ -1868,20 +1853,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            // Xáo trộn thứ tự các câu trong đề
             selectedQuestions = (typeof shuffleArray === 'function') ? shuffleArray(selectedQuestions) : selectedQuestions.sort(() => Math.random() - 0.5);
 
-            // 4. Gán danh sách câu hỏi vào hệ thống hiển thị của trang
+            // Cập nhật biến toàn cục
             window.currentQuestions = selectedQuestions;
             window.questions = selectedQuestions;
 
-            // Đổi môn học trên giao diện thành Toán
+            // Chuyển giao diện sang môn Toán
             const selectMonHoc = document.getElementById('subject-select');
             if (selectMonHoc) {
                 selectMonHoc.value = "Toán";
                 selectMonHoc.dispatchEvent(new Event('change'));
             }
 
-            // Bật máy tính, ẩn các nút không liên quan
+            // Bật máy tính, ẩn các nút không cần thiết
             const btnCalc = document.getElementById('btn-calc');
             const btnDict = document.getElementById('btn-dict');
             const btnVerbs = document.getElementById('btn-verbs');
@@ -1889,14 +1875,35 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btnDict) btnDict.style.display = 'none';
             if (btnVerbs) btnVerbs.style.display = 'none';
 
-            // 5. Khởi tạo giao diện làm bài
+            // 4. Gọi hàm khởi tạo giao diện quiz của trang gốc (nếu có)
             if (typeof initQuizApp === 'function') {
                 initQuizApp(selectedQuestions);
             } else if (typeof startQuiz === 'function') {
                 startQuiz();
             }
 
-            // 6. Ép thời gian đếm ngược chuẩn 30 phút (1800 giây)
+            // 5. TỰ TẠO VÀ RENDER GIAO DIỆN HIỂN THỊ ĐỦ 21 CÂU NẾU TRANG GỐC BỊ GIỚI HẠN 10 CÂU
+            setTimeout(() => {
+                let quizContainer = document.querySelector('#quiz-container, .quiz-content, .questions-wrapper') || document.body;
+                
+                // Kiểm tra xem trang có đang hiển thị đủ số lượng câu không, nếu không ta tự render bổ sung hoặc ép hiển thị
+                let renderedItems = document.querySelectorAll('.question-container, .quiz-question, [id^="question"]');
+                
+                if (renderedItems.length < 21 && typeof renderQuestions === 'function') {
+                    try {
+                        renderQuestions(selectedQuestions);
+                    } catch(err) {}
+                }
+
+                // Ép hiển thị toàn bộ các thẻ câu hỏi trên trang
+                let allQElements = document.querySelectorAll('.question-container, .quiz-question, [id^="question"], .question-item');
+                allQElements.forEach((el, index) => {
+                    el.style.display = 'block';
+                    el.style.visibility = 'visible';
+                });
+            }, 400);
+
+            // 6. Cố định thời gian chuẩn 30 phút (1800 giây)
             if (typeof window.startTimerTotal === 'function') {
                 window.startTimerTotal(30 * 60);
             } else {
