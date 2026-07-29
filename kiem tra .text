@@ -1,8 +1,8 @@
 // ==========================================
-// TOÀN BỘ MÃ NGUỒN HỆ THỐNG TRẮC NGHIỆM HOÀN CHỈNH
+// TOÀN BỘ MÃ NGUỒN HỆ THỐNG TRẮC NGHIỆM HOÀN CHỈNH & ĐỒNG BỘ
 // ==========================================
 
-const API_URL = "YOUR_GOOGLE_APPS_SCRIPT_API_URL_HERE"; // Thay thế bằng URL Google Apps Script của bạn
+const API_URL = "https://script.google.com/macros/s/AKfycbzKhjTj95GBob8cPfSikXMUVg2S0vJ0BkEOTk2da1IY9xUFFGa8HvrM3FGLO-AJ6tvJ/exec"; // Thay thế bằng URL Google Apps Script của bạn
 
 window.AppState = window.AppState || {
     currentQuizData: [],
@@ -108,6 +108,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         alert(`Đã tải thành công ${data.length} câu hỏi!`);
                         if (typeof window.showTopicSelection === 'function') {
                             window.showTopicSelection();
+                        } else {
+                            // Fallback nếu chưa định nghĩa màn hình chọn chủ đề riêng
+                            window.startQuiz();
                         }
                     } else {
                         alert('Không có dữ liệu câu hỏi cho môn này.');
@@ -123,6 +126,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// Hàm dự phòng nếu giao diện cần màn hình chọn chủ đề
+window.showTopicSelection = window.showTopicSelection || function() {
+    let startScreen = document.getElementById('start-screen');
+    if (startScreen) startScreen.style.display = 'block';
+};
+
 // ==========================================
 // 3. HIỂN THỊ CÂU HỎI & XỬ LÝ LỰA CHỌN
 // ==========================================
@@ -137,6 +146,10 @@ window.startQuiz = function() {
         window.startTimerTotal(15 * 60);
     }
     window.addEventListener('beforeunload', handleBeforeUnload);
+};
+
+window.startQuizWithToolCheck = window.startQuizWithToolCheck || function() {
+    window.startQuiz();
 };
 
 window.renderQuestions = function() {
@@ -315,10 +328,12 @@ document.addEventListener('touchend', function() {
 window.startTimerTotal = function(durationSeconds) {
     clearInterval(AppState.timerInterval);
     let remainingTime = durationSeconds;
+    AppState.timeLeft = durationSeconds;
     const timerDisplay = document.getElementById('timer-display');
     
     AppState.timerInterval = setInterval(() => {
         remainingTime--;
+        AppState.timeLeft = remainingTime;
         let minutes = Math.floor(remainingTime / 60);
         let seconds = remainingTime % 60;
         if (timerDisplay) {
@@ -330,6 +345,11 @@ window.startTimerTotal = function(durationSeconds) {
             window.submitQuiz();
         }
     }, 1000);
+};
+
+// Tạo Alias để tương thích với lời gọi startTimer ở phần đề tổng hợp
+window.startTimer = function(durationSeconds) {
+    window.startTimerTotal(durationSeconds);
 };
 
 window.submitQuiz = function() {
