@@ -1776,7 +1776,7 @@ window.calcCalculate = function() {
     }
 };
 //--------------------------------------------------------
- document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => {
     const btnTaoDeToan = document.getElementById('btn-tao-de-toan');
     
     if (btnTaoDeToan) {
@@ -1795,13 +1795,11 @@ window.calcCalculate = function() {
             }
 
             try {
-                newBtn.innerText = "Đang tải dữ liệu từ Google Sheets...";
+                newBtn.innerText = "Đang tạo đúng 21 câu (30 phút)...";
                 newBtn.disabled = true;
 
-                // Tự động tìm link Web App đang được cấu hình trong trang gốc
                 let webAppUrl = window.WEB_APP_URL || window.scriptUrl || window.API_URL || "";
                 
-                // Nếu chưa tìm thấy qua biến, quét trong toàn bộ các thẻ script của trang web
                 if (!webAppUrl) {
                     const scripts = document.querySelectorAll('script');
                     for (let s of scripts) {
@@ -1814,18 +1812,11 @@ window.calcCalculate = function() {
                     }
                 }
 
-                // Nếu vẫn không tìm thấy, hãy dán cứng link Web App của bạn vào đây trong ngoặc kép
                 if (!webAppUrl) {
-                    webAppUrl = "https://script.google.com/macros/s/AKfycbzKhjTj95GBob8cPfSikXMUVg2S0vJ0BkEOTk2da1IY9xUFFGa8HvrM3FGLO-AJ6tvJ/exec"; 
+                    webAppUrl = "ĐIỀN_LINK_WEB_APP_CỦA_BẠN_VÀO_ĐÂY"; 
                 }
 
-                if (!webAppUrl || webAppUrl.includes("ĐIỀN_LINK")) {
-                    alert("Không tìm thấy URL Google Apps Script. Vui lòng kiểm tra lại mã nguồn.");
-                    resetBtn();
-                    return;
-                }
-
-                // 2. Fetch dữ liệu trực tiếp từ Google Sheets
+                // 2. Tải dữ liệu từ Google Sheets
                 let response = await fetch(webAppUrl);
                 let result = await response.json();
                 let rawList = result.questions || result.data || result;
@@ -1836,7 +1827,6 @@ window.calcCalculate = function() {
                     return;
                 }
 
-                // Chuyển đổi dữ liệu từ mảng 2 chiều sang danh sách Object
                 let headers = rawList[0];
                 let dataList = [];
                 for (let i = 1; i < rawList.length; i++) {
@@ -1848,7 +1838,7 @@ window.calcCalculate = function() {
                     dataList.push(obj);
                 }
 
-                // 3. Cấu hình đúng chuẩn 21 câu hỏi theo yêu cầu của bạn
+                // 3. Lọc đúng chuẩn cấu hình 21 câu
                 let cauHinh = {
                     'Hình học': 2,
                     'Đổi đơn vị': 6,
@@ -1877,10 +1867,14 @@ window.calcCalculate = function() {
                     return;
                 }
 
-                // Xáo trộn tổng thể danh sách câu hỏi
                 selectedQuestions = (typeof shuffleArray === 'function') ? shuffleArray(selectedQuestions) : selectedQuestions.sort(() => Math.random() - 0.5);
 
-                // Bật máy tính cho môn Toán, ẩn các nút không cần thiết
+                // 4. Lưu trực tiếp danh sách câu hỏi vào biến toàn cục của trang để các hàm hiển thị đọc đúng danh sách này
+                window.currentQuestions = selectedQuestions;
+                window.questions = selectedQuestions;
+                if (window.quizData) window.quizData.questions = selectedQuestions;
+
+                // Bật máy tính, ẩn các nút không liên quan
                 const btnCalc = document.getElementById('btn-calc');
                 const btnDict = document.getElementById('btn-dict');
                 const btnVerbs = document.getElementById('btn-verbs');
@@ -1888,23 +1882,47 @@ window.calcCalculate = function() {
                 if (btnDict) btnDict.style.display = 'none';
                 if (btnVerbs) btnVerbs.style.display = 'none';
 
-                // Khởi tạo giao diện làm bài và chạy đồng hồ đếm ngược 30 phút
+                // 5. Kích hoạt giao diện làm bài
                 if (typeof initQuizApp === 'function') {
+                    // Thử gọi initQuizApp, nếu hàm này có cơ chế tự load lại thì ta ghi đè biến toàn cục trước đó
                     initQuizApp(selectedQuestions);
-                    if (typeof window.startTimerTotal === 'function') {
-                        window.startTimerTotal(30 * 60);
-                    }
                 } else if (typeof startQuiz === 'function') {
                     startQuiz();
+                }
+
+                // Đảm bảo ép hiển thị toàn bộ các câu hỏi thay vì bị cắt trang (pagination nếu có)
+                setTimeout(() => {
+                    let questionContainers = document.querySelectorAll('.question-container, .quiz-question, [id^="question"]');
+                    questionContainers.forEach(el => el.style.display = 'block');
+                }, 200);
+
+                // 6. Cố định thời gian chuẩn 30 phút (1800 giây) và ép đồng hồ chạy đúng
+                if (typeof window.startTimerTotal === 'function') {
+                    window.startTimerTotal(30 * 60);
                 } else {
-                    alert("Đã tạo đề thành công nhưng thiếu hàm khởi tạo giao diện quiz.");
+                    // Tự chạy đồng hồ đếm ngược nếu trang web dùng biến đếm giờ riêng
+                    let timeLeft = 30 * 60;
+                    if (window.timerInterval) clearInterval(window.timerInterval);
+                    window.timerInterval = setInterval(() => {
+                        timeLeft--;
+                        let m = Math.floor(timeLeft / 60);
+                        let s = timeLeft % 60;
+                        let timerDisplay = document.getElementById('timer') || document.querySelector('.timer');
+                        if (timerDisplay) {
+                            timerDisplay.innerText = `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+                        }
+                        if (timeLeft <= 0) {
+                            clearInterval(window.timerInterval);
+                            alert("Hết giờ làm bài!");
+                        }
+                    }, 1000);
                 }
 
                 resetBtn();
 
             } catch (err) {
                 console.error(err);
-                alert("Lỗi kết nối hoặc phân tích dữ liệu từ Google Sheets.");
+                alert("Lỗi xử lý dữ liệu.");
                 resetBtn();
             }
         });
