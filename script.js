@@ -1870,7 +1870,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let setupScreen = document.querySelector('.setup-screen, #setup-section, form');
             if (setupScreen) setupScreen.style.display = 'none';
 
-            // Chỉ tạo thanh công cụ sạch sẽ gồm: Máy tính và Trang chủ (KHÔNG CÓ TRA TỪ HAY ĐT BQT)
+            // Giao diện đầy đủ thanh công cụ: Tra từ, ĐT Bất Quy Tắc, Máy tính, Trang chủ
             let htmlContent = `<div style="max-width: 800px; margin: 0 auto; padding: 20px; background: #f9f9f9; position: relative;">
                 
                 <!-- Popup Máy tính -->
@@ -1907,10 +1907,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
 
-                <!-- Thanh tiêu đề chuẩn cho môn Toán -->
+                <!-- Thanh tiêu đề tích hợp đầy đủ công cụ -->
                 <div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 12px 15px; border-radius: 8px; border: 2px solid #b71c1c; margin-bottom: 20px; position: sticky; top: 10px; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex-wrap: wrap; gap: 10px;">
-                    <button id="btn-home" style="background: #607d8b; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px;">🏠 Trang chủ</button>
-                    <button id="btn-calc-toggle" style="background: #ff9800; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px;">🧮 Calculator</button>
+                    <button id="btn-tratru" style="background: #0288d1; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">📖 Tra từ</button>
+                    <button id="btn-dtbqt" style="background: #7b1fa2; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">📚 ĐT Bất Quy Tắc</button>
+                    <button id="btn-calc-toggle" style="background: #ff9800; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">🧮 Calculator</button>
+                    <button id="btn-home" style="background: #607d8b; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">🏠 Trang chủ</button>
                     <div style="font-size: 15px; font-weight: bold; color: #333;">Đúng: <span id="count-dung" style="color: green; font-size: 18px;">0</span> | Sai: <span id="count-sai" style="color: red; font-size: 18px;">0</span></div>
                     <div style="font-size: 15px; font-weight: bold; color: #d32f2f; background: #ffebee; padding: 6px 12px; border-radius: 6px;">⏱ <span id="timer">30:00</span></div>
                 </div>
@@ -1940,17 +1942,20 @@ document.addEventListener('DOMContentLoaded', () => {
             let containerTarget = document.querySelector('#quiz-view') || document.body;
             containerTarget.innerHTML = htmlContent;
 
-            // Xóa triệt để các nút Tra từ hoặc ĐT Bất Quy Tắc nếu có sót lại từ hệ thống cũ trên trang
-            document.querySelectorAll('button, div, span').forEach(el => {
-                let text = el.innerText ? el.innerText.trim() : "";
-                if ((text.includes("Tra từ") || text.includes("Đt Bất Quy Tắc") || text.includes("ĐT Bất Quy Tắc")) && !el.id.includes('btn-home') && !el.id.includes('btn-calc')) {
-                    el.style.display = 'none';
-                }
-            });
-
             // Xử lý nút Trang chủ
             document.getElementById('btn-home').addEventListener('click', () => {
                 location.reload();
+            });
+
+            // Xử lý sự kiện cho các nút Tra từ hoặc ĐT Bất Quy Tắc nếu trang có sẵn hàm hỗ trợ toàn cục
+            document.getElementById('btn-tratru').addEventListener('click', () => {
+                if (typeof openTraTuModal === 'function') openTraTuModal();
+                else alert("Tính năng Tra từ đang được cấu hình.");
+            });
+
+            document.getElementById('btn-dtbqt').addEventListener('click', () => {
+                if (typeof openBQTModal === 'function') openBQTModal();
+                else alert("Tính năng Động từ bất quy tắc đang được cấu hình.");
             });
 
             // Xử lý Máy tính
