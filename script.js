@@ -1775,12 +1775,11 @@ window.calcCalculate = function() {
         display.value = 'Lỗi';
     }
 };
-// Gắn sự kiện cho nút "Tạo đề tổng hợp Toán"
 document.addEventListener('DOMContentLoaded', () => {
     const btnTaoDeToan = document.getElementById('btn-tao-de-toan');
     
     if (btnTaoDeToan) {
-        btnTaoDeToan.addEventListener('click', function() {
+        btnTaoDeToan.addEventListener('click', async function() {
             // 1. Tự động chọn môn Toán trên giao diện
             const selectMonHoc = document.getElementById('subject-select');
             if (selectMonHoc) {
@@ -1788,53 +1787,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 selectMonHoc.dispatchEvent(new Event('change'));
             }
 
-            // 2. Tìm kiếm thông minh toàn bộ các mảng dữ liệu đang tồn tại trong bộ nhớ trình duyệt
-            let dataList = null;
-            for (let key in window) {
-                if (Array.isArray(window[key]) && window[key].length > 0) {
-                    // Kiểm tra xem mảng này có chứa các thuộc tính đặc trưng của câu hỏi không
-                    let firstItem = window[key][0];
-                    if (firstItem && (firstItem.chuDe || firstItem.topic || firstItem.cauHoi || firstItem.question)) {
-                        dataList = window[key];
-                        break;
-                    }
-                }
-            }
+            try {
+                // Hiển thị thông báo đang tải nhẹ nhàng
+                btnTaoDeToan.innerText = "Đang tạo đề...";
+                btnTaoDeToan.disabled = true;
 
-            // Nếu vẫn chưa tìm thấy dữ liệu, tự động kích hoạt nút "Xác nhận Mã & Tải đề" gốc của trang
-            if (!dataList || dataList.length === 0) {
-                const buttons = document.querySelectorAll('button, input[type="button"]');
-                for (let btn of buttons) {
-                    if (btn.textContent.includes('Tải đề') || btn.textContent.includes('Xác nhận')) {
-                        btn.click();
-                        break;
-                    }
+                // 2. Tự động lấy file dữ liệu câu hỏi (Bạn thay đường dẫn file JSON chứa câu hỏi môn Toán của bạn vào đây nếu khác tên)
+                let response = await fetch('data.json'); // Hoặc đường dẫn API/file dữ liệu của bạn
+                let dataList = await response.json();
+
+                // Nếu dữ liệu trả về nằm trong một thuộc tính cụ thể (ví dụ data.questions), hãy trích xuất ra
+                if (!Array.isArray(dataList)) {
+                    dataList = dataList.questions || dataList.data || dataList.cauHoi || [];
                 }
 
-                // Chờ 0.8 giây để hệ thống kịp nạp dữ liệu rồi quét lại một lần nữa
-                setTimeout(() => {
-                    for (let key in window) {
-                        if (Array.isArray(window[key]) && window[key].length > 0) {
-                            let firstItem = window[key][0];
-                            if (firstItem && (firstItem.chuDe || firstItem.topic || firstItem.cauHoi || firstItem.question)) {
-                                dataList = window[key];
-                                break;
-                            }
-                        }
-                    }
-                    thucThiTaoDe(dataList);
-                }, 800);
-            } else {
-                thucThiTaoDe(dataList);
-            }
-
-            // Hàm xử lý lọc câu hỏi và vào thi
-            function thucThiTaoDe(list) {
-                if (!list || list.length === 0) {
-                    alert("Vui lòng bấm nút 'Xác nhận Mã & Tải đề' một lần duy nhất, sau đó bấm lại nút này nhé!");
-                    return;
-                }
-
+                // 3. Cấu hình đúng chuẩn số lượng câu hỏi bạn yêu cầu
                 let cauHinh = {
                     'Hình học': 2,
                     'Đổi đơn vị': 6,
@@ -1847,7 +1814,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 for (let chuDe in cauHinh) {
                     let countNeeded = cauHinh[chuDe];
-                    let pool = list.filter(q => {
+                    let pool = dataList.filter(q => {
                         let c = q.chuDe || q.topic || q.subject || "";
                         return c.trim().toLowerCase() === chuDe.toLowerCase();
                     });
@@ -1858,13 +1825,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (selectedQuestions.length === 0) {
-                    alert("Không tìm thấy câu hỏi phù hợp với các chủ đề Toán yêu cầu!");
+                    alert("Không tìm thấy dữ liệu câu hỏi phù hợp với các chủ đề Toán yêu cầu!");
+                    btnTaoDeToan.innerText = "🎯 Tạo đề tổng hợp Toán (30 phút - 21 câu)";
+                    btnTaoDeToan.disabled = false;
                     return;
                 }
 
+                // Xáo trộn tổng thể
                 selectedQuestions = (typeof shuffleArray === 'function') ? shuffleArray(selectedQuestions) : selectedQuestions.sort(() => Math.random() - 0.5);
 
-                // Bật máy tính cho môn Toán
+                // Bật công cụ máy tính cho môn Toán
                 const btnCalc = document.getElementById('btn-calc');
                 const btnDict = document.getElementById('btn-dict');
                 const btnVerbs = document.getElementById('btn-verbs');
@@ -1872,7 +1842,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (btnDict) btnDict.style.display = 'none';
                 if (btnVerbs) btnVerbs.style.display = 'none';
 
-                // Vào thi ngay với 30 phút
+                // Khởi tạo giao diện thi và chạy đồng hồ 30 phút
                 if (typeof initQuizApp === 'function') {
                     initQuizApp(selectedQuestions);
                     if (typeof window.startTimerTotal === 'function') {
@@ -1883,6 +1853,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     alert("Đã tạo đề thành công nhưng thiếu hàm khởi tạo giao diện quiz.");
                 }
+
+            } catch (error) {
+                console.error(error);
+                alert("Lỗi tải dữ liệu trực tiếp. Vui lòng kiểm tra lại đường dẫn file dữ liệu câu hỏi.");
+            } finally {
+                btnTaoDeToan.innerText = "🎯 Tạo đề tổng hợp Toán (30 phút - 21 câu)";
+                btnTaoDeToan.disabled = false;
             }
         });
     }
