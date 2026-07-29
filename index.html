@@ -99,10 +99,13 @@
         <button type="button" onclick="window.toggleAllTopics()" style="padding: 6px 12px; font-size: 0.95em; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Chọn/Bỏ chọn tất cả</button>
     </div>
     <div id="topic-container">Chưa tải dữ liệu...</div>
-    <button id="btnMixedQuiz" class="btn btn-warning w-100 mt-2 mb-2" style="background-color: #ffc107; font-weight: bold; color: #000;">
-    🎯 Tạo đề tổng hợp (30 phút - 21 câu)
-</button>
-    <button type="button" id="start-btn" onclick="window.startQuizWithToolCheck()" style="width: 100%; padding: 16px; background: #007bff; color: white; border: none; cursor: pointer; margin-top: 15px; border-radius: 8px; font-weight: bold; font-size: 1.2em;">Bắt Đầu Làm Bài</button>
+
+    <!-- NÚT TẠO ĐỀ TỔNG HỢP MÔN TOÁN (BẤM VÀO TẠO NGAY KHÔNG CẦN BẤM BẮT ĐẦU) -->
+    <button type="button" id="btn-tao-de-toan" style="width: 100%; padding: 14px; background-color: #ffc107; color: #000; border: none; border-radius: 8px; font-weight: bold; font-size: 1.1em; margin-top: 10px; margin-bottom: 10px; cursor: pointer;">
+        🎯 Tạo đề tổng hợp Toán (30 phút - 22 câu)
+    </button>
+
+    <button type="button" id="start-btn" onclick="window.startQuizWithToolCheck()" style="width: 100%; padding: 16px; background: #007bff; color: white; border: none; cursor: pointer; margin-top: 5px; border-radius: 8px; font-weight: bold; font-size: 1.2em;">Bắt Đầu Làm Bài</button>
 
     <div id="leaderboard" style="margin-top: 25px; padding: 18px; border: 2px solid red; border-radius: 10px; background: #fff;">
         <h3 style="color: red; margin-top: 0; font-size: 1.3em;">🏆 Bảng xếp hạng:</h3>
@@ -114,15 +117,13 @@
     <div class="quiz-sticky-header">
         <div>⏱️ <span id="timer-display" style="color: red; font-size: 1.15em;">--:--</span></div>
         <div style="display: flex; gap: 8px;">
-            <!-- Nút Công cụ Toán (Sẽ tự ẩn/hiện dựa theo môn học) -->
+            <!-- Nút Công cụ Toán -->
             <button type="button" id="btn-calc" onclick="window.openCalculatorModal()" style="display: none; background: #28a745; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🧮 Máy tính</button>
             
-            <!-- Nút Công cụ Tiếng Anh (Sẽ tự ẩn/hiện dựa theo môn học) -->
+            <!-- Nút Công cụ Tiếng Anh -->
             <button type="button" id="btn-dict" onclick="window.openDictionaryModal()" style="display: none; background: #17a2b8; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📖 Tra từ</button>
             <button type="button" id="btn-verbs" onclick="window.openIrregularVerbsModal()" style="display: none; background: #e0a800; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📚 ĐT Bất Quy Tắc</button>
-            <button class="btn-listen" onclick="playAudio('https://drive.google.com/uc?export=open&id=1F3LzQAq2stgh11cecDaOOxYM4sxVO9eb')">
-  🔊 Nghe câu hỏi
-</button>
+            
             <button type="button" onclick="window.backToHome()" style="background: #6c757d; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🏠 Trang chủ</button>
         </div>
         <div>Đúng: <span id="correct-count-display" style="color: green;">0</span> | Sai: <span id="wrong-count-display" style="color: red;">0</span></div>
@@ -132,9 +133,7 @@
     <button type="button" id="submit-btn" onclick="window.submitQuiz()" style="width: 100%; padding: 16px; background: #28a745; color: white; border: none; cursor: pointer; border-radius: 8px; font-weight: bold; font-size: 1.2em; margin-top: 15px;">Nộp bài</button>
 </div>
 
-<!-- ========================================================= -->
-<!-- 🟢 MODAL MÁY TÍNH BỎ TÚI (ĐÃ BỔ SUNG KHUNG HTML DƯỚI ĐÂY) -->
-<!-- ========================================================= -->
+<!-- MODAL MÁY TÍNH BỎ TÚI -->
 <div id="calc-modal">
     <div class="dict-content" style="max-width: 320px; text-align: center;">
         <h3 style="color: #540606; margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
@@ -196,9 +195,7 @@
         <div style="margin-bottom: 12px;">
             <input type="text" id="iv-search-input" placeholder="Nhập từ cần tìm (V1, V2, V3 hoặc nghĩa tiếng Việt)..." oninput="window.filterIrregularVerbs()" style="margin: 0; width: 100%; padding: 12px; border: 1px solid #540606; border-radius: 8px; box-sizing: border-box;">
         </div>
-        <div id="iv-result-list" style="max-height: 350px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
-            <!-- Danh sách động từ sẽ được render tự động qua JS -->
-        </div>
+        <div id="iv-result-list" style="max-height: 350px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #ddd;"></div>
     </div>
 </div>
 
@@ -239,7 +236,7 @@
         }
     };
 
-    // Hàm phụ trợ tự động nhận diện môn học và bật/tắt nút công cụ tương ứng khi bấm Bắt Đầu Làm Bài
+    // Hàm tự động nhận diện môn học và bật/tắt nút công cụ tương ứng
     window.startQuizWithToolCheck = function() {
         const subjectSelect = document.getElementById('subject-select');
         const selectedSubject = subjectSelect ? subjectSelect.value.toLowerCase() : '';
@@ -265,11 +262,84 @@
             if (btnVerbs) btnVerbs.style.display = 'none';
         }
 
-        // Gọi tiếp hàm startQuiz gốc trong file script.js
         if (typeof window.startQuiz === 'function') {
             window.startQuiz();
         }
     };
+
+    // --- LOGIC XỬ LÝ NÚT TẠO ĐỀ TỔNG HỢP MÔN TOÁN ---
+    document.addEventListener('DOMContentLoaded', () => {
+        const btnTaoDeToan = document.getElementById('btn-tao-de-toan');
+        
+        if (btnTaoDeToan) {
+            btnTaoDeToan.addEventListener('click', function() {
+                const selectMonHoc = document.getElementById('subject-select');
+                if (!selectMonHoc || (!selectMonHoc.value.toLowerCase().includes('toán') && !selectMonHoc.value.toLowerCase().includes('toan'))) {
+                    alert("Vui lòng chọn môn Toán ở mục 'Chọn môn học' trước khi bấm tạo đề Toán!");
+                    return;
+                }
+
+                if (!window.allQuizData || window.allQuizData.length === 0) {
+                    alert("Dữ liệu câu hỏi chưa được tải. Vui lòng bấm 'Xác nhận Mã & Tải đề' trước!");
+                    return;
+                }
+
+                // Cấu hình số lượng theo yêu cầu:
+                // 2 câu Hình học, 6 câu Đổi đơn vị, 4 câu Phân số, 4 câu Phép tính số thập phân, 6 câu So sánh phân số
+                let cauHinh = {
+                    'Hình học': 2,
+                    'Đổi đơn vị': 6,
+                    'Phân số': 4,
+                    'Phép tính số thập phân': 4,
+                    'So sánh phân số': 6
+                };
+
+                let selectedQuestions = [];
+
+                for (let chuDe in cauHinh) {
+                    let countNeeded = cauHinh[chuDe];
+                    let pool = window.allQuizData.filter(q => 
+                        q.chuDe && q.chuDe.trim().toLowerCase() === chuDe.toLowerCase()
+                    );
+
+                    // Xáo trộn ngẫu nhiên kho câu hỏi của chủ đề
+                    pool = (typeof shuffleArray === 'function') ? shuffleArray(pool) : pool.sort(() => Math.random() - 0.5);
+
+                    let picked = pool.slice(0, countNeeded);
+                    selectedQuestions = selectedQuestions.concat(picked);
+                }
+
+                if (selectedQuestions.length === 0) {
+                    alert("Không tìm thấy dữ liệu câu hỏi phù hợp cho các chủ đề môn Toán!");
+                    return;
+                }
+
+                // Xáo trộn toàn bộ danh sách 22 câu vừa gom được
+                selectedQuestions = (typeof shuffleArray === 'function') ? shuffleArray(selectedQuestions) : selectedQuestions.sort(() => Math.random() - 0.5);
+
+                // Tự động kích hoạt nút máy tính cho môn Toán khi vào thi
+                const btnCalc = document.getElementById('btn-calc');
+                const btnDict = document.getElementById('btn-dict');
+                const btnVerbs = document.getElementById('btn-verbs');
+                if (btnCalc) btnCalc.style.display = 'block';
+                if (btnDict) btnDict.style.display = 'none';
+                if (btnVerbs) btnVerbs.style.display = 'none';
+
+                // Vào thẳng màn hình làm bài ngay lập tức không cần bấm nút Bắt Đầu
+                if (typeof initQuizApp === 'function') {
+                    initQuizApp(selectedQuestions);
+                    
+                    // Thiết lập thời gian 30 phút (30 * 60 giây)
+                    if (typeof window.startTimerTotal === 'function') {
+                        window.startTimerTotal(30 * 60);
+                    }
+                } else {
+                    console.error("Không tìm thấy hàm initQuizApp trong script.js!");
+                    alert("Đã tạo đề nhưng có lỗi khởi tạo giao diện quiz.");
+                }
+            });
+        }
+    });
 </script>
 </body>
 </html>
