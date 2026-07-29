@@ -59,7 +59,6 @@ function updateScoreDisplay() {
     }
 }
 
-// HÀM NGHE: Đã lược bỏ chữ "Câu X." để đọc thẳng nội dung câu hỏi và đáp án
 window.speakQuestion = function(index) {
     if (!('speechSynthesis' in window)) {
         return alert("Trình duyệt của bạn không hỗ trợ tính năng đọc văn bản!");
@@ -68,7 +67,7 @@ window.speakQuestion = function(index) {
     const item = AppState.currentQuizData[index];
     if (!item) return;
 
-    let textToSpeak = item.question;
+    let textToSpeak = "Câu " + (index + 1) + ". " + item.question;
     let hasOptions = item.a || item.b || item.c || item.d;
     if (hasOptions) {
         let keysToRender = item._shuffledKeys || ['a', 'b', 'c', 'd'].filter(k => item[k]);
@@ -95,45 +94,44 @@ function handleBeforeUnload(e) {
 // XỬ LÝ DỮ LIỆU BÀI THI VÀ KHỞI TẠO MÀN HÌNH
 // ==========================================
 
-function initQuizApp(rawData) {
-    AppState.currentQuizData = rawData.map(item => {
-        let rawCorrect = String(item.correct || '').trim();
-        let correctKeys = [];
+AppState.currentQuizData = rawData.map(item => {
+    let rawCorrect = String(item.correct || '').trim();
+    let correctKeys = [];
 
-        if (rawCorrect.length > 1 && /^[a-dA-D,\s]+$/.test(rawCorrect)) {
-            correctKeys = rawCorrect.toLowerCase().split(/[\s,]+/).filter(k => ['a','b','c','d'].includes(k));
-        } else if (rawCorrect.length === 1 && ['a','b','c','d'].includes(rawCorrect.toLowerCase())) {
-            correctKeys = [rawCorrect.toLowerCase()];
-        } else {
-            ['a', 'b', 'c', 'd'].forEach(k => {
-                let val = String(item[k] || '');
-                if (val.startsWith('*') || val.startsWith('【')) {
-                    correctKeys.push(k);
-                }
-            });
-        }
+    if (rawCorrect.length > 1 && /^[a-dA-D,\s]+$/.test(rawCorrect)) {
+        correctKeys = rawCorrect.toLowerCase().split(/[\s,]+/).filter(k => ['a','b','c','d'].includes(k));
+    } else if (rawCorrect.length === 1 && ['a','b','c','d'].includes(rawCorrect.toLowerCase())) {
+        correctKeys = [rawCorrect.toLowerCase()];
+    } else {
+        ['a', 'b', 'c', 'd'].forEach(k => {
+            let val = String(item[k] || '');
+            if (val.startsWith('*') || val.startsWith('【')) {
+                correctKeys.push(k);
+            }
+        });
+    }
 
-        let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k]);
-        validKeys = shuffleArray(validKeys);
-        
-        return { ...item, _shuffledKeys: validKeys, _correctKeys: correctKeys };
-    });
+    let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k]);
+    validKeys = shuffleArray(validKeys);
+    
+    return { ...item, _shuffledKeys: validKeys, _correctKeys: correctKeys };
+});
 
-    AppState.correctCount = 0;
-    AppState.wrongCount = 0;
+AppState.correctCount = 0;
+AppState.wrongCount = 0;
 
-    const startScreen = document.getElementById('start-screen');
-    if (startScreen) startScreen.style.display = 'none';
+const startScreen = document.getElementById('start-screen');
+if (startScreen) startScreen.style.display = 'none';
 
-    const quizScreen = document.getElementById('quiz-screen');
-    if (quizScreen) quizScreen.style.display = 'block';
+const quizScreen = document.getElementById('quiz-screen');
+if (quizScreen) quizScreen.style.display = 'block';
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
+window.addEventListener('beforeunload', handleBeforeUnload);
 
-    updateScoreDisplay();
-    window.renderQuiz();
-    window.startTimerTotal(10 * 60);
-}
+updateScoreDisplay();
+window.renderQuiz();
+window.startTimerTotal(10 * 60);
+};
 
 // ==========================================
 // PHẦN 5: CÁC HÀM RENDER, XỬ LÝ ĐÁP ÁN & NỘP BÀI
