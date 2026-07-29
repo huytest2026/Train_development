@@ -268,72 +268,75 @@
     };
 
     // --- LOGIC XỬ LÝ NÚT TẠO ĐỀ TỔNG HỢP MÔN TOÁN ---
-    document.addEventListener('DOMContentLoaded', () => {
-        const btnTaoDeToan = document.getElementById('btn-tao-de-toan');
-        
-        if (btnTaoDeToan) {
-            btnTaoDeToan.addEventListener('click', function() {
-                const selectMonHoc = document.getElementById('subject-select');
-                if (!selectMonHoc || (!selectMonHoc.value.toLowerCase().includes('toán') && !selectMonHoc.value.toLowerCase().includes('toan'))) {
-                    alert("Vui lòng chọn môn Toán ở mục 'Chọn môn học' trước khi bấm tạo đề Toán!");
-                    return;
+    // --- LOGIC XỬ LÝ NÚT TẠO ĐỀ TỔNG HỢP MÔN TOÁN ---
+document.addEventListener('DOMContentLoaded', () => {
+    const btnTaoDeToan = document.getElementById('btn-tao-de-toan');
+    
+    if (btnTaoDeToan) {
+        btnTaoDeToan.addEventListener('click', function() {
+            const selectMonHoc = document.getElementById('subject-select');
+            if (!selectMonHoc || (!selectMonHoc.value.toLowerCase().includes('toán') && !selectMonHoc.value.toLowerCase().includes('toan'))) {
+                alert("Vui lòng chọn môn Toán ở mục 'Chọn môn học' trước khi bấm tạo đề Toán!");
+                return;
+            }
+
+            if (!window.allQuizData || window.allQuizData.length === 0) {
+                alert("Dữ liệu câu hỏi chưa được tải. Vui lòng bấm 'Xác nhận Mã & Tải đề' trước!");
+                return;
+            }
+
+            let cauHinh = {
+                'Hình học': 2,
+                'Đổi đơn vị': 6,
+                'Phân số': 4,
+                'Phép tính số thập phân': 4,
+                'So sánh phân số': 6
+            };
+
+            let selectedQuestions = [];
+
+            for (let chuDe in cauHinh) {
+                let countNeeded = cauHinh[chuDe];
+                let pool = window.allQuizData.filter(q => 
+                    q.chuDe && q.chuDe.trim().toLowerCase() === chuDe.toLowerCase()
+                );
+
+                pool = (typeof shuffleArray === 'function') ? shuffleArray(pool) : pool.sort(() => Math.random() - 0.5);
+                let picked = pool.slice(0, countNeeded);
+                selectedQuestions = selectedQuestions.concat(picked);
+            }
+
+            if (selectedQuestions.length === 0) {
+                alert("Không tìm thấy dữ liệu câu hỏi phù hợp cho các chủ đề môn Toán!");
+                return;
+            }
+
+            selectedQuestions = (typeof shuffleArray === 'function') ? shuffleArray(selectedQuestions) : selectedQuestions.sort(() => Math.random() - 0.5);
+
+            // ==========================================
+            // ÉP BUỘC HIỆN MÁY TÍNH VÀ ẨN HOÀN TOÀN TRA TỪ, ĐỘNG TỪ BẤT QUY TẮC
+            // ==========================================
+            const btnCalc = document.getElementById('btn-calc');
+            const btnDict = document.getElementById('btn-dict');
+            const btnVerbs = document.getElementById('btn-verbs');
+            
+            if (btnCalc) btnCalc.style.setProperty('display', 'block', 'important');
+            if (btnDict) btnDict.style.setProperty('display', 'none', 'important');
+            if (btnVerbs) btnVerbs.style.setProperty('display', 'none', 'important');
+
+            if (typeof initQuizApp === 'function') {
+                initQuizApp(selectedQuestions);
+                
+                if (typeof window.startTimerTotal === 'function') {
+                    window.startTimerTotal(30 * 60);
                 }
-
-                if (!window.allQuizData || window.allQuizData.length === 0) {
-                    alert("Dữ liệu câu hỏi chưa được tải. Vui lòng bấm 'Xác nhận Mã & Tải đề' trước!");
-                    return;
-                }
-
-                let cauHinh = {
-                    'Hình học': 2,
-                    'Đổi đơn vị': 6,
-                    'Phân số': 4,
-                    'Phép tính số thập phân': 4,
-                    'So sánh phân số': 6
-                };
-
-                let selectedQuestions = [];
-
-                for (let chuDe in cauHinh) {
-                    let countNeeded = cauHinh[chuDe];
-                    let pool = window.allQuizData.filter(q => 
-                        q.chuDe && q.chuDe.trim().toLowerCase() === chuDe.toLowerCase()
-                    );
-
-                    pool = (typeof shuffleArray === 'function') ? shuffleArray(pool) : pool.sort(() => Math.random() - 0.5);
-
-                    let picked = pool.slice(0, countNeeded);
-                    selectedQuestions = selectedQuestions.concat(picked);
-                }
-
-                if (selectedQuestions.length === 0) {
-                    alert("Không tìm thấy dữ liệu câu hỏi phù hợp cho các chủ đề môn Toán!");
-                    return;
-                }
-
-                selectedQuestions = (typeof shuffleArray === 'function') ? shuffleArray(selectedQuestions) : selectedQuestions.sort(() => Math.random() - 0.5);
-
-                // Tự động kích hoạt nút máy tính cho môn Toán khi vào thi bằng nút tổng hợp
-                const btnCalc = document.getElementById('btn-calc');
-                const btnDict = document.getElementById('btn-dict');
-                const btnVerbs = document.getElementById('btn-verbs');
-                if (btnCalc) btnCalc.style.display = 'block';
-                if (btnDict) btnDict.style.display = 'none';
-                if (btnVerbs) btnVerbs.style.display = 'none';
-
-                if (typeof initQuizApp === 'function') {
-                    initQuizApp(selectedQuestions);
-                    
-                    if (typeof window.startTimerTotal === 'function') {
-                        window.startTimerTotal(30 * 60);
-                    }
-                } else {
-                    console.error("Không tìm thấy hàm initQuizApp trong script.js!");
-                    alert("Đã tạo đề nhưng có lỗi khởi tạo giao diện quiz.");
-                }
-            });
-        }
-    });
+            } else {
+                console.error("Không tìm thấy hàm initQuizApp trong script.js!");
+                alert("Đã tạo đề nhưng có lỗi khởi tạo giao diện quiz.");
+            }
+        });
+    }
+});
 </script>
 </body>
 </html>
