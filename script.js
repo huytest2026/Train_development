@@ -1775,11 +1775,18 @@ window.calcCalculate = function() {
         display.value = 'Lỗi';
     }
 };
-document.addEventListener('DOMContentLoaded', () => {
+//--------------------------------------------------------
+    document.addEventListener('DOMContentLoaded', () => {
     const btnTaoDeToan = document.getElementById('btn-tao-de-toan');
     
     if (btnTaoDeToan) {
-        btnTaoDeToan.addEventListener('click', async function() {
+        const newBtn = btnTaoDeToan.cloneNode(true);
+        btnTaoDeToan.parentNode.replaceChild(newBtn, btnTaoDeToan);
+
+        newBtn.addEventListener('click', async function(e) {
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+
             // 1. Tự động chọn môn Toán trên giao diện
             const selectMonHoc = document.getElementById('subject-select');
             if (selectMonHoc) {
@@ -1788,20 +1795,49 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                // Hiển thị thông báo đang tải nhẹ nhàng
-                btnTaoDeToan.innerText = "Đang tạo đề...";
-                btnTaoDeToan.disabled = true;
+                newBtn.innerText = "Đang tải dữ liệu từ Google Sheet...";
+                newBtn.disabled = true;
 
-                // 2. Tự động lấy file dữ liệu câu hỏi (Bạn thay đường dẫn file JSON chứa câu hỏi môn Toán của bạn vào đây nếu khác tên)
-                let response = await fetch('data.json'); // Hoặc đường dẫn API/file dữ liệu của bạn
-                let dataList = await response.json();
+                // 2. Tìm kiếm hàm tải dữ liệu gốc hoặc đường dẫn Google Sheet có sẵn trong mã của trang
+                let dataList = null;
 
-                // Nếu dữ liệu trả về nằm trong một thuộc tính cụ thể (ví dụ data.questions), hãy trích xuất ra
-                if (!Array.isArray(dataList)) {
-                    dataList = dataList.questions || dataList.data || dataList.cauHoi || [];
+                // Cách A: Thử gọi hàm tải dữ liệu gốc của trang web nếu có
+                if (typeof window.loadQuizData === 'function') {
+                    await window.loadQuizData();
+                } else if (typeof window.loadData === 'function') {
+                    await window.loadData();
                 }
 
-                // 3. Cấu hình đúng chuẩn số lượng câu hỏi bạn yêu cầu
+                // Quét lại các biến toàn cục xem dữ liệu đã về chưa
+                for (let key in window) {
+                    if (Array.isArray(window[key]) && window[key].length > 0) {
+                        let item = window[key][0];
+                        if (item && (item.chuDe || item.Chủ_đề || item.topic || item.noiDungCauHoi)) {
+                            dataList = window[key];
+                            break;
+                        }
+                    }
+                }
+
+                // Cách B: Nếu vẫn chưa có, ta tự fetch trực tiếp từ Google Sheets (dựa trên link Sheet công khai của bạn)
+                if (!dataList || dataList.length === 0) {
+                    // Thay link CSV Google Sheet của bạn vào đây nếu trang web dùng chung link này
+                    const sheetCSVUrl = 'https://docs.google.com/spreadsheets/d/1_YOUR_SHEET_ID_HERE/gviz/tq?tqx=out:csv&sheet=BT'; 
+                    
+                    let response = await fetch(sheetCSVUrl);
+                    let csvText = await response.text();
+                    
+                    // Chuyển đổi dữ liệu CSV từ Google Sheet thành mảng object
+                    dataList = parseCSV(csvText);
+                }
+
+                if (!dataList || dataList.length === 0) {
+                    alert("Không thể tải được dữ liệu từ Google Sheet. Vui lòng kiểm tra lại kết nối mạng!");
+                    resetBtn();
+                    return;
+                }
+
+                // 3. Cấu hình đúng chuẩn 21 câu hỏi theo yêu cầu
                 let cauHinh = {
                     'Hình học': 2,
                     'Đổi đơn vị': 6,
@@ -1815,7 +1851,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 for (let chuDe in cauHinh) {
                     let countNeeded = cauHinh[chuDe];
                     let pool = dataList.filter(q => {
-                        let c = q.chuDe || q.topic || q.subject || "";
+                        let c = q.chuDe || q.Chủ_đề || q.topic || q.subject || "";
                         return c.trim().toLowerCase() === chuDe.toLowerCase();
                     });
 
@@ -1825,16 +1861,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (selectedQuestions.length === 0) {
-                    alert("Không tìm thấy dữ liệu câu hỏi phù hợp với các chủ đề Toán yêu cầu!");
-                    btnTaoDeToan.innerText = "🎯 Tạo đề tổng hợp Toán (30 phút - 21 câu)";
-                    btnTaoDeToan.disabled = false;
+                    alert("Không tìm thấy câu hỏi khớp với các chủ đề Toán yêu cầu!");
+                    resetBtn();
                     return;
                 }
 
-                // Xáo trộn tổng thể
+                // Xáo trộn tổng thể danh sách câu hỏi
                 selectedQuestions = (typeof shuffleArray === 'function') ? shuffleArray(selectedQuestions) : selectedQuestions.sort(() => Math.random() - 0.5);
 
-                // Bật công cụ máy tính cho môn Toán
+                // Bật máy tính cho môn Toán, ẩn các nút không cần thiết
                 const btnCalc = document.getElementById('btn-calc');
                 const btnDict = document.getElementById('btn-dict');
                 const btnVerbs = document.getElementById('btn-verbs');
@@ -1842,7 +1877,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (btnDict) btnDict.style.display = 'none';
                 if (btnVerbs) btnVerbs.style.display = 'none';
 
-                // Khởi tạo giao diện thi và chạy đồng hồ 30 phút
+                // Khởi tạo giao diện làm bài và chạy đồng hồ đếm ngược 30 phút
                 if (typeof initQuizApp === 'function') {
                     initQuizApp(selectedQuestions);
                     if (typeof window.startTimerTotal === 'function') {
@@ -1854,13 +1889,38 @@ document.addEventListener('DOMContentLoaded', () => {
                     alert("Đã tạo đề thành công nhưng thiếu hàm khởi tạo giao diện quiz.");
                 }
 
-            } catch (error) {
-                console.error(error);
-                alert("Lỗi tải dữ liệu trực tiếp. Vui lòng kiểm tra lại đường dẫn file dữ liệu câu hỏi.");
-            } finally {
-                btnTaoDeToan.innerText = "🎯 Tạo đề tổng hợp Toán (30 phút - 21 câu)";
-                btnTaoDeToan.disabled = false;
+            } catch (err) {
+                console.error(err);
+                alert("Lỗi kết nối tới Google Sheet. Hãy chắc chắn Google Sheet ở chế độ công khai (Anyone with the link can view).");
+                resetBtn();
             }
         });
+    }
+
+    // Hàm phụ trợ đọc dữ liệu CSV từ Google Sheet
+    function parseCSV(text) {
+        let lines = text.split("\n");
+        let result = [];
+        let headers = lines[0].split(",").map(h => h.replace(/^"|"$/g, '').trim());
+
+        for (let i = 1; i < lines.length; i++) {
+            if (!lines[i].trim()) continue;
+            let currentline = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+            let obj = {};
+            for (let j = 0; j < headers.length; j++) {
+                let val = currentline[j] ? currentline[j].replace(/^"|"$/g, '').trim() : "";
+                obj[headers[j]] = val;
+            }
+            result.push(obj);
+        }
+        return result;
+    }
+
+    function resetBtn() {
+        const btn = document.getElementById('btn-tao-de-toan');
+        if (btn) {
+            btn.innerText = "🎯 Tạo đề tổng hợp Toán (30 phút - 21 câu)";
+            btn.disabled = false;
+        }
     }
 });
