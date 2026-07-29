@@ -1785,12 +1785,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const selectMonHoc = document.getElementById('subject-select');
             if (selectMonHoc) {
                 selectMonHoc.value = "Toán";
+                // Kích hoạt sự kiện change nếu trang web có dùng để load danh sách chủ đề
+                selectMonHoc.dispatchEvent(new Event('change'));
             }
 
-            // Tìm kho dữ liệu câu hỏi thực tế trong hệ thống của bạn (kiểm tra các tên biến phổ biến)
-            let currentData = window.allQuizData || window.quizData || window.questions || window.danhSachCauHoi;
-
-            // Hàm thực thi bốc đề và vào thi
+            // Hàm thực thi bốc đề và vào thi chính thức
             function thucThiTaoDe(dataList) {
                 let cauHinh = {
                     'Hình học': 2,
@@ -1842,26 +1841,45 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // Nếu chưa có dữ liệu, tự động bấm nút "Xác nhận Mã & Tải đề" hộ người dùng
-            if (!currentData || currentData.length === 0) {
-                const loadBtn = document.getElementById('load-data-btn');
-                if (loadBtn) {
-                    loadBtn.click(); // Kích hoạt nút tải dữ liệu gốc
+            // Kiểm tra xem dữ liệu đã có sẵn chưa
+            let currentData = window.allQuizData || window.quizData || window.questions || window.danhSachCauHoi;
+
+            if (currentData && currentData.length > 0) {
+                thucThiTaoDe(currentData);
+            } else {
+                // Nếu chưa có, tự động bấm nút "Xác nhận Mã & Tải đề" gốc trên giao diện
+                const loadBtn = document.getElementById('load-data-btn'); // Hoặc nút xác nhận mã của bạn
+                // Tìm nút có chứa chữ "Xác nhận Mã & Tải đề" nếu không có id cụ thể
+                let actualLoadBtn = loadBtn;
+                if (!actualLoadBtn) {
+                    const buttons = document.querySelectorAll('button, input[type="button"], input[type="submit"]');
+                    for (let btn of buttons) {
+                        if (btn.textContent.includes('Tải đề') || btn.textContent.includes('Xác nhận')) {
+                            actualLoadBtn = btn;
+                            break;
+                        }
+                    }
+                }
+
+                if (actualLoadBtn) {
+                    actualLoadBtn.click();
                 } else if (typeof window.loadData === 'function') {
                     window.loadData();
                 }
 
-                // Chờ 1 giây để dữ liệu được nạp vào bộ nhớ rồi tiến hành bốc đề
-                setTimeout(() => {
+                // Cơ chế chờ thông minh: Kiểm tra liên tục mỗi 300ms trong tối đa 5 giây xem dữ liệu đã về chưa
+                let checkCount = 0;
+                let interval = setInterval(() => {
+                    checkCount++;
                     let freshData = window.allQuizData || window.quizData || window.questions || window.danhSachCauHoi;
                     if (freshData && freshData.length > 0) {
+                        clearInterval(interval);
                         thucThiTaoDe(freshData);
-                    } else {
-                        alert("Vui lòng bấm nút 'Xác nhận Mã & Tải đề' một lần trước khi tạo đề tổng hợp!");
+                    } else if (checkCount > 15) { // Sau khoảng 4.5 giây mà không thấy dữ liệu
+                        clearInterval(interval);
+                        alert("Không thể tải dữ liệu tự động. Vui lòng bấm thủ công nút 'Xác nhận Mã & Tải đề' 1 lần rồi bấm lại nút này!");
                     }
-                }, 1000);
-            } else {
-                thucThiTaoDe(currentData);
+                }, 300);
             }
         });
     }
