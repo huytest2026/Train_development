@@ -59,7 +59,7 @@ function updateScoreDisplay() {
     }
 }
 
-// HÀM NGHE: Đã lược bỏ chữ "Câu X." để đọc thẳng nội dung khi làm theo Mã đề
+// HÀM NGHE: Đã lược bỏ chữ "Câu X." để đọc thẳng nội dung câu hỏi và đáp án
 window.speakQuestion = function(index) {
     if (!('speechSynthesis' in window)) {
         return alert("Trình duyệt của bạn không hỗ trợ tính năng đọc văn bản!");
