@@ -1776,7 +1776,7 @@ window.calcCalculate = function() {
     }
 };
 //--------------------------------------------------------
-  document.addEventListener('DOMContentLoaded', () => {
+ document.addEventListener('DOMContentLoaded', () => {
     const btnTaoDeToan = document.getElementById('btn-tao-de-toan');
     
     if (btnTaoDeToan) {
@@ -1795,50 +1795,44 @@ window.calcCalculate = function() {
             }
 
             try {
-                newBtn.innerText = "Đang tải dữ liệu trực tiếp...";
+                newBtn.innerText = "Đang tải dữ liệu từ Google Sheets...";
                 newBtn.disabled = true;
 
-                // 2. Tự động lấy URL Google Apps Script đang được cấu hình sẵn trong trang (hoặc gán trực tiếp vào đây nếu có)
-                let scriptUrl = window.WEB_APP_URL || window.scriptUrl || "";
+                // THAY LINK GOOGLE APPS SCRIPT WEB APP CỦA BẠN VÀO DƯỚI ĐÂY
+                let MY_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzKhjTj95GBob8cPfSikXMUVg2S0vJ0BkEOTk2da1IY9xUFFGa8HvrM3FGLO-AJ6tvJ/exec"; 
                 
-                // Nếu trang web có sẵn hàm tải dữ liệu gốc, kích hoạt nó trước
-                if (typeof window.taiDuLieu === 'function') {
-                    await window.taiDuLieu();
-                } else {
-                    // Tìm nút xác nhận mã gốc để bấm kích hoạt dữ liệu nếu chưa có URL
-                    const originalLoadBtn = Array.from(document.querySelectorAll('button, .btn')).find(b => b.textContent.includes('Xác nhận Mã'));
-                    if (originalLoadBtn) {
-                        originalLoadBtn.click();
-                    }
+                // Nếu bạn lưu URL ở biến toàn cục nào đó trong trang, hãy gán nó vào đây
+                if (MY_WEB_APP_URL.includes("ĐIỀN_URL")) {
+                    MY_WEB_APP_URL = window.WEB_APP_URL || window.scriptUrl || window.API_URL || "";
                 }
 
-                // Chờ một chút để dữ liệu được nạp vào bộ nhớ trình duyệt
-                let dataList = null;
-                for (let i = 0; i < 15; i++) {
-                    dataList = window.questions || window.allQuestions || window.danhSachCauHoi || window.cauHoiList;
-                    if (dataList && dataList.length > 1) break;
-                    await new Promise(r => setTimeout(r, 300));
-                }
-
-                if (!dataList || dataList.length <= 1) {
-                    alert("Không thể tải được dữ liệu câu hỏi từ Google Sheets. Vui lòng kiểm tra lại kết nối mạng!");
+                if (!MY_WEB_APP_URL) {
+                    alert("Chưa cấu hình URL Google Apps Script trong code! Hãy điền link Web App vào file script.js");
                     resetBtn();
                     return;
                 }
 
-                // Nếu dữ liệu đang ở dạng mảng 2 chiều, chuyển đổi sang mảng Object
-                if (Array.isArray(dataList[0])) {
-                    let headers = dataList[0];
-                    let formattedList = [];
-                    for (let i = 1; i < dataList.length; i++) {
-                        let row = dataList[i];
-                        let obj = {};
-                        for (let j = 0; j < headers.length; j++) {
-                            obj[headers[j]] = row[j];
-                        }
-                        formattedList.push(obj);
+                // 2. Fetch trực tiếp dữ liệu từ Google Sheets qua Web App
+                let response = await fetch(MY_WEB_APP_URL);
+                let result = await response.json();
+                let rawList = result.questions || [];
+
+                if (!rawList || rawList.length <= 1) {
+                    alert("Không lấy được dữ liệu câu hỏi từ Google Sheets. Vui lòng kiểm tra lại Web App!");
+                    resetBtn();
+                    return;
+                }
+
+                // Chuyển đổi dữ liệu từ mảng 2 chiều sang danh sách Object
+                let headers = rawList[0];
+                let dataList = [];
+                for (let i = 1; i < rawList.length; i++) {
+                    let row = rawList[i];
+                    let obj = {};
+                    for (let j = 0; j < headers.length; j++) {
+                        obj[headers[j]] = row[j];
                     }
-                    dataList = formattedList;
+                    dataList.push(obj);
                 }
 
                 // 3. Cấu hình đúng chuẩn 21 câu hỏi theo yêu cầu của bạn
@@ -1897,7 +1891,7 @@ window.calcCalculate = function() {
 
             } catch (err) {
                 console.error(err);
-                alert("Lỗi xử lý dữ liệu từ Google Sheets.");
+                alert("Lỗi kết nối hoặc phân tích dữ liệu từ Google Sheets.");
                 resetBtn();
             }
         });
