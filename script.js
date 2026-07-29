@@ -1781,16 +1781,14 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (btnTaoDeToan) {
         btnTaoDeToan.addEventListener('click', function() {
-            // 1. Tự động chuyển hoặc thiết lập môn học là Toán nếu người dùng chưa chọn hoặc chọn chưa đúng
+            // Tự động gán môn Toán
             const selectMonHoc = document.getElementById('subject-select');
             if (selectMonHoc) {
-                selectMonHoc.value = "Toán"; // Ép chọn môn Toán luôn để không cần thao tác rườm rà
+                selectMonHoc.value = "Toán";
             }
 
-            // Hàm thực thi chính sau khi đã có dữ liệu câu hỏi
-            function processTaoDeToan() {
-                // Cấu hình số lượng câu hỏi theo đúng yêu cầu:
-                // 2 câu Hình học, 6 câu Đổi đơn vị, 4 câu Phân số, 4 câu Phép tính số thập phân, 6 câu So sánh phân số
+            // Hàm thực thi tạo đề sau khi đã có dữ liệu
+            function thucThiTaoDe() {
                 let cauHinh = {
                     'Hình học': 2,
                     'Đổi đơn vị': 6,
@@ -1807,22 +1805,19 @@ document.addEventListener('DOMContentLoaded', () => {
                         q.chuDe && q.chuDe.trim().toLowerCase() === chuDe.toLowerCase()
                     );
 
-                    // Xáo trộn ngẫu nhiên kho câu hỏi của chủ đề
                     pool = (typeof shuffleArray === 'function') ? shuffleArray(pool) : pool.sort(() => Math.random() - 0.5);
-
                     let picked = pool.slice(0, countNeeded);
                     selectedQuestions = selectedQuestions.concat(picked);
                 }
 
                 if (selectedQuestions.length === 0) {
-                    alert("Không tìm thấy dữ liệu câu hỏi phù hợp cho các chủ đề môn Toán trong kho dữ liệu!");
+                    alert("Không tìm thấy dữ liệu câu hỏi phù hợp cho các chủ đề môn Toán!");
                     return;
                 }
 
-                // Xáo trộn tổng thể danh sách câu hỏi
                 selectedQuestions = (typeof shuffleArray === 'function') ? shuffleArray(selectedQuestions) : selectedQuestions.sort(() => Math.random() - 0.5);
 
-                // Bật công cụ máy tính cho môn Toán trên giao diện thi
+                // Bật máy tính cho môn Toán
                 const btnCalc = document.getElementById('btn-calc');
                 const btnDict = document.getElementById('btn-dict');
                 const btnVerbs = document.getElementById('btn-verbs');
@@ -1830,36 +1825,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (btnDict) btnDict.style.display = 'none';
                 if (btnVerbs) btnVerbs.style.display = 'none';
 
-                // Vào thẳng màn hình làm bài ngay lập tức và bật đồng hồ đếm ngược 30 phút
+                // Vào thi ngay với 30 phút
                 if (typeof initQuizApp === 'function') {
                     initQuizApp(selectedQuestions);
                     if (typeof window.startTimerTotal === 'function') {
                         window.startTimerTotal(30 * 60);
                     }
                 } else {
-                    alert("Đã tạo đề nhưng thiếu hàm khởi tạo giao diện quiz (initQuizApp).");
+                    alert("Đã tạo đề nhưng thiếu hàm khởi tạo quiz (initQuizApp).");
                 }
             }
 
-            // 2. Kiểm tra xem dữ liệu đã được tải chưa. Nếu chưa, tự động gọi hàm tải dữ liệu ngầm rồi tạo đề luôn!
+            // Nếu chưa có dữ liệu, tự động kích hoạt nút "Xác nhận Mã & Tải đề" trên giao diện của bạn
             if (!window.allQuizData || window.allQuizData.length === 0) {
-                // Kiểm tra xem trang web có hàm tải dữ liệu gốc không (thường là window.loadData hoặc hàm tương tự)
-                if (typeof window.loadData === 'function') {
-                    // Gọi hàm tải dữ liệu, sau đó chờ một nhịp ngắn rồi tiến hành tạo đề
+                const loadBtn = document.getElementById('load-data-btn');
+                if (loadBtn) {
+                    loadBtn.click(); // Tự động bấm nút tải đề hộ bạn
+                } else if (typeof window.loadData === 'function') {
                     window.loadData();
-                    setTimeout(() => {
-                        if (window.allQuizData && window.allQuizData.length > 0) {
-                            processTaoDeToan();
-                        } else {
-                            alert("Không thể tải dữ liệu tự động. Vui lòng thử lại sau 1 giây!");
-                        }
-                    }, 1000);
-                } else {
-                    alert("Chưa có dữ liệu câu hỏi và không tìm thấy hàm tải dữ liệu tự động!");
                 }
+
+                // Chờ 1.5 giây để dữ liệu kịp tải về rồi tiến hành tạo đề
+                setTimeout(() => {
+                    if (window.allQuizData && window.allQuizData.length > 0) {
+                        thucThiTaoDe();
+                    } else {
+                        alert("Vui lòng bấm nút 'Xác nhận Mã & Tải đề' một lần trước khi tạo đề tổng hợp!");
+                    }
+                }, 1500);
             } else {
-                // Nếu đã có sẵn dữ liệu thì tiến hành tạo đề ngay lập tức
-                processTaoDeToan();
+                thucThiTaoDe();
             }
         });
     }
