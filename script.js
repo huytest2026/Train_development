@@ -314,7 +314,7 @@ window.speakQuestion = function(index) {
     const item = AppState.currentQuizData[index];
     if (!item) return;
     
-    // 1. NHẬN DIỆN CÁC DẠNG BÀI ĐẶC BIỆT (Giữ nguyên logic cũ của bạn)
+    // 1. NHẬN DIỆN CÁC DẠNG BÀI ĐẶC BIỆT
     let isListeningType = false;
     if (item.loai === 'listening_fill') {
         isListeningType = true;
@@ -339,8 +339,9 @@ window.speakQuestion = function(index) {
                       item._isAnswered;
     }
 
-    // 3. CHUẨN BỊ TEXT CÂU HỎI VÀ ĐÁP ÁN (Giữ nguyên logic lấy đáp án cũ của bạn)
-    let questionText = item.passage || item.question || '';
+    // 3. CHUẨN BỊ TEXT CÂU HỎI VÀ ĐÁP ÁN
+    // QUAN TRỌNG: Chỉ lấy nội dung `item.question`, tuyệt đối không cộng thêm chữ "Câu X." hay nhãn đề
+    let questionText = item.question || item.passage || '';
     let correctAnswerStr = '';
     
     let correctKeys = item._correctKeys || (typeof getCorrectKeys === 'function' ? getCorrectKeys(item) : []);
@@ -354,7 +355,6 @@ window.speakQuestion = function(index) {
 
     // 4. XỬ LÝ LỌC TEXT CHO TỪNG LOẠI BÀI
     if (isListeningType) {
-        // [Tính năng cũ]: Ưu tiên đọc nội dung dạng listening. Nếu có chỗ trống và có đáp án thì ghép vào.
         textToRead = questionText;
         if (correctAnswerStr) {
             if (textToRead.includes('___')) {
@@ -364,45 +364,36 @@ window.speakQuestion = function(index) {
             }
         }
     } else {
-        // [Tính năng chuẩn hóa]: Các dạng bài tập thông thường
         if (!hasAnswered) {
-            // Chưa làm: Chỉ lấy đề bài (sẽ được lọc dấu gạch dưới ở bước cuối)
             textToRead = questionText;
         } else {
-            // Đã làm: Chia trường hợp
             if (isVietAnh) {
-                // Bài Việt-Anh: Chỉ đọc đáp án (Tránh AI đọc tiếng Việt)
                 textToRead = correctAnswerStr;
             } else if (questionText.match(/_{2,}|\.{3,}/) && correctAnswerStr) {
-                // Câu hỏi trắc nghiệm có lỗ hổng (___): Ghép nối đáp án vào đúng vị trí
                 textToRead = questionText.replace(/_{2,}|\.{3,}/g, " " + correctAnswerStr + " ");
             } else {
-                // Câu hỏi trắc nghiệm bình thường: Đọc đề bài, nghỉ một chút, đọc đáp án
                 textToRead = questionText + ". " + correctAnswerStr;
             }
         }
     }
 
-    // 5. PHÁT FILE ÂM THANH ONLINE (Giữ nguyên tính năng cũ)
+    // 5. PHÁT FILE ÂM THANH ONLINE
     if (textToRead && (textToRead.startsWith('http://') || textToRead.startsWith('https://')) && 
         (textToRead.endsWith('.mp3') || textToRead.endsWith('.wav') || textToRead.endsWith('.m4a') || textToRead.includes('drive.google.com'))) {
         new Audio(textToRead).play().catch(() => alert("Không thể phát file âm thanh."));
         return;
     }
 
-    // 6. PHÁT ÂM BẰNG TEXT-TO-SPEECH (Tích hợp chống lỗi "underscore")
+    // 6. PHÁT ÂM BẰNG TEXT-TO-SPEECH
     if (textToRead && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
         
-        // TRIỆT ĐỂ: Dọn sạch mọi dấu gạch dưới còn sót và khoảng trắng thừa 
-        // để AI đọc mượt mà cho dù người dùng đã chọn đáp án hay chưa
         let finalCleanText = textToRead.replace(/_/g, ' ')
-                                       .replace(/\s+/g, ' ')
-                                       .trim();
-                                       
+                                    .replace(/\s+/g, ' ')
+                                    .trim();
+                                    
         const utterance = new SpeechSynthesisUtterance(finalCleanText);
         utterance.lang = 'en-US';
-        // [Tính năng cũ]: Tốc độ đọc chậm hơn (0.85) cho bài Listening, bình thường (0.9)
         utterance.rate = isListeningType ? 0.85 : 0.9; 
         
         window.speechSynthesis.speak(utterance);
