@@ -1775,69 +1775,91 @@ window.calcCalculate = function() {
         display.value = 'Lỗi';
     }
 };
-// Gắn sự kiện cho nút "Tạo đề tổng hợp (30 phút - 22 câu)"
+// Gắn sự kiện cho nút "Tạo đề tổng hợp Toán"
 document.addEventListener('DOMContentLoaded', () => {
-    const btnTaoDeToan = document.getElementById('btn-tao-de-toan'); // Thay id này bằng id thực tế của nút trong HTML của bạn nếu khác
+    const btnTaoDeToan = document.getElementById('btn-tao-de-toan');
     
     if (btnTaoDeToan) {
         btnTaoDeToan.addEventListener('click', function() {
-            // 1. Kiểm tra xem người dùng đã chọn môn Toán chưa
-            const selectMonHoc = document.getElementById('mon-hoc') || document.querySelector('select[name="monHoc"]');
-            if (selectMonHoc && selectMonHoc.value !== 'Toán' && selectMonHoc.value !== 'Toan') {
-                alert("Vui lòng chọn môn Toán trước khi sử dụng tính năng này!");
-                return;
+            // 1. Tự động chuyển hoặc thiết lập môn học là Toán nếu người dùng chưa chọn hoặc chọn chưa đúng
+            const selectMonHoc = document.getElementById('subject-select');
+            if (selectMonHoc) {
+                selectMonHoc.value = "Toán"; // Ép chọn môn Toán luôn để không cần thao tác rườm rà
             }
 
-            // 2. Kiểm tra xem dữ liệu gốc của môn Toán đã được tải về chưa
+            // Hàm thực thi chính sau khi đã có dữ liệu câu hỏi
+            function processTaoDeToan() {
+                // Cấu hình số lượng câu hỏi theo đúng yêu cầu:
+                // 2 câu Hình học, 6 câu Đổi đơn vị, 4 câu Phân số, 4 câu Phép tính số thập phân, 6 câu So sánh phân số
+                let cauHinh = {
+                    'Hình học': 2,
+                    'Đổi đơn vị': 6,
+                    'Phân số': 4,
+                    'Phép tính số thập phân': 4,
+                    'So sánh phân số': 6
+                };
+
+                let selectedQuestions = [];
+
+                for (let chuDe in cauHinh) {
+                    let countNeeded = cauHinh[chuDe];
+                    let pool = window.allQuizData.filter(q => 
+                        q.chuDe && q.chuDe.trim().toLowerCase() === chuDe.toLowerCase()
+                    );
+
+                    // Xáo trộn ngẫu nhiên kho câu hỏi của chủ đề
+                    pool = (typeof shuffleArray === 'function') ? shuffleArray(pool) : pool.sort(() => Math.random() - 0.5);
+
+                    let picked = pool.slice(0, countNeeded);
+                    selectedQuestions = selectedQuestions.concat(picked);
+                }
+
+                if (selectedQuestions.length === 0) {
+                    alert("Không tìm thấy dữ liệu câu hỏi phù hợp cho các chủ đề môn Toán trong kho dữ liệu!");
+                    return;
+                }
+
+                // Xáo trộn tổng thể danh sách câu hỏi
+                selectedQuestions = (typeof shuffleArray === 'function') ? shuffleArray(selectedQuestions) : selectedQuestions.sort(() => Math.random() - 0.5);
+
+                // Bật công cụ máy tính cho môn Toán trên giao diện thi
+                const btnCalc = document.getElementById('btn-calc');
+                const btnDict = document.getElementById('btn-dict');
+                const btnVerbs = document.getElementById('btn-verbs');
+                if (btnCalc) btnCalc.style.display = 'block';
+                if (btnDict) btnDict.style.display = 'none';
+                if (btnVerbs) btnVerbs.style.display = 'none';
+
+                // Vào thẳng màn hình làm bài ngay lập tức và bật đồng hồ đếm ngược 30 phút
+                if (typeof initQuizApp === 'function') {
+                    initQuizApp(selectedQuestions);
+                    if (typeof window.startTimerTotal === 'function') {
+                        window.startTimerTotal(30 * 60);
+                    }
+                } else {
+                    alert("Đã tạo đề nhưng thiếu hàm khởi tạo giao diện quiz (initQuizApp).");
+                }
+            }
+
+            // 2. Kiểm tra xem dữ liệu đã được tải chưa. Nếu chưa, tự động gọi hàm tải dữ liệu ngầm rồi tạo đề luôn!
             if (!window.allQuizData || window.allQuizData.length === 0) {
-                alert("Đang tải dữ liệu, vui lòng đợi trong giây lát rồi thử lại!");
-                return;
-            }
-
-            // 3. Lọc câu hỏi theo đúng số lượng yêu cầu cho từng chủ đề môn Toán
-            let cauHinh = {
-                'Hình học': 2,
-                'Đổi đơn vị': 6,
-                'Phân số': 4,
-                'Phép tính số thập phân': 4,
-                'So sánh phân số': 6
-            };
-
-            let selectedQuestions = [];
-
-            for (let chuDe in cauHinh) {
-                let countNeeded = cauHinh[chuDe];
-                // Lọc các câu thuộc chủ đề tương ứng (có thể điều chỉnh điều kiện lọc chuDe cho khớp với data của bạn)
-                let pool = window.allQuizData.filter(q => 
-                    q.chuDe && q.chuDe.trim().toLowerCase() === chuDe.toLowerCase()
-                );
-
-                // Xáo trộn ngẫu nhiên kho câu hỏi của chủ đề đó
-                pool = shuffleArray(pool);
-
-                // Lấy đủ số lượng yêu cầu
-                let picked = pool.slice(0, countNeeded);
-                selectedQuestions = selectedQuestions.concat(picked);
-            }
-
-            if (selectedQuestions.length === 0) {
-                alert("Không tìm thấy dữ liệu câu hỏi phù hợp cho môn Toán!");
-                return;
-            }
-
-            // Xáo trộn toàn bộ danh sách 22 câu vừa gom được để đề thi ngẫu nhiên thứ tự
-            selectedQuestions = shuffleArray(selectedQuestions);
-
-            // 4. Bỏ qua bước nhập mã học sinh, vào thẳng màn hình làm bài ngay lập tức
-            if (typeof initQuizApp === 'function') {
-                initQuizApp(selectedQuestions);
-                
-                // Đặt thời gian làm bài là 30 phút (30 * 60 giây)
-                if (typeof window.startTimerTotal === 'function') {
-                    window.startTimerTotal(30 * 60);
+                // Kiểm tra xem trang web có hàm tải dữ liệu gốc không (thường là window.loadData hoặc hàm tương tự)
+                if (typeof window.loadData === 'function') {
+                    // Gọi hàm tải dữ liệu, sau đó chờ một nhịp ngắn rồi tiến hành tạo đề
+                    window.loadData();
+                    setTimeout(() => {
+                        if (window.allQuizData && window.allQuizData.length > 0) {
+                            processTaoDeToan();
+                        } else {
+                            alert("Không thể tải dữ liệu tự động. Vui lòng thử lại sau 1 giây!");
+                        }
+                    }, 1000);
+                } else {
+                    alert("Chưa có dữ liệu câu hỏi và không tìm thấy hàm tải dữ liệu tự động!");
                 }
             } else {
-                console.error("Không tìm thấy hàm initQuizApp!");
+                // Nếu đã có sẵn dữ liệu thì tiến hành tạo đề ngay lập tức
+                processTaoDeToan();
             }
         });
     }
