@@ -1787,143 +1787,129 @@ document.addEventListener('DOMContentLoaded', () => {
             e.stopPropagation();
             e.stopImmediatePropagation();
 
-            newBtn.innerText = "Đang tạo đề 21 câu (30 phút)...";
+            newBtn.innerText = "Đang tải đề 21 câu (30 phút)...";
             newBtn.disabled = true;
 
-            // 1. Kích hoạt nút tải dữ liệu gốc để nạp dữ liệu câu hỏi vào bộ nhớ
-            const originalLoadBtn = Array.from(document.querySelectorAll('button, .btn')).find(b => b.textContent.includes('Xác nhận Mã'));
-            if (originalLoadBtn) {
-                originalLoadBtn.click();
-            }
+            try {
+                // Lấy link Web App từ trang hoặc điền trực tiếp link của bạn vào đây
+                let webAppUrl = window.WEB_APP_URL || window.scriptUrl || window.API_URL || "https://script.google.com/macros/s/AKfycbzKhjTj95GBob8cPfSikXMUVg2S0vJ0BkEOTk2da1IY9xUFFGa8HvrM3FGLO-AJ6tvJ/exec";
 
-            // 2. Chờ dữ liệu câu hỏi sẵn sàng
-            let dataList = null;
-            for (let i = 0; i < 30; i++) {
-                dataList = window.questions || window.allQuestions || window.danhSachCauHoi || window.cauHoiList;
-                if (dataList && dataList.length > 1) break;
-                await new Promise(r => setTimeout(r, 300));
-            }
+                let response = await fetch(webAppUrl);
+                let result = await response.json();
+                let rawList = result.questions || result.data || result;
 
-            if (!dataList || dataList.length <= 1) {
-                alert("Vui lòng bấm 'Xác nhận Mã & Tải đề' 1 lần trước khi bấm Tạo đề nhé!");
-                resetBtn();
-                return;
-            }
+                if (!rawList || rawList.length <= 1) {
+                    alert("Không thể tải được dữ liệu từ Google Sheets!");
+                    resetBtn();
+                    return;
+                }
 
-            if (Array.isArray(dataList[0])) {
-                let headers = dataList[0];
-                let formattedList = [];
-                for (let i = 1; i < dataList.length; i++) {
-                    let row = dataList[i];
+                // Xử lý chuyển đổi dữ liệu từ mảng 2 chiều sang mảng object
+                let headers = rawList[0];
+                let dataList = [];
+                for (let i = 1; i < rawList.length; i++) {
+                    let row = rawList[i];
                     let obj = {};
                     for (let j = 0; j < headers.length; j++) {
                         obj[headers[j]] = row[j];
                     }
-                    formattedList.push(obj);
+                    dataList.push(obj);
                 }
-                dataList = formattedList;
-            }
 
-            // 3. Lọc chính xác chuẩn 21 câu theo đúng phân bổ chủ đề yêu cầu
-            let cauHinh = {
-                'Hình học': 2,
-                'Đổi đơn vị': 6,
-                'Phân số': 4,
-                'Phép tính số thập phân': 4,
-                'So sánh phân số': 6
-            };
+                // Lọc chính xác chuẩn 21 câu theo đúng phân bổ chủ đề yêu cầu
+                let cauHinh = {
+                    'Hình học': 2,
+                    'Đổi đơn vị': 6,
+                    'Phân số': 4,
+                    'Phép tính số thập phân': 4,
+                    'So sánh phân số': 6
+                };
 
-            let selectedQuestions = [];
+                let selectedQuestions = [];
 
-            for (let chuDe in cauHinh) {
-                let countNeeded = cauHinh[chuDe];
-                let pool = dataList.filter(q => {
-                    let c = q['Chủ đề'] || q['chuDe'] || q['topic'] || "";
-                    return c.trim().toLowerCase() === chuDe.toLowerCase();
-                });
+                for (let chuDe in cauHinh) {
+                    let countNeeded = cauHinh[chuDe];
+                    let pool = dataList.filter(q => {
+                        let c = q['Chủ đề'] || q['chuDe'] || q['topic'] || "";
+                        return c.trim().toLowerCase() === chuDe.toLowerCase();
+                    });
 
-                pool = (typeof shuffleArray === 'function') ? shuffleArray(pool) : pool.sort(() => Math.random() - 0.5);
-                let picked = pool.slice(0, countNeeded);
-                selectedQuestions = selectedQuestions.concat(picked);
-            }
+                    pool = (typeof shuffleArray === 'function') ? shuffleArray(pool) : pool.sort(() => Math.random() - 0.5);
+                    let picked = pool.slice(0, countNeeded);
+                    selectedQuestions = selectedQuestions.concat(picked);
+                }
 
-            if (selectedQuestions.length === 0) {
-                alert("Không tìm thấy câu hỏi khớp với các chủ đề Toán yêu cầu!");
+                if (selectedQuestions.length === 0) {
+                    alert("Không tìm thấy câu hỏi khớp với các chủ đề Toán yêu cầu!");
+                    resetBtn();
+                    return;
+                }
+
+                selectedQuestions = (typeof shuffleArray === 'function') ? shuffleArray(selectedQuestions) : selectedQuestions.sort(() => Math.random() - 0.5);
+
+                // Cập nhật biến toàn cục của trang
+                window.currentQuestions = selectedQuestions;
+                window.questions = selectedQuestions;
+                if (window.quizData) window.quizData.questions = selectedQuestions;
+
+                // Chuyển giao diện sang môn Toán
+                const selectMonHoc = document.getElementById('subject-select');
+                if (selectMonHoc) {
+                    selectMonHoc.value = "Toán";
+                    selectMonHoc.dispatchEvent(new Event('change'));
+                }
+
+                // Bật máy tính, ẩn các nút không cần thiết
+                const btnCalc = document.getElementById('btn-calc');
+                const btnDict = document.getElementById('btn-dict');
+                const btnVerbs = document.getElementById('btn-verbs');
+                if (btnCalc) btnCalc.style.display = 'block';
+                if (btnDict) btnDict.style.display = 'none';
+                if (btnVerbs) btnVerbs.style.display = 'none';
+
+                // Khởi tạo giao diện bài làm
+                if (typeof initQuizApp === 'function') {
+                    initQuizApp(selectedQuestions);
+                } else if (typeof startQuiz === 'function') {
+                    startQuiz();
+                }
+
+                // Ép hiển thị toàn bộ các câu hỏi
+                setTimeout(() => {
+                    let allQElements = document.querySelectorAll('.question-container, .quiz-question, [id^="question"], .question-item');
+                    allQElements.forEach(el => {
+                        el.style.display = 'block';
+                        el.style.visibility = 'visible';
+                    });
+                }, 300);
+
+                // Cố định thời gian chuẩn 30 phút (1800 giây)
+                if (typeof window.startTimerTotal === 'function') {
+                    window.startTimerTotal(30 * 60);
+                } else {
+                    let timeLeft = 30 * 60;
+                    if (window.timerInterval) clearInterval(window.timerInterval);
+                    window.timerInterval = setInterval(() => {
+                        timeLeft--;
+                        let m = Math.floor(timeLeft / 60);
+                        let s = timeLeft % 60;
+                        let timerDisplay = document.getElementById('timer') || document.querySelector('.timer');
+                        if (timerDisplay) {
+                            timerDisplay.innerText = `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+                        }
+                        if (timeLeft <= 0) {
+                            clearInterval(window.timerInterval);
+                        }
+                    }, 1000);
+                }
+
                 resetBtn();
-                return;
+
+            } catch (err) {
+                console.error(err);
+                alert("Lỗi tải dữ liệu. Vui lòng kiểm tra lại đường dẫn Web App.");
+                resetBtn();
             }
-
-            // Xáo trộn thứ tự các câu trong đề
-            selectedQuestions = (typeof shuffleArray === 'function') ? shuffleArray(selectedQuestions) : selectedQuestions.sort(() => Math.random() - 0.5);
-
-            // Cập nhật biến toàn cục
-            window.currentQuestions = selectedQuestions;
-            window.questions = selectedQuestions;
-
-            // Chuyển giao diện sang môn Toán
-            const selectMonHoc = document.getElementById('subject-select');
-            if (selectMonHoc) {
-                selectMonHoc.value = "Toán";
-                selectMonHoc.dispatchEvent(new Event('change'));
-            }
-
-            // Bật máy tính, ẩn các nút không cần thiết
-            const btnCalc = document.getElementById('btn-calc');
-            const btnDict = document.getElementById('btn-dict');
-            const btnVerbs = document.getElementById('btn-verbs');
-            if (btnCalc) btnCalc.style.display = 'block';
-            if (btnDict) btnDict.style.display = 'none';
-            if (btnVerbs) btnVerbs.style.display = 'none';
-
-            // 4. Gọi hàm khởi tạo giao diện quiz của trang gốc (nếu có)
-            if (typeof initQuizApp === 'function') {
-                initQuizApp(selectedQuestions);
-            } else if (typeof startQuiz === 'function') {
-                startQuiz();
-            }
-
-            // 5. TỰ TẠO VÀ RENDER GIAO DIỆN HIỂN THỊ ĐỦ 21 CÂU NẾU TRANG GỐC BỊ GIỚI HẠN 10 CÂU
-            setTimeout(() => {
-                let quizContainer = document.querySelector('#quiz-container, .quiz-content, .questions-wrapper') || document.body;
-                
-                // Kiểm tra xem trang có đang hiển thị đủ số lượng câu không, nếu không ta tự render bổ sung hoặc ép hiển thị
-                let renderedItems = document.querySelectorAll('.question-container, .quiz-question, [id^="question"]');
-                
-                if (renderedItems.length < 21 && typeof renderQuestions === 'function') {
-                    try {
-                        renderQuestions(selectedQuestions);
-                    } catch(err) {}
-                }
-
-                // Ép hiển thị toàn bộ các thẻ câu hỏi trên trang
-                let allQElements = document.querySelectorAll('.question-container, .quiz-question, [id^="question"], .question-item');
-                allQElements.forEach((el, index) => {
-                    el.style.display = 'block';
-                    el.style.visibility = 'visible';
-                });
-            }, 400);
-
-            // 6. Cố định thời gian chuẩn 30 phút (1800 giây)
-            if (typeof window.startTimerTotal === 'function') {
-                window.startTimerTotal(30 * 60);
-            } else {
-                let timeLeft = 30 * 60;
-                if (window.timerInterval) clearInterval(window.timerInterval);
-                window.timerInterval = setInterval(() => {
-                    timeLeft--;
-                    let m = Math.floor(timeLeft / 60);
-                    let s = timeLeft % 60;
-                    let timerDisplay = document.getElementById('timer') || document.querySelector('.timer');
-                    if (timerDisplay) {
-                        timerDisplay.innerText = `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
-                    }
-                    if (timeLeft <= 0) {
-                        clearInterval(window.timerInterval);
-                    }
-                }, 1000);
-            }
-
-            resetBtn();
         });
     }
 
