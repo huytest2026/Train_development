@@ -1947,43 +1947,50 @@ document.addEventListener('DOMContentLoaded', () => {
                 location.reload();
             });
 
-            // Xử lý sự kiện cho các nút Tra từ hoặc ĐT Bất Quy Tắc nếu trang có sẵn hàm hỗ trợ toàn cục
-            document.getElementById('btn-tratru').addEventListener('click', () => {
-                if (typeof openTraTuModal === 'function') openTraTuModal();
-                else alert("Tính năng Tra từ đang được cấu hình.");
-            });
+            
+            // QUẢN LÝ MÁY TÍNH BỎ TÚI (CALCULATOR)
+// ==========================================
+window.openCalculatorModal = function() {
+    const modal = document.getElementById('calc-modal');
+    if (modal) modal.style.display = 'flex';
+};
 
-            document.getElementById('btn-dtbqt').addEventListener('click', () => {
-                if (typeof openBQTModal === 'function') openBQTModal();
-                else alert("Tính năng Động từ bất quy tắc đang được cấu hình.");
-            });
+window.closeCalculatorModal = function() {
+    const modal = document.getElementById('calc-modal');
+    if (modal) modal.style.display = 'none';
+};
 
-            // Xử lý Máy tính
-            const calcModal = document.getElementById('calc-modal');
-            document.getElementById('btn-calc-toggle').addEventListener('click', () => {
-                calcModal.style.display = calcModal.style.display === 'none' ? 'block' : 'none';
-            });
-            document.getElementById('calc-close').addEventListener('click', () => {
-                calcModal.style.display = 'none';
-            });
+window.calcInput = function(value) {
+    const display = document.getElementById('calc-display');
+    if (display) {
+        display.value += value;
+    }
+};
 
-            const calcScreen = document.getElementById('calc-screen');
-            document.querySelectorAll('.calc-btn').forEach(button => {
-                button.addEventListener('click', () => {
-                    let val = button.getAttribute('data-val');
-                    if (val === 'C') {
-                        calcScreen.value = '';
-                    } else if (val === '=') {
-                        try {
-                            calcScreen.value = eval(calcScreen.value.replace(/×/g, '*').replace(/÷/g, '/'));
-                        } catch (err) {
-                            calcScreen.value = 'Lỗi';
-                        }
-                    } else {
-                        calcScreen.value += val;
-                    }
-                });
-            });
+window.calcClear = function() {
+    const display = document.getElementById('calc-display');
+    if (display) {
+        display.value = '';
+    }
+};
+
+window.calcCalculate = function() {
+    const display = document.getElementById('calc-display');
+    if (!display || !display.value.trim()) return;
+
+    try {
+        let expression = display.value.replace(/×/g, '*').replace(/÷/g, '/');
+        let result = new Function(`return ${expression}`)();
+        
+        if (result !== undefined && !isNaN(result)) {
+            display.value = result;
+        } else {
+            display.value = 'Lỗi';
+        }
+    } catch (e) {
+        display.value = 'Lỗi';
+    }
+};
 
             let scoreDung = 0;
             let scoreSai = 0;
