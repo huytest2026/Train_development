@@ -2111,3 +2111,31 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 });
+window.downloadPDF = function() {
+    // 1. Lấy phần thẻ chứa danh sách câu hỏi / bài tập (ví dụ id="quiz-container")
+    const element = document.getElementById('quiz-container'); 
+
+    if (!element) {
+        alert("Không tìm thấy nội dung bài tập!");
+        return;
+    }
+
+    // 2. Cấu hình file PDF xuất ra
+    const opt = {
+        margin:       [10, 10, 10, 10], // Lề top, left, bottom, right (mm)
+        filename:     'Bai_tap_tong_hop.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true }, // Tăng độ nét
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    // 3. Tạm thời ẩn các nút bấm bên trong vùng cần chụp
+    const actionButtons = element.querySelectorAll('button, .no-print');
+    actionButtons.forEach(btn => btn.style.visibility = 'hidden');
+
+    // 4. Xuất và tải file PDF
+    html2pdf().set(opt).from(element).save().then(() => {
+        // Hiện lại các nút bấm sau khi xuất xong
+        actionButtons.forEach(btn => btn.style.visibility = 'visible');
+    });
+};
