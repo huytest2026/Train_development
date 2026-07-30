@@ -526,7 +526,10 @@ window.toggleDarkMode = function() {
 };
 
 window.handleSubjectChange = function() {
-    const mon = document.getElementById('subject-select').value.toLowerCase();
+    // SỬ DỤNG cleanKey ĐỂ XÓA DẤU TRƯỚC KHI SO SÁNH
+    const monRaw = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
+    const mon = cleanKey(monRaw);
+    
     const levelContainer = document.getElementById('level-container');
     if (levelContainer) levelContainer.style.display = (mon.includes('anh') || mon.includes('english')) ? 'block' : 'none';
     
@@ -543,11 +546,16 @@ window.handleSubjectChange = function() {
         if (btnCalc) btnCalc.style.display = 'none';
         if (btnDict) btnDict.style.display = 'block';
         if (btnVerbs) btnVerbs.style.display = 'block';
+    } else {
+        // Ẩn hết nếu là môn khác
+        if (btnCalc) btnCalc.style.display = 'none';
+        if (btnDict) btnDict.style.display = 'none';
+        if (btnVerbs) btnVerbs.style.display = 'none';
     }
 
     window.updateTopicList();
     window.updateMadeList();
-    window.renderLeaderboard(mon);
+    window.renderLeaderboard(monRaw);
     window.saveUserSelections();
 };
 
