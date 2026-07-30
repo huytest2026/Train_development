@@ -916,7 +916,7 @@ function getCorrectKeys(item) {
 }
 
 window.startQuiz = function() {
-   // KIỂM TRA MÔN BẰNG CÁCH DÙNG cleanKey
+    // KIỂM TRA MÔN BẰNG CÁCH DÙNG cleanKey
     const subjectSelect = document.getElementById('subject-select');
     const selectedSubjectRaw = subjectSelect ? subjectSelect.value : '';
     const selectedSubject = cleanKey(selectedSubjectRaw);
