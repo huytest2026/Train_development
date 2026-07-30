@@ -188,3 +188,28 @@ button:active { transform: scale(0.98); }
     gap: 4px !important;
     height: auto !important;
 }
+@media print {
+    /* Ẩn các thành phần giao diện không cần thiết khi in */
+    #btn-calc, #btn-dict, #btn-verbs, 
+    .timer, .nav-buttons, button, 
+    #subject-select, .header-tools {
+        display: none !important;
+    }
+
+    /* Đưa nền về màu trắng và định dạng lại khung bài tập */
+    body {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* Mỗi câu hỏi không bị ngắt đôi giữa 2 trang */
+    .question-card, .quiz-item {
+        border: 1px solid #ccc !important;
+        box-shadow: none !important;
+        page-break-inside: avoid;
+        margin-bottom: 15px !important;
+        padding: 10px !important;
+    }
+}
