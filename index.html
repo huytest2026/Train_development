@@ -99,6 +99,61 @@
             border: 2px solid #540606;
             position: relative;
         }
+
+        /* Khung thông tin chỉ hiển thị khi in */
+        .print-only-header {
+            display: none;
+        }
+
+        /* --- CẤU HÌNH ĐỊNH DẠNG KHI IN / XUẤT PDF --- */
+        @media print {
+            /* Giữ nguyên màu sắc chuẩn (nền, chữ, khung đáp án) */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            /* Ẩn các công cụ và giao diện không thuộc bài thi */
+            #start-screen, #calc-modal, #dict-modal, #irregular-verbs-modal, 
+            .quiz-sticky-header, #submit-btn {
+                display: none !important;
+            }
+
+            /* Hiển thị vùng bài làm */
+            #quiz-screen {
+                display: block !important;
+            }
+
+            /* Hiển thị tiêu đề bài thi dành riêng cho bản in PDF */
+            .print-only-header {
+                display: block !important;
+            }
+
+            body {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+                margin: 0 !important;
+                padding: 10px !important;
+            }
+
+            .container {
+                background-color: transparent !important;
+                box-shadow: none !important;
+                max-width: 100% !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+
+            /* Tránh việc câu hỏi bị ngắt đôi giữa 2 trang A4 */
+            .quiz-card {
+                border: 1.5px solid #540606 !important;
+                box-shadow: none !important;
+                page-break-inside: avoid;
+                break-inside: avoid;
+                margin-bottom: 20px !important;
+                padding: 15px !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -148,8 +203,8 @@
 
     <!-- NÚT TẠO ĐỀ TỔNG HỢP MÔN TOÁN -->
     <button type="button" id="btn-tao-de-toan" style="width: 100%; padding: 12px; background-color: #ffc107; color: #000; border: none; border-radius: 8px; font-weight: bold; font-size: 1em; margin-top: 10px; margin-bottom: 10px; cursor: pointer;">
-    🎯 Tạo đề tổng hợp (30 phút - 21 câu)
-</button>
+        🎯 Tạo đề tổng hợp (30 phút - 21 câu)
+    </button>
 
     <button type="button" id="start-btn" onclick="window.startQuizWithToolCheck()" style="width: 100%; padding: 16px; background: #007bff; color: white; border: none; cursor: pointer; margin-top: 5px; border-radius: 8px; font-weight: bold; font-size: 1.2em;">Bắt Đầu Làm Bài</button>
 
@@ -160,6 +215,10 @@
 </div>
 
 <div class="container" id="quiz-screen" style="display:none;">
+    
+    <!-- KHUNG TIÊU ĐỀ BÀI THI KHI IN / TẢI PDF -->
+    <div id="print-only-header" class="print-only-header"></div>
+
     <div class="quiz-sticky-header">
         <div>⏱️ <span id="timer-display" style="color: red; font-size: 1.15em;">--:--</span></div>
         <div style="display: flex; gap: 8px;">
@@ -170,6 +229,9 @@
             <button type="button" id="btn-dict" onclick="window.openDictionaryModal()" style="display: none; background: #17a2b8; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📖 Tra từ</button>
             <button type="button" id="btn-verbs" onclick="window.openIrregularVerbsModal()" style="display: none; background: #e0a800; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📚 ĐT Bất Quy Tắc</button>
             
+            <!-- NÚT IN / XUẤT PDF -->
+            <button type="button" onclick="window.printQuiz()" style="background: #fd7e14; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🖨️ In / PDF</button>
+
             <button type="button" onclick="window.backToHome()" style="background: #6c757d; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🏠 Trang chủ</button>
         </div>
         <div>Đúng: <span id="correct-count-display" style="color: green;">0</span> | Sai: <span id="wrong-count-display" style="color: red;">0</span></div>
@@ -265,6 +327,31 @@
 
 <script src="script.js"></script>
 <script>
+    // --- HÀM IN & TỰ ĐỘNG CHÈN THÔNG TIN BÀI THI VÀO XUẤT PDF ---
+    window.printQuiz = function() {
+        const studentCode = document.getElementById('student-code')?.value || 'Chưa nhập';
+        const subjectSelect = document.getElementById('subject-select');
+        const subjectText = (subjectSelect && subjectSelect.selectedIndex >= 0 && subjectSelect.value) 
+                            ? subjectSelect.options[subjectSelect.selectedIndex].text 
+                            : 'Tổng hợp';
+
+        const printHeader = document.getElementById('print-only-header');
+        if (printHeader) {
+            printHeader.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #540606; padding-bottom: 10px; margin-bottom: 20px;">
+                    <div>
+                        <h2 style="margin: 0; color: #540606;">BÀI KIỂM TRA MÔN: ${subjectText.toUpperCase()}</h2>
+                        <p style="margin: 5px 0 0 0; font-weight: bold; font-size: 1.1em;">Học sinh: ${studentCode}</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <p style="margin: 0; font-size: 0.95em; color: #333;">Ngày xuất đề/bài: ${new Date().toLocaleDateString('vi-VN')}</p>
+                    </div>
+                </div>
+            `;
+        }
+        window.print();
+    };
+
     // --- Tính năng Kéo thả (Draggable) cho máy tính ---
     document.addEventListener('DOMContentLoaded', () => {
         const calcModal = document.getElementById('calc-modal');
