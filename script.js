@@ -2139,3 +2139,6 @@ window.downloadPDF = function() {
         actionButtons.forEach(btn => btn.style.visibility = 'visible');
     });
 };
+window.printQuiz = function() {
+    window.print();
+};
