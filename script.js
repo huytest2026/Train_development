@@ -526,10 +526,7 @@ window.toggleDarkMode = function() {
 };
 
 window.handleSubjectChange = function() {
-    // SỬ DỤNG cleanKey ĐỂ XÓA DẤU TRƯỚC KHI SO SÁNH
-    const monRaw = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
-    const mon = cleanKey(monRaw);
-    
+    const mon = document.getElementById('subject-select').value.toLowerCase();
     const levelContainer = document.getElementById('level-container');
     if (levelContainer) levelContainer.style.display = (mon.includes('anh') || mon.includes('english')) ? 'block' : 'none';
     
@@ -546,18 +543,14 @@ window.handleSubjectChange = function() {
         if (btnCalc) btnCalc.style.display = 'none';
         if (btnDict) btnDict.style.display = 'block';
         if (btnVerbs) btnVerbs.style.display = 'block';
-    } else {
-        // Ẩn hết nếu là môn khác
-        if (btnCalc) btnCalc.style.display = 'none';
-        if (btnDict) btnDict.style.display = 'none';
-        if (btnVerbs) btnVerbs.style.display = 'none';
     }
 
     window.updateTopicList();
     window.updateMadeList();
-    window.renderLeaderboard(monRaw);
+    window.renderLeaderboard(mon);
     window.saveUserSelections();
 };
+
 window.updateMadeList = function() {
     const monSelect = document.getElementById('subject-select') ? document.getElementById('subject-select').value.trim() : '';
     const madeSelect = document.getElementById('made-select');
@@ -914,10 +907,10 @@ function getCorrectKeys(item) {
     return [...new Set(keys)];
 }
 
-// KIỂM TRA MÔN BẰNG CÁCH DÙNG cleanKey
+window.startQuiz = function() {
+    // Kiểm tra môn học đang chọn để ẩn/hiện nút phù hợp trên giao diện
     const subjectSelect = document.getElementById('subject-select');
-    const selectedSubjectRaw = subjectSelect ? subjectSelect.value : '';
-    const selectedSubject = cleanKey(selectedSubjectRaw);
+    const selectedSubject = subjectSelect ? subjectSelect.value.toLowerCase() : '';
 
     const btnCalc = document.getElementById('btn-calc');
     const btnDict = document.getElementById('btn-dict');
@@ -941,7 +934,7 @@ function getCorrectKeys(item) {
         if (btnVerbs) btnVerbs.style.display = 'none';
     }
 
-    const mon = selectedSubjectRaw;
+    const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
     if (!mon) return alert("Vui lòng chọn môn học trước khi bắt đầu!");
 
     const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
