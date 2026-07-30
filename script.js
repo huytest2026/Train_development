@@ -1891,48 +1891,46 @@ document.addEventListener('DOMContentLoaded', () => {
             let setupScreen = document.querySelector('.setup-screen, #setup-section, form');
             if (setupScreen) setupScreen.style.display = 'none';
 
-            // Giao diện đầy đủ thanh công cụ: Tra từ, ĐT Bất Quy Tắc, Máy tính, Trang chủ
+            // Giao diện chuẩn cho môn Toán: Chỉ hiện Máy tính và Trang chủ (Ẩn Tra từ & ĐT Bất Quy Tắc)
             let htmlContent = `<div style="max-width: 800px; margin: 0 auto; padding: 20px; background: #f9f9f9; position: relative;">
                 
                 <!-- Popup Máy tính -->
                 <div id="calc-modal" style="display: none; position: fixed; top: 80px; right: 20px; background: #333; padding: 15px; border-radius: 10px; z-index: 2000; box-shadow: 0 5px 15px rgba(0,0,0,0.3); width: 240px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
                         <span style="color: white; font-weight: bold; font-size: 14px;">Máy tính</span>
-                        <button id="calc-close" style="background: red; color: white; border: none; border-radius: 3px; cursor: pointer; padding: 2px 6px;">✕</button>
+                        <button id="calc-close" onclick="closeCalculatorModal()" style="background: red; color: white; border: none; border-radius: 3px; cursor: pointer; padding: 2px 6px;">✕</button>
                     </div>
-                    <input type="text" id="calc-screen" readonly style="width: 100%; height: 35px; background: #fff; text-align: right; font-size: 18px; padding: 5px; margin-bottom: 10px; box-sizing: border-box; border-radius: 4px; border: none;" value="">
+                    <input type="text" id="calc-display" readonly style="width: 100%; height: 35px; background: #fff; text-align: right; font-size: 18px; padding: 5px; margin-bottom: 10px; box-sizing: border-box; border-radius: 4px; border: none;" value="">
                     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px;">
-                        <button class="calc-btn" data-val="C" style="background: #d32f2f; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">C</button>
-                        <button class="calc-btn" data-val="(" style="background: #555; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">(</button>
-                        <button class="calc-btn" data-val=")" style="background: #555; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">)</button>
-                        <button class="calc-btn" data-val="/" style="background: #ff9800; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">÷</button>
+                        <button class="calc-btn" onclick="calcClear()" style="background: #d32f2f; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">C</button>
+                        <button class="calc-btn" onclick="calcInput('(')" style="background: #555; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">(</button>
+                        <button class="calc-btn" onclick="calcInput(')')" style="background: #555; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">)</button>
+                        <button class="calc-btn" onclick="calcInput('÷')" style="background: #ff9800; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">÷</button>
                         
-                        <button class="calc-btn" data-val="7" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">7</button>
-                        <button class="calc-btn" data-val="8" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">8</button>
-                        <button class="calc-btn" data-val="9" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">9</button>
-                        <button class="calc-btn" data-val="*" style="background: #ff9800; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">×</button>
+                        <button class="calc-btn" onclick="calcInput('7')" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">7</button>
+                        <button class="calc-btn" onclick="calcInput('8')" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">8</button>
+                        <button class="calc-btn" onclick="calcInput('9')" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">9</button>
+                        <button class="calc-btn" onclick="calcInput('×')" style="background: #ff9800; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">×</button>
                         
-                        <button class="calc-btn" data-val="4" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">4</button>
-                        <button class="calc-btn" data-val="5" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">5</button>
-                        <button class="calc-btn" data-val="6" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">6</button>
-                        <button class="calc-btn" data-val="-" style="background: #ff9800; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">-</button>
+                        <button class="calc-btn" onclick="calcInput('4')" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">4</button>
+                        <button class="calc-btn" onclick="calcInput('5')" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">5</button>
+                        <button class="calc-btn" onclick="calcInput('6')" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">6</button>
+                        <button class="calc-btn" onclick="calcInput('-')" style="background: #ff9800; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">-</button>
                         
-                        <button class="calc-btn" data-val="1" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">1</button>
-                        <button class="calc-btn" data-val="2" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">2</button>
-                        <button class="calc-btn" data-val="3" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">3</button>
-                        <button class="calc-btn" data-val="+" style="background: #ff9800; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">+</button>
+                        <button class="calc-btn" onclick="calcInput('1')" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">1</button>
+                        <button class="calc-btn" onclick="calcInput('2')" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">2</button>
+                        <button class="calc-btn" onclick="calcInput('3')" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">3</button>
+                        <button class="calc-btn" onclick="calcInput('+')" style="background: #ff9800; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">+</button>
                         
-                        <button class="calc-btn" data-val="0" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; grid-column: span 2; font-weight:bold; cursor:pointer;">0</button>
-                        <button class="calc-btn" data-val="." style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">.</button>
-                        <button class="calc-btn" data-val="=" style="background: #4caf50; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">=</button>
+                        <button class="calc-btn" onclick="calcInput('0')" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; grid-column: span 2; font-weight:bold; cursor:pointer;">0</button>
+                        <button class="calc-btn" onclick="calcInput('.')" style="background: #666; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">.</button>
+                        <button class="calc-btn" onclick="calcCalculate()" style="background: #4caf50; color:white; padding: 8px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">=</button>
                     </div>
                 </div>
 
-                <!-- Thanh tiêu đề tích hợp đầy đủ công cụ -->
+                <!-- Thanh tiêu đề chuẩn cho môn Toán -->
                 <div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 12px 15px; border-radius: 8px; border: 2px solid #b71c1c; margin-bottom: 20px; position: sticky; top: 10px; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex-wrap: wrap; gap: 10px;">
-                    <button id="btn-tratru" style="background: #0288d1; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">📖 Tra từ</button>
-                    <button id="btn-dtbqt" style="background: #7b1fa2; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">📚 ĐT Bất Quy Tắc</button>
-                    <button id="btn-calc-toggle" style="background: #ff9800; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">🧮 Calculator</button>
+                    <button id="btn-calc-toggle" onclick="openCalculatorModal()" style="background: #ff9800; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">🧮 Máy tính</button>
                     <button id="btn-home" style="background: #607d8b; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">🏠 Trang chủ</button>
                     <div style="font-size: 15px; font-weight: bold; color: #333;">Đúng: <span id="count-dung" style="color: green; font-size: 18px;">0</span> | Sai: <span id="count-sai" style="color: red; font-size: 18px;">0</span></div>
                     <div style="font-size: 15px; font-weight: bold; color: #d32f2f; background: #ffebee; padding: 6px 12px; border-radius: 6px;">⏱ <span id="timer">30:00</span></div>
@@ -1968,50 +1966,48 @@ document.addEventListener('DOMContentLoaded', () => {
                 location.reload();
             });
 
-            
             // QUẢN LÝ MÁY TÍNH BỎ TÚI (CALCULATOR)
-// ==========================================
-window.openCalculatorModal = function() {
-    const modal = document.getElementById('calc-modal');
-    if (modal) modal.style.display = 'flex';
-};
+            window.openCalculatorModal = function() {
+                const modal = document.getElementById('calc-modal');
+                if (modal) modal.style.display = 'flex';
+            };
 
-window.closeCalculatorModal = function() {
-    const modal = document.getElementById('calc-modal');
-    if (modal) modal.style.display = 'none';
-};
+            window.closeCalculatorModal = function() {
+                const modal = document.getElementById('calc-modal');
+                if (modal) modal.style.display = 'none';
+            };
 
-window.calcInput = function(value) {
-    const display = document.getElementById('calc-display');
-    if (display) {
-        display.value += value;
-    }
-};
+            window.calcInput = function(value) {
+                const display = document.getElementById('calc-display');
+                if (display) {
+                    display.value += value;
+                }
+            };
 
-window.calcClear = function() {
-    const display = document.getElementById('calc-display');
-    if (display) {
-        display.value = '';
-    }
-};
+            window.calcClear = function() {
+                const display = document.getElementById('calc-display');
+                if (display) {
+                    display.value = '';
+                }
+            };
 
-window.calcCalculate = function() {
-    const display = document.getElementById('calc-display');
-    if (!display || !display.value.trim()) return;
+            window.calcCalculate = function() {
+                const display = document.getElementById('calc-display');
+                if (!display || !display.value.trim()) return;
 
-    try {
-        let expression = display.value.replace(/×/g, '*').replace(/÷/g, '/');
-        let result = new Function(`return ${expression}`)();
-        
-        if (result !== undefined && !isNaN(result)) {
-            display.value = result;
-        } else {
-            display.value = 'Lỗi';
-        }
-    } catch (e) {
-        display.value = 'Lỗi';
-    }
-};
+                try {
+                    let expression = display.value.replace(/×/g, '*').replace(/÷/g, '/');
+                    let result = new Function(`return ${expression}`)();
+                    
+                    if (result !== undefined && !isNaN(result)) {
+                        display.value = result;
+                    } else {
+                        display.value = 'Lỗi';
+                    }
+                } catch (e) {
+                    display.value = 'Lỗi';
+                }
+            };
 
             let scoreDung = 0;
             let scoreSai = 0;
