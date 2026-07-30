@@ -137,3 +137,54 @@ button:active { transform: scale(0.98); }
     border: 2px solid #540606;
     position: relative;
 }
+/* --- CSS RIÊNG CHO MÁY TÍNH CẦM TAY (ĐẶT Ở CUỐI FILE) --- */
+#calc-modal {
+    position: fixed !important;
+    width: 210px !important;
+    height: auto !important;
+    min-height: unset !important;
+    max-height: unset !important;
+    background: #222 !important;
+    padding: 10px !important;
+    border-radius: 8px !important;
+    z-index: 9999 !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4) !important;
+    display: none;
+    flex-direction: column !important;
+    user-select: none !important;
+    overflow: hidden !important;
+}
+
+#calc-modal * {
+    box-sizing: border-box !important;
+}
+
+#calc-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    margin-bottom: 8px !important;
+    cursor: move !important;
+    background: #333 !important;
+    padding: 4px 8px !important;
+    border-radius: 4px !important;
+}
+
+#calc-display {
+    width: 100% !important;
+    height: 32px !important;
+    background: #fff !important;
+    text-align: right !important;
+    font-size: 16px !important;
+    padding: 4px !important;
+    margin-bottom: 8px !important;
+    border-radius: 4px !important;
+    border: none !important;
+}
+
+#calc-modal > div:last-child {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 4px !important;
+    height: auto !important;
+}
