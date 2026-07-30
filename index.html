@@ -108,9 +108,10 @@
                 print-color-adjust: exact !important;
             }
 
-            /* Ẩn các công cụ không cần thiết khi in */
+            /* Ẩn các công cụ và thanh trạng thái khi in */
             #start-screen, #calc-modal, #dict-modal, #irregular-verbs-modal, 
-            .quiz-sticky-header, #submit-btn, #btn-print-pdf {
+            .quiz-sticky-header, #submit-btn, #btn-print-pdf,
+            div[style*="border: 2px solid red"], div[style*="border:2px solid red"] {
                 display: none !important;
             }
 
@@ -290,44 +291,56 @@
 
 <script src="script.js"></script>
 <script>
-    // --- HÀM TỰ ĐỘNG BẢO VỆ & GẮN NÚT IN/PDF VÀO HEADER ---
+    // --- HÀM TỰ ĐỘNG CHÈN NÚT IN/PDF CHO CẢ ĐỀ THƯỜNG VÀ ĐỀ TỔNG HỢP TOÁN ---
     function autoEnsurePrintButton() {
         const quizScreen = document.getElementById('quiz-screen');
         if (!quizScreen || quizScreen.style.display === 'none') return;
 
-        // Tìm thanh header của bài thi
-        const stickyHeader = document.querySelector('.quiz-sticky-header');
-        if (!stickyHeader) return;
+        // Nếu nút đã tồn tại rồi thì không tạo lại
+        if (document.getElementById('btn-print-pdf')) return;
 
-        // Nếu nút In / PDF chưa xuất hiện thì tự động tạo và chèn vào
-        if (!document.getElementById('btn-print-pdf')) {
+        // Tìm điểm tựa để chèn nút (Thường là nút Calculator hoặc Trang chủ)
+        let targetBtn = document.getElementById('btn-calc');
+
+        if (!targetBtn) {
+            // Tìm bất kỳ nút nào chứa chữ Calculator hoặc Trang chủ trong vùng bài thi
+            const allButtons = Array.from(quizScreen.querySelectorAll('button'));
+            targetBtn = allButtons.find(btn => 
+                btn.innerText.includes('Calculator') || 
+                btn.innerText.includes('Trang chủ') || 
+                btn.innerText.includes('🧮')
+            );
+        }
+
+        if (targetBtn && targetBtn.parentNode) {
             const printBtn = document.createElement('button');
             printBtn.id = 'btn-print-pdf';
             printBtn.type = 'button';
             printBtn.innerHTML = '🖨️ In / PDF';
-            printBtn.style.cssText = 'background: #28a745; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold; margin-right: 5px;';
+            printBtn.style.cssText = 'background: #28a745; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold; margin-right: 6px; margin-left: 6px; display: inline-block !important;';
             printBtn.onclick = function() { window.printQuiz(); };
 
-            // Ưu tiên chèn bên cạnh nút Calculator/Trang chủ
-            const calcBtn = document.getElementById('btn-calc') || stickyHeader.querySelector('button');
-            if (calcBtn && calcBtn.parentNode) {
-                calcBtn.parentNode.insertBefore(printBtn, calcBtn);
-            } else {
-                stickyHeader.appendChild(printBtn);
-            }
+            // Chèn nút In / PDF ngay bên cạnh nút Calculator
+            targetBtn.parentNode.insertBefore(printBtn, targetBtn);
         }
     }
 
-    // Tự động kiểm tra liên tục để script.js không xóa mất nút nữa
-    setInterval(autoEnsurePrintButton, 300);
+    // Chạy kiểm tra liên tục mỗi 200ms để đảm bảo dù Đề Tổng Hợp load lúc nào nút cũng xuất hiện
+    setInterval(autoEnsurePrintButton, 200);
 
     // --- HÀM IN & CHÈN TIÊU ĐỀ KHI XUẤT PDF ---
     window.printQuiz = function() {
         const studentCode = document.getElementById('student-code')?.value || 'Chưa nhập';
         const subjectSelect = document.getElementById('subject-select');
-        const subjectText = (subjectSelect && subjectSelect.selectedIndex >= 0 && subjectSelect.value) 
+        let subjectText = (subjectSelect && subjectSelect.selectedIndex >= 0 && subjectSelect.value) 
                             ? subjectSelect.options[subjectSelect.selectedIndex].text 
-                            : 'ĐỀ TỔNG HỢP TOÁN';
+                            : 'MÔN TOÁN';
+
+        // Kiểm tra xem có phải Đề Tổng Hợp không
+        const quizContent = document.getElementById('quiz-screen')?.innerText || '';
+        if (quizContent.includes('ĐỀ TỔNG HỢP TOÁN')) {
+            subjectText = 'TỔNG HỢP TOÁN';
+        }
 
         const printHeader = document.getElementById('print-only-header');
         if (printHeader) {
@@ -498,6 +511,8 @@
                     if (typeof window.startTimerTotal === 'function') {
                         window.startTimerTotal(30 * 60);
                     }
+                    // Ép tự động chèn ngay nút In / PDF vào Đề Tổng Hợp
+                    setTimeout(autoEnsurePrintButton, 50);
                 } else {
                     alert("Đã tạo đề nhưng có lỗi khởi tạo giao diện quiz.");
                 }
