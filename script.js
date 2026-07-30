@@ -1891,17 +1891,19 @@ document.addEventListener('DOMContentLoaded', () => {
             let setupScreen = document.querySelector('.setup-screen, #setup-section, form');
             if (setupScreen) setupScreen.style.display = 'none';
 
-            // Giao diện chính + Máy tính nhỏ gọn, có thể kéo thả (Draggable)
             let htmlContent = `<div style="max-width: 800px; margin: 0 auto; padding: 20px; background: #f9f9f9; position: relative;">
                 
-                <!-- Popup Máy tính nhỏ gọn & Kéo thả được -->
-                <div id="calc-modal" style="display: none; position: fixed; top: 120px; right: 50px; background: #222; padding: 10px; border-radius: 8px; z-index: 9999; box-shadow: 0 8px 20px rgba(0,0,0,0.4); width: 210px; user-select: none;">
-                    <!-- Thanh tiêu đề dùng để kéo thả -->
+                <!-- Popup Máy tính đã sửa lỗi vùng đen dư thừa bằng height: auto và display: inline-block -->
+                <div id="calc-modal" style="display: none; position: fixed; top: 120px; right: 50px; background: #222; padding: 10px; border-radius: 8px; z-index: 9999; box-shadow: 0 8px 20px rgba(0,0,0,0.4); width: 210px; height: auto !important; max-height: none !important; user-select: none;">
+                    
+                    <!-- Thanh tiêu đề kéo thả -->
                     <div id="calc-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; cursor: move; background: #333; padding: 4px 8px; border-radius: 4px;">
-                        <span style="color: #ff9800; font-weight: bold; font-size: 13px;">🧮 Máy tính (Kéo đây)</span>
+                        <span style="color: #ff9800; font-weight: bold; font-size: 13px;">🧮 Máy tính</span>
                         <button id="calc-close" onclick="closeCalculatorModal()" style="background: #d32f2f; color: white; border: none; border-radius: 3px; cursor: pointer; padding: 1px 5px; font-size: 12px;">✕</button>
                     </div>
+
                     <input type="text" id="calc-display" readonly style="width: 100%; height: 32px; background: #fff; text-align: right; font-size: 16px; padding: 4px; margin-bottom: 8px; box-sizing: border-box; border-radius: 4px; border: none;" value="">
+                    
                     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;">
                         <button class="calc-btn" onclick="calcClear()" style="background: #d32f2f; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">C</button>
                         <button class="calc-btn" onclick="calcInput('(')" style="background: #555; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">(</button>
@@ -1962,7 +1964,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let containerTarget = document.querySelector('#quiz-view') || document.body;
             containerTarget.innerHTML = htmlContent;
 
-            // KÍCH HOẠT TÍNH NĂNG KÉO THẢ CHO MÁY TÍNH (DRAGGABLE)
+            // Xử lý kéo thả (Draggable)
             const calcModal = document.getElementById('calc-modal');
             const calcHeader = document.getElementById('calc-header');
             let isDragging = false;
@@ -1972,7 +1974,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 isDragging = true;
                 offsetX = e.clientX - calcModal.offsetLeft;
                 offsetY = e.clientY - calcModal.offsetTop;
-                calcModal.style.right = 'auto'; // Hủy neo bên phải để dùng left/top chính xác
+                calcModal.style.right = 'auto'; 
             });
 
             document.addEventListener('mousemove', (e) => {
@@ -1985,12 +1987,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 isDragging = false;
             });
 
-            // Xử lý nút Trang chủ
+            // Nút Trang chủ
             document.getElementById('btn-home').addEventListener('click', () => {
                 location.reload();
             });
 
-            // HÀM ĐIỀU KHIỂN MÁY TÍNH
+            // Hàm mở/đóng máy tính
             window.openCalculatorModal = function() {
                 if (calcModal) calcModal.style.display = 'block';
             };
@@ -2034,7 +2036,6 @@ document.addEventListener('DOMContentLoaded', () => {
             let scoreDung = 0;
             let scoreSai = 0;
 
-            // Xử lý chọn đáp án
             selectedQuestions.forEach((q, index) => {
                 let correctAns = (q['Đáp án đúng'] || "").toString().trim().toUpperCase();
                 let radios = document.querySelectorAll(`input[name="question_${index}"]`);
@@ -2068,14 +2069,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
 
-            // Xử lý nút nộp bài
             document.getElementById('custom-submit-btn').addEventListener('click', () => {
                 if (window.timerInterval) clearInterval(window.timerInterval);
                 alert(`Bạn đã hoàn thành bài thi!\n- Số câu đúng: ${scoreDung}\n- Số câu sai: ${scoreSai}`);
                 location.reload();
             });
 
-            // Đồng hồ đếm ngược 30 phút
             let timeLeft = 30 * 60;
             if (window.timerInterval) clearInterval(window.timerInterval);
             window.timerInterval = setInterval(() => {
