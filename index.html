@@ -92,8 +92,24 @@
     </div>
 
     <!-- Tệp kịch bản chính và mã xử lý logic bổ sung -->
-    <script src="script.js"></script>
+   <script src="script.js"></script>
     <script>
+        // --- Gắn sự kiện tự động cho các nút chính ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Xử lý nút Tải dữ liệu / Xác nhận mã
+            const btnLoadData = document.getElementById('btn-load-data');
+            if (btnLoadData) {
+                btnLoadData.addEventListener('click', function() {
+                    if (typeof window.loadData === 'function') {
+                        window.loadData();
+                    } else {
+                        console.error("Không tìm thấy hàm loadData trong script.js!");
+                        alert("Lỗi: Không tìm thấy hàm tải dữ liệu trong script.js");
+                    }
+                });
+            }
+        });
+
         // --- Tính năng Kéo thả (Draggable) cho máy tính ---
         document.addEventListener('DOMContentLoaded', () => {
             const calcModal = document.getElementById('calc-modal');
