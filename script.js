@@ -526,10 +526,25 @@ window.toggleDarkMode = function() {
 };
 
 window.handleSubjectChange = function() {
-    const mon = document.getElementById('subject-select').value;
+    const mon = document.getElementById('subject-select').value.toLowerCase();
     const levelContainer = document.getElementById('level-container');
-    if (levelContainer) levelContainer.style.display = (mon === 'Tiếng Anh') ? 'block' : 'none';
+    if (levelContainer) levelContainer.style.display = (mon.includes('anh') || mon.includes('english')) ? 'block' : 'none';
     
+    // Xử lý ẩn hiện nút công cụ ngay tại màn hình chọn môn
+    const btnCalc = document.getElementById('btn-calc');
+    const btnDict = document.getElementById('btn-dict');
+    const btnVerbs = document.getElementById('btn-verbs');
+
+    if (mon.includes('toan') || mon.includes('math')) {
+        if (btnCalc) btnCalc.style.display = 'block';
+        if (btnDict) btnDict.style.display = 'none';
+        if (btnVerbs) btnVerbs.style.display = 'none';
+    } else if (mon.includes('anh') || mon.includes('english')) {
+        if (btnCalc) btnCalc.style.display = 'none';
+        if (btnDict) btnDict.style.display = 'block';
+        if (btnVerbs) btnVerbs.style.display = 'block';
+    }
+
     window.updateTopicList();
     window.updateMadeList();
     window.renderLeaderboard(mon);
@@ -893,7 +908,7 @@ function getCorrectKeys(item) {
 }
 
 window.startQuiz = function() {
-    // Kiểm tra môn học đang chọn để ẩn/hiện nút phù hợp trên header
+    // Kiểm tra môn học đang chọn để ẩn/hiện nút phù hợp trên giao diện
     const subjectSelect = document.getElementById('subject-select');
     const selectedSubject = subjectSelect ? subjectSelect.value.toLowerCase() : '';
 
@@ -901,16 +916,22 @@ window.startQuiz = function() {
     const btnDict = document.getElementById('btn-dict');
     const btnVerbs = document.getElementById('btn-verbs');
 
-    // Kiểm tra nếu là môn Toán (có chứa chữ 'toan' hoặc tương tự)
+    // Nếu là môn Toán: Chỉ hiện máy tính, ẩn tra từ và động từ bất quy tắc
     if (selectedSubject.includes('toan') || selectedSubject.includes('math')) {
         if (btnCalc) btnCalc.style.display = 'block';
         if (btnDict) btnDict.style.display = 'none';
         if (btnVerbs) btnVerbs.style.display = 'none';
-    } else {
-        // Mặc định hoặc môn Tiếng Anh
+    } 
+    // Nếu là môn Tiếng Anh: Hiện tra từ và động từ bất quy tắc, ẩn máy tính
+    else if (selectedSubject.includes('anh') || selectedSubject.includes('english')) {
         if (btnCalc) btnCalc.style.display = 'none';
         if (btnDict) btnDict.style.display = 'block';
         if (btnVerbs) btnVerbs.style.display = 'block';
+    } else {
+        // Mặc định cho các môn khác (như Tiếng Việt)
+        if (btnCalc) btnCalc.style.display = 'none';
+        if (btnDict) btnDict.style.display = 'none';
+        if (btnVerbs) btnVerbs.style.display = 'none';
     }
 
     const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
