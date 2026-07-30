@@ -365,123 +365,6 @@
     };
 
     // --- LOGIC XỬ LÝ NÚT TẠO ĐỀ TỔNG HỢP MÔN TOÁN ---
-    <script>
-    // --- Tính năng Kéo thả (Draggable) cho máy tính ---
-    document.addEventListener('DOMContentLoaded', () => {
-        const calcModal = document.getElementById('calc-modal');
-        const calcHeader = document.getElementById('calc-header');
-        let isDragging = false;
-        let offsetX, offsetY;
-
-        if (calcHeader && calcModal) {
-            calcHeader.addEventListener('mousedown', (e) => {
-                isDragging = true;
-                offsetX = e.clientX - calcModal.offsetLeft;
-                offsetY = e.clientY - calcModal.offsetTop;
-                calcModal.style.right = 'auto'; 
-            });
-
-            document.addEventListener('mousemove', (e) => {
-                if (!isDragging) return;
-                calcModal.style.left = (e.clientX - offsetX) + 'px';
-                calcModal.style.top = (e.clientY - offsetY) + 'px';
-            });
-
-            document.addEventListener('mouseup', () => {
-                isDragging = false;
-            });
-        }
-    });
-
-    // --- Các hàm hỗ trợ Mở / Đóng và Tính toán khoa học ---
-    window.openCalculatorModal = function() {
-        const modal = document.getElementById('calc-modal');
-        if (modal) modal.style.display = 'flex';
-    };
-
-    window.closeCalculatorModal = function() {
-        const modal = document.getElementById('calc-modal');
-        if (modal) modal.style.display = 'none';
-    };
-
-    window.calcInput = function(val) {
-        const display = document.getElementById('calc-display');
-        if (display) {
-            if (display.value === '0' || display.value === 'Lỗi') display.value = val;
-            else display.value += val;
-        }
-    };
-
-    window.calcClear = function() {
-        const display = document.getElementById('calc-display');
-        if (display) display.value = '0';
-    };
-
-    window.calcCalculate = function() {
-        const display = document.getElementById('calc-display');
-        if (display) {
-            try {
-                let expression = display.value.replace(/×/g, '*').replace(/÷/g, '/');
-                let result = new Function(`return ${expression}`)();
-                if (result !== undefined && !isNaN(result)) {
-                    display.value = Number(result.toFixed(6));
-                } else {
-                    display.value = 'Lỗi';
-                }
-            } catch (e) {
-                display.value = 'Lỗi';
-            }
-        }
-    };
-
-    // Hàm tự động nhận diện môn học và hiển thị công cụ tương ứng cho mọi trường hợp
-    window.startQuizWithToolCheck = function() {
-        const subjectSelect = document.getElementById('subject-select');
-        const selectedSubject = subjectSelect ? subjectSelect.value.toLowerCase() : '';
-        
-        const btnCalc = document.getElementById('btn-calc');
-        const btnDict = document.getElementById('btn-dict');
-        const btnVerbs = document.getElementById('btn-verbs');
-
-        const isMath = selectedSubject.includes('toán') || selectedSubject.includes('math');
-        const isEnglish = selectedSubject.includes('anh') || selectedSubject.includes('english');
-
-        if (isMath) {
-            if (btnCalc) btnCalc.style.setProperty('display', 'block', 'important');
-            if (btnDict) btnDict.style.display = 'none';
-            if (btnVerbs) btnVerbs.style.display = 'none';
-        } else if (isEnglish) {
-            if (btnCalc) btnCalc.style.display = 'none';
-            if (btnDict) btnDict.style.setProperty('display', 'block', 'important');
-            if (btnVerbs) btnVerbs.style.setProperty('display', 'block', 'important');
-        } else {
-            // Mặc định nếu là môn Toán hoặc đang ôn tập chung
-            if (btnCalc) btnCalc.style.setProperty('display', 'block', 'important');
-        }
-
-        if (typeof window.startQuiz === 'function') {
-            window.startQuiz();
-        }
-    };
-
-    // Tự động kiểm tra hiển thị nút máy tính ngay khi vào màn hình làm bài (phòng trường hợp gọi từ script ngoài)
-    setInterval(() => {
-        const quizScreen = document.getElementById('quiz-screen');
-        const btnCalc = document.getElementById('btn-calc');
-        const subjectSelect = document.getElementById('subject-select');
-        
-        if (quizScreen && quizScreen.style.display !== 'none' && btnCalc) {
-            const subVal = subjectSelect ? subjectSelect.value.toLowerCase() : '';
-            // Nếu không phải tiếng Anh thì ưu tiên hiển thị nút Máy tính
-            if (!subVal.includes('anh') && !subVal.includes('english')) {
-                if (btnCalc.style.display === 'none') {
-                    btnCalc.style.setProperty('display', 'block', 'important');
-                }
-            }
-        }
-    }, 500);
-
-    // --- LOGIC XỬ LÝ NÚT TẠO ĐỀ TỔNG HỢP MÔN TOÁN ---
     document.addEventListener('DOMContentLoaded', () => {
         const btnTaoDeToan = document.getElementById('btn-tao-de-toan');
         
@@ -547,7 +430,6 @@
             });
         }
     });
-
 </script>
 </body>
 </html>
