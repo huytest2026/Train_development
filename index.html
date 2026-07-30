@@ -213,6 +213,8 @@
             <button type="button" id="btn-calc" onclick="window.openCalculatorModal()" style="display: none; background: #fd7e14; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🧮 Calculator</button>
             <button type="button" id="btn-dict" onclick="window.openDictionaryModal()" style="display: none; background: #17a2b8; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📖 Tra từ</button>
             <button type="button" id="btn-verbs" onclick="window.openIrregularVerbsModal()" style="display: none; background: #e0a800; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📚 ĐT Bất Quy Tắc</button>
+            <!-- NÚT IN / PDF CỐ ĐỊNH CHUẨN XÁC CẢ CHO ĐỀ THƯỜNG VÀ ĐỀ TỔNG HỢP -->
+            <button type="button" id="btn-print-pdf" onclick="window.printQuiz()" style="background: #28a745; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🖨️ In / PDF</button>
             <button type="button" onclick="window.backToHome()" style="background: #6c757d; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🏠 Trang chủ</button>
         </div>
         <div>Đúng: <span id="correct-count-display" style="color: green;">0</span> | Sai: <span id="wrong-count-display" style="color: red;">0</span></div>
@@ -291,43 +293,6 @@
 
 <script src="script.js"></script>
 <script>
-    // --- HÀM TỰ ĐỘNG CHÈN NÚT IN/PDF CHO CẢ ĐỀ THƯỜNG VÀ ĐỀ TỔNG HỢP TOÁN ---
-    function autoEnsurePrintButton() {
-        const quizScreen = document.getElementById('quiz-screen');
-        if (!quizScreen || quizScreen.style.display === 'none') return;
-
-        // Nếu nút đã tồn tại rồi thì không tạo lại
-        if (document.getElementById('btn-print-pdf')) return;
-
-        // Tìm điểm tựa để chèn nút (Thường là nút Calculator hoặc Trang chủ)
-        let targetBtn = document.getElementById('btn-calc');
-
-        if (!targetBtn) {
-            // Tìm bất kỳ nút nào chứa chữ Calculator hoặc Trang chủ trong vùng bài thi
-            const allButtons = Array.from(quizScreen.querySelectorAll('button'));
-            targetBtn = allButtons.find(btn => 
-                btn.innerText.includes('Calculator') || 
-                btn.innerText.includes('Trang chủ') || 
-                btn.innerText.includes('🧮')
-            );
-        }
-
-        if (targetBtn && targetBtn.parentNode) {
-            const printBtn = document.createElement('button');
-            printBtn.id = 'btn-print-pdf';
-            printBtn.type = 'button';
-            printBtn.innerHTML = '🖨️ In / PDF';
-            printBtn.style.cssText = 'background: #28a745; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold; margin-right: 6px; margin-left: 6px; display: inline-block !important;';
-            printBtn.onclick = function() { window.printQuiz(); };
-
-            // Chèn nút In / PDF ngay bên cạnh nút Calculator
-            targetBtn.parentNode.insertBefore(printBtn, targetBtn);
-        }
-    }
-
-    // Chạy kiểm tra liên tục mỗi 200ms để đảm bảo dù Đề Tổng Hợp load lúc nào nút cũng xuất hiện
-    setInterval(autoEnsurePrintButton, 200);
-
     // --- HÀM IN & CHÈN TIÊU ĐỀ KHI XUẤT PDF ---
     window.printQuiz = function() {
         const studentCode = document.getElementById('student-code')?.value || 'Chưa nhập';
@@ -338,8 +303,8 @@
 
         // Kiểm tra xem có phải Đề Tổng Hợp không
         const quizContent = document.getElementById('quiz-screen')?.innerText || '';
-        if (quizContent.includes('ĐỀ TỔNG HỢP TOÁN')) {
-            subjectText = 'TỔNG HỢP TOÁN';
+        if (quizContent.includes('ĐỀ TỔNG HỢP TOÁN') || document.querySelector('#quiz-screen')?.dataset?.isDeTongHop === 'true') {
+            subjectText = 'TỔNG HỢP TOÁN (21 CÂU)';
         }
 
         const printHeader = document.getElementById('print-only-header');
@@ -423,6 +388,9 @@
 
     // Hàm nhận diện môn học và bật/tắt nút công cụ
     window.startQuizWithToolCheck = function() {
+        const quizScreen = document.getElementById('quiz-screen');
+        if (quizScreen) quizScreen.dataset.isDeTongHop = 'false';
+
         const subjectSelect = document.getElementById('subject-select');
         const selectedSubject = subjectSelect ? subjectSelect.value.toLowerCase() : '';
         
@@ -464,7 +432,10 @@
                     return;
                 }
 
-                if (!window.allQuizData || window.allQuizData.length === 0) {
+                // Lấy nguồn dữ liệu đầy đủ từ AppState
+                const poolData = (window.AppState && window.AppState.allQuizData) || window.allQuizData || [];
+
+                if (!poolData || poolData.length === 0) {
                     alert("Dữ liệu câu hỏi chưa được tải. Vui lòng bấm 'Xác nhận Mã & Tải đề' trước!");
                     return;
                 }
@@ -481,7 +452,7 @@
 
                 for (let chuDe in cauHinh) {
                     let countNeeded = cauHinh[chuDe];
-                    let pool = window.allQuizData.filter(q => 
+                    let pool = poolData.filter(q => 
                         q.chuDe && q.chuDe.trim().toLowerCase() === chuDe.toLowerCase()
                     );
 
@@ -505,14 +476,34 @@
                 if (btnDict) btnDict.style.setProperty('display', 'none', 'important');
                 if (btnVerbs) btnVerbs.style.setProperty('display', 'none', 'important');
 
-                if (typeof initQuizApp === 'function') {
-                    initQuizApp(selectedQuestions);
-                    
-                    if (typeof window.startTimerTotal === 'function') {
-                        window.startTimerTotal(30 * 60);
+                // Khởi tạo bài thi chuẩn ứng dụng
+                if (window.AppState) {
+                    AppState.currentQuizData = selectedQuestions.map(item => {
+                        let correctKeys = (typeof getCorrectKeys === 'function') ? getCorrectKeys(item) : [];
+                        let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k] && item[k] !== '');
+                        validKeys = (typeof shuffleArray === 'function') ? shuffleArray(validKeys) : validKeys;
+                        return { ...item, _shuffledKeys: validKeys, _correctKeys: correctKeys };
+                    });
+
+                    AppState.correctCount = 0;
+                    AppState.wrongCount = 0;
+
+                    const startScreen = document.getElementById('start-screen');
+                    if (startScreen) startScreen.style.display = 'none';
+
+                    const quizScreen = document.getElementById('quiz-screen');
+                    if (quizScreen) {
+                        quizScreen.style.display = 'block';
+                        quizScreen.dataset.isDeTongHop = 'true';
                     }
-                    // Ép tự động chèn ngay nút In / PDF vào Đề Tổng Hợp
-                    setTimeout(autoEnsurePrintButton, 50);
+
+                    if (typeof handleBeforeUnload !== 'undefined') {
+                        window.addEventListener('beforeunload', handleBeforeUnload);
+                    }
+
+                    if (typeof updateScoreDisplay === 'function') updateScoreDisplay();
+                    if (typeof window.renderQuiz === 'function') window.renderQuiz();
+                    if (typeof window.startTimerTotal === 'function') window.startTimerTotal(30 * 60);
                 } else {
                     alert("Đã tạo đề nhưng có lỗi khởi tạo giao diện quiz.");
                 }
