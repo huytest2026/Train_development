@@ -916,9 +916,10 @@ function getCorrectKeys(item) {
 }
 
 window.startQuiz = function() {
-    // Kiểm tra môn học đang chọn để ẩn/hiện nút phù hợp trên giao diện
+   // KIỂM TRA MÔN BẰNG CÁCH DÙNG cleanKey
     const subjectSelect = document.getElementById('subject-select');
-    const selectedSubject = subjectSelect ? subjectSelect.value.toLowerCase() : '';
+    const selectedSubjectRaw = subjectSelect ? subjectSelect.value : '';
+    const selectedSubject = cleanKey(selectedSubjectRaw);
 
     const btnCalc = document.getElementById('btn-calc');
     const btnDict = document.getElementById('btn-dict');
@@ -942,7 +943,7 @@ window.startQuiz = function() {
         if (btnVerbs) btnVerbs.style.display = 'none';
     }
 
-    const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
+    const mon = selectedSubjectRaw;
     if (!mon) return alert("Vui lòng chọn môn học trước khi bắt đầu!");
 
     const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
