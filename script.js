@@ -2150,3 +2150,34 @@ window.downloadPDF = function() {
 window.printQuiz = function() {
     window.print();
 };
+// ============================================================
+// BỘ TỰ ĐỘNG GHI NHẬN LỊCH SỬ MÁY TÍNH (TỰ ĐỘNG BẮT SỰ KIỆN CLICK)
+// ============================================================
+window.calcLogs = { openCount: 0, history: [] };
+
+document.addEventListener('click', function(e) {
+    // 1. Tự động đếm khi bấm nút "Calculator" trên màn hình
+    var btnCalc = e.target.closest('button, a, div');
+    if (btnCalc && btnCalc.innerText && btnCalc.innerText.includes('Calculator')) {
+        if (!window.calcLogs) window.calcLogs = { openCount: 0, history: [] };
+        window.calcLogs.openCount++;
+        console.log("✅ Đã ghi nhận mở máy tính. Tổng lần mở:", window.calcLogs.openCount);
+    }
+
+    // 2. Tự động lưu phép tính khi bấm nút bằng "=" trên máy tính
+    var btnEqual = e.target;
+    if (btnEqual && (btnEqual.innerText === '=' || btnEqual.textContent === '=')) {
+        // Tìm ô hiển thị màn hình máy tính khoa học
+        var displayEl = document.querySelector('input[type="text"]') || document.querySelector('.calculator input');
+        
+        if (displayEl && displayEl.value) {
+            if (!window.calcLogs) window.calcLogs = { openCount: 0, history: [] };
+            var currentTime = new Date().toLocaleTimeString('vi-VN');
+            var val = displayEl.value;
+            
+            // Lưu vào danh sách lịch sử
+            window.calcLogs.history.push("[" + currentTime + "] Thực hiện tính / Kết quả: " + val);
+            console.log("✅ Đã ghi nhận phép tính:", val);
+        }
+    }
+});
