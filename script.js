@@ -1466,21 +1466,31 @@ window.submitQuiz = function() {
         };
     });
 
-    if (maHS && mon) {
+    // 1. Tự động bù tên Môn và Chủ đề nếu làm Đề tổng hợp (tránh bị undefined)
+var submitMon = mon || "Toán"; 
+var submitChuDe = selectedTopicsStr;
+
+// Nếu không có tên chủ đề lẻ, tự động đặt tên là "Đề tổng hợp Toán (21 câu)"
+if (!submitChuDe || submitChuDe === "") {
+    submitChuDe = "Đề tổng hợp Toán (21 câu)";
+}
+
+// 2. Chỉ cần có Mã học sinh (maHS) là BẮT BUỘC gửi về Google Sheets
+if (maHS) {
     fetch(API_URL, {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             maHS: maHS,
-            mon: mon,
+            mon: submitMon,
             score: score,
-            level: level,
-            chuDe: selectedTopicsStr,
-            made: selectedMade,
-            details: details,
+            level: level || 1,
+            chuDe: submitChuDe,
+            made: selectedMade || "Đề tổng hợp",
+            details: details || [],
 
-            // 👇 BỔ SUNG THÊM 2 DÒNG NÀY ĐỂ TRUYỀN DỮ LIỆU MÁY TÍNH
+            // Dữ liệu máy tính
             calcOpenCount: (window.calcLogs && window.calcLogs.openCount) ? window.calcLogs.openCount : 0,
             calcHistory: (window.calcLogs && window.calcLogs.history && window.calcLogs.history.length > 0) 
                          ? window.calcLogs.history.map(item => 
@@ -1488,7 +1498,11 @@ window.submitQuiz = function() {
                            ).join("\n") 
                          : "Không sử dụng máy tính"
         })
-    }).catch(err => console.log('Lỗi gửi kết quả:', err));
+    }).then(() => {
+        console.log("✅ Đã gửi bài thi tổng hợp thành công!");
+    }).catch(err => console.log('❌ Lỗi gửi kết quả:', err));
+} else {
+    console.warn("⚠️ Chưa có Mã học sinh (maHS) nên chưa gửi được!");
 }
 
     let quizScreen = document.getElementById('quiz-screen');
