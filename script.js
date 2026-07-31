@@ -1856,7 +1856,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnTaoDeToan) {
         const newBtn = btnTaoDeToan.cloneNode(true);
         btnTaoDeToan.parentNode.replaceChild(newBtn, btnTaoDeToan);
-
+}
         newBtn.addEventListener('click', async function(e) {
             e.stopPropagation();
             e.stopImmediatePropagation();
@@ -2008,6 +2008,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let quizContainer = document.getElementById('quiz-screen') || document.body;
             quizContainer.innerHTML = htmlContent;
             quizContainer.style.display = 'block';
+            });
 
             // ==========================================
             // 3. XỬ LÝ NỘP BÀI & CHUẨN HÓA DỮ LIỆU ĐỂ LƯU
