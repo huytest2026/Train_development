@@ -1964,7 +1964,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 <!-- Thanh điều hướng phía trên -->
                 <div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 12px 15px; border-radius: 8px; border: 2px solid #b71c1c; margin-bottom: 20px; position: sticky; top: 10px; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex-wrap: wrap; gap: 10px;">
-                    <button id="btn-calc-toggle" onclick="openCalculatorModal()" style="background: #ff9800; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">🧮 Calculator</button>
+                    <button id="btn-calc-toggle" onclick="openCalculatorModal()" font-weight: bold; cursor: pointer; font-size: 0.95em;">🧮 Máy tính</button>
+                    <div>
+                        <span style="font-size: 1.1em; font-weight: bold; color: #540606;">⏱️ Thời gian: <span id="timer-display">20:00</span></span>
+                    </div>
+                </div>
+
+                <!-- Vùng hiển thị câu hỏi -->
+                <div id="quiz"></div>
+
+                <!-- Nút nộp bài -->
+                <div style="text-align: center; margin-top: 25px;">
+                    <button type="button" onclick="window.submitQuiz()" style="background: #28a745; color: white; border: none; padding: 14px 30px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.1em; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">📤 Nộp bài thi</button>
+                </div>
+            </div>`;
+
+            // Chèn HTML mới vào màn hình bài thi
+            let quizScreen = document.getElementById('quiz-screen');
+            if (quizScreen) {
+                quizScreen.innerHTML = htmlContent;
+                quizScreen.style.display = 'block';
+            }
+
+            // Gán dữ liệu câu hỏi được chọn vào AppState và hiển thị
+            AppState.currentQuizData = selectedQuestions.map(item => {
+                let correctKeys = getCorrectKeys(item);
+                let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k] && String(item[k]).trim() !== '');
+                validKeys = shuffleArray(validKeys);
+                return { ...item, _shuffledKeys: validKeys, _correctKeys: correctKeys };
+            });
+
+            AppState.correctCount = 0;
+            AppState.wrongCount = 0;
+
+            window.addEventListener('beforeunload', handleBeforeUnload);
+            updateScoreDisplay();
+            window.renderQuiz();
+            window.startTimerTotal(20 * 60); // 20 phút làm bài
+
+            resetBtn();
+        });
+    }
+
+    function resetBtn() {
+        if (btnTaoDeToan) {
+            btnTaoDeToan.innerText = "🎲 Tạo đề Toán tổng hợp";
+            btnTaoDeToan.disabled = false;
+        }
+    }
+}); font-weight: bold; cursor: pointer;">🧮 Calculator</button>
                     <button id="btn-home" style="background: #607d8b; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">🏠 Trang chủ</button>
                     <div style="font-size: 15px; font-weight: bold; color: #333;">Đúng: <span id="count-dung" style="color: green; font-size: 18px;">0</span> | Sai: <span id="count-sai" style="color: red; font-size: 18px;">0</span></div>
                     <div style="font-size: 15px; font-weight: bold; color: #d32f2f; background: #ffebee; padding: 6px 12px; border-radius: 6px;">⏱ <span id="timer">30:00</span></div>
