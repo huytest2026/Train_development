@@ -2126,7 +2126,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('custom-submit-btn').click();
             }
         }, 1000);
-        };
+       });
     
 
    function resetBtn() {
