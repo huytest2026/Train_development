@@ -1827,8 +1827,26 @@ window.calcCalculate = function() {
         display.value = 'Lỗi';
     }
 };
+
+// Hàm lấy Mã Học Sinh từ ô Nhập hoặc bộ nhớ Trình duyệt
+function getMaHS() {
+    let inputMaHS = document.getElementById('student-code');
+    if (inputMaHS && inputMaHS.value.trim() !== "") {
+        return inputMaHS.value.trim();
+    }
+    return localStorage.getItem('saved_maHS') || "";
+}
+
 //--------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
+    // Lưu Mã Học Sinh tự động khi nhập
+    const studentCodeInput = document.getElementById('student-code');
+    if (studentCodeInput) {
+        studentCodeInput.addEventListener('change', (e) => {
+            localStorage.setItem('saved_maHS', e.target.value.trim());
+        });
+    }
+
     const btnTaoDeToan = document.getElementById('btn-tao-de-toan');
     
     if (btnTaoDeToan) {
@@ -1845,8 +1863,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let dataList = null;
 
             try {
-                let webAppUrl = "https://script.google.com/macros/s/AKfycbzKhjTj95GBob8cPfSikXMUVg2S0vJ0BkEOTk2da1IY9xUFFGa8HvrM3FGLO-AJ6tvJ/exec"; 
-                
+                let webAppUrl = (typeof API_URL !== 'undefined') ? API_URL : ""; 
                 let response = await fetch(webAppUrl);
                 let result = await response.json();
                 dataList = result.questions || result.data || result;
@@ -1856,7 +1873,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!dataList || dataList.length <= 1) {
                 alert("Không thể tải được dữ liệu trực tiếp. Hãy kiểm tra lại link Web App Google Sheets trong code!");
-                resetBtn();
+                newBtn.innerText = "Tạo đề Toán tổng hợp";
+                newBtn.disabled = false;
                 return;
             }
 
@@ -1879,9 +1897,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return m.toString().trim().toLowerCase() === "toán";
             });
 
-            if (filteredPool.length === 0) {
-                filteredPool = dataList;
-            }
+            if (filteredPool.length === 0) filteredPool = dataList;
 
             let cauHinh = {
                 'Hình học': 2,
@@ -1923,77 +1939,135 @@ document.addEventListener('DOMContentLoaded', () => {
             if (setupScreen) setupScreen.style.display = 'none';
 
             let htmlContent = `<div style="max-width: 800px; margin: 0 auto; padding: 20px; background: #f9f9f9; position: relative;">
-                
-                <!-- Popup Máy tính đã sửa lỗi vùng đen dư thừa bằng height: auto và display: inline-block -->
                 <div id="calc-modal" style="display: none; position: fixed; top: 120px; right: 50px; background: #222; padding: 10px; border-radius: 8px; z-index: 9999; box-shadow: 0 8px 20px rgba(0,0,0,0.4); width: 210px; height: auto !important; max-height: none !important; user-select: none;">
-                    
-                    <!-- Thanh tiêu đề kéo thả -->
                     <div id="calc-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; cursor: move; background: #333; padding: 4px 8px; border-radius: 4px;">
                         <span style="color: #ff9800; font-weight: bold; font-size: 13px;">🧮 Máy tính</span>
                         <button id="calc-close" onclick="closeCalculatorModal()" style="background: #d32f2f; color: white; border: none; border-radius: 3px; cursor: pointer; padding: 1px 5px; font-size: 12px;">✕</button>
                     </div>
-
                     <input type="text" id="calc-display" readonly style="width: 100%; height: 32px; background: #fff; text-align: right; font-size: 16px; padding: 4px; margin-bottom: 8px; box-sizing: border-box; border-radius: 4px; border: none;" value="">
-                    
                     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;">
                         <button class="calc-btn" onclick="calcClear()" style="background: #d32f2f; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">C</button>
                         <button class="calc-btn" onclick="calcInput('(')" style="background: #555; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">(</button>
                         <button class="calc-btn" onclick="calcInput(')')" style="background: #555; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">)</button>
                         <button class="calc-btn" onclick="calcInput('÷')" style="background: #ff9800; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">÷</button>
-                        
                         <button class="calc-btn" onclick="calcInput('7')" style="background: #666; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">7</button>
                         <button class="calc-btn" onclick="calcInput('8')" style="background: #666; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">8</button>
                         <button class="calc-btn" onclick="calcInput('9')" style="background: #666; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">9</button>
                         <button class="calc-btn" onclick="calcInput('×')" style="background: #ff9800; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">×</button>
-                        
                         <button class="calc-btn" onclick="calcInput('4')" style="background: #666; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">4</button>
                         <button class="calc-btn" onclick="calcInput('5')" style="background: #666; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">5</button>
                         <button class="calc-btn" onclick="calcInput('6')" style="background: #666; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">6</button>
                         <button class="calc-btn" onclick="calcInput('-')" style="background: #ff9800; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">-</button>
-                        
                         <button class="calc-btn" onclick="calcInput('1')" style="background: #666; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">1</button>
                         <button class="calc-btn" onclick="calcInput('2')" style="background: #666; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">2</button>
                         <button class="calc-btn" onclick="calcInput('3')" style="background: #666; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">3</button>
                         <button class="calc-btn" onclick="calcInput('+')" style="background: #ff9800; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">+</button>
-                        
                         <button class="calc-btn" onclick="calcInput('0')" style="background: #666; color:white; padding: 6px; border:none; border-radius:3px; grid-column: span 2; font-weight:bold; cursor:pointer; font-size:13px;">0</button>
                         <button class="calc-btn" onclick="calcInput('.')" style="background: #666; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">.</button>
                         <button class="calc-btn" onclick="calcCalculate()" style="background: #4caf50; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">=</button>
                     </div>
                 </div>
 
-                <!-- Thanh điều hướng phía trên -->
                 <div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 12px 15px; border-radius: 8px; border: 2px solid #b71c1c; margin-bottom: 20px; position: sticky; top: 10px; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex-wrap: wrap; gap: 10px;">
                     <button id="btn-calc-toggle" onclick="openCalculatorModal()" style="background: #ff9800; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">🧮 Calculator</button>
-                    <button id="btn-home" style="background: #607d8b; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">🏠 Trang chủ</button>
-                    <div style="font-size: 15px; font-weight: bold; color: #333;">Đúng: <span id="count-dung" style="color: green; font-size: 18px;">0</span> | Sai: <span id="count-sai" style="color: red; font-size: 18px;">0</span></div>
-                    <div style="font-size: 15px; font-weight: bold; color: #d32f2f; background: #ffebee; padding: 6px 12px; border-radius: 6px;">⏱ <span id="timer">30:00</span></div>
+                    <button id="btn-home" onclick="window.location.reload()" style="background: #607d8b; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">🏠 Trang chủ</button>
                 </div>
                 <h2 style="text-align: center; color: #b71c1c; margin-bottom: 20px;">ĐỀ TỔNG HỢP TOÁN (21 CÂU)</h2>`;
 
             selectedQuestions.forEach((q, index) => {
                 let qText = q['Nội dung câu hỏi'] || q['Câu hỏi'] || q['question'] || "";
-                let a = q['Đáp án A'] || "";
-                let b = q['Đáp án B'] || "";
-                let c = q['Đáp án C'] || "";
-                let d = q['Đáp án D'] || "";
+                let a = q['Đáp án A'] || q['a'] || "";
+                let b = q['Đáp án B'] || q['b'] || "";
+                let c = q['Đáp án C'] || q['c'] || "";
+                let d = q['Đáp án D'] || q['d'] || "";
 
                 htmlContent += `
-                    <div class="question-card" id="q_card_${index}" style="background: white; border: 2px solid #dcdcdc; border-radius: 8px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <div class="question-card" id="q_card_${index}" style="background: white; border: 2px solid #dcdcdc; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
                         <p style="font-weight: bold; font-size: 16px; color: #333;">Câu ${index + 1}: ${qText}</p>
                         <div style="margin-left: 15px;">
-                            <label class="ans-label ans_${index}" data-ans="A" style="display: block; margin: 8px 0; padding: 6px 10px; border-radius: 4px; cursor: pointer;"><input type="radio" name="question_${index}" value="A"> A. ${a}</label>
-                            <label class="ans-label ans_${index}" data-ans="B" style="display: block; margin: 8px 0; padding: 6px 10px; border-radius: 4px; cursor: pointer;"><input type="radio" name="question_${index}" value="B"> B. ${b}</label>
-                            <label class="ans-label ans_${index}" data-ans="C" style="display: block; margin: 8px 0; padding: 6px 10px; border-radius: 4px; cursor: pointer;"><input type="radio" name="question_${index}" value="C"> C. ${c}</label>
-                            <label class="ans-label ans_${index}" data-ans="D" style="display: block; margin: 8px 0; padding: 6px 10px; border-radius: 4px; cursor: pointer;"><input type="radio" name="question_${index}" value="D"> D. ${d}</label>
+                            <label style="display: block; margin: 8px 0; cursor: pointer;"><input type="radio" name="question_${index}" value="A"> A. ${a}</label>
+                            <label style="display: block; margin: 8px 0; cursor: pointer;"><input type="radio" name="question_${index}" value="B"> B. ${b}</label>
+                            <label style="display: block; margin: 8px 0; cursor: pointer;"><input type="radio" name="question_${index}" value="C"> C. ${c}</label>
+                            <label style="display: block; margin: 8px 0; cursor: pointer;"><input type="radio" name="question_${index}" value="D"> D. ${d}</label>
                         </div>
                     </div>`;
             });
 
-            htmlContent += `<button id="custom-submit-btn" style="display: block; width: 100%; padding: 12px; background: #2e7d32; color: white; font-size: 18px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 20px;">Nộp bài tổng kết</button></div>`;
+            htmlContent += `
+                <button id="custom-submit-btn" style="display: block; width: 100%; padding: 14px; background: #28a745; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer;">NỘP BÀI THI</button>
+            </div>`;
 
-            let containerTarget = document.querySelector('#quiz-view') || document.body;
-            containerTarget.innerHTML = htmlContent;
+            let quizContainer = document.getElementById('quiz-screen') || document.body;
+            quizContainer.innerHTML = htmlContent;
+            quizContainer.style.display = 'block';
+
+            // ==========================================
+            // BỔ SUNG SỰ KIỆN NỘP BÀI (ĐÃ SỬA LỖI)
+            // ==========================================
+            const submitBtn = document.getElementById('custom-submit-btn');
+            if (submitBtn) {
+                submitBtn.addEventListener('click', function() {
+                    let maHS = getMaHS();
+                    
+                    if (!maHS) {
+                        alert("Chưa nhận diện được Mã học sinh! Vui lòng quay lại nhập Mã học sinh trước khi làm bài.");
+                        return;
+                    }
+
+                    let correctCount = 0;
+                    let details = [];
+
+                    selectedQuestions.forEach((q, index) => {
+                        let selected = document.querySelector(`input[name="question_${index}"]:checked`);
+                        let userAns = selected ? selected.value : "Chưa chọn";
+                        let correctAns = q['Đáp án đúng'] || q['correct'] || "";
+                        
+                        let isCorrect = (userAns.trim().toLowerCase() === correctAns.trim().toLowerCase());
+                        if (isCorrect) correctCount++;
+
+                        details.push({
+                            index: index + 1,
+                            question: q['Nội dung câu hỏi'] || q['question'] || '',
+                            userAnswer: userAns,
+                            correctAnswer: correctAns,
+                            isCorrect: isCorrect
+                        });
+                    });
+
+                    let score = Math.round((correctCount / selectedQuestions.length) * 10 * 10) / 10;
+
+                    submitBtn.disabled = true;
+                    submitBtn.innerText = "Đang gửi kết quả...";
+
+                    let webAppUrl = (typeof API_URL !== 'undefined') ? API_URL : "";
+
+                    fetch(webAppUrl, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            maHS: maHS,
+                            mon: "Toán",
+                            score: score,
+                            level: 1,
+                            chuDe: "Đề tổng hợp Toán (21 câu)",
+                            made: "Đề tổng hợp",
+                            details: details
+                        })
+                    }).then(() => {
+                        alert(`Đã nộp bài thành công!\n\nMã HS: ${maHS}\nSố câu đúng: ${correctCount}/${selectedQuestions.length}\nĐiểm số: ${score}`);
+                        window.location.reload();
+                    }).catch(err => {
+                        console.error('Lỗi khi gửi kết quả:', err);
+                        alert("Có lỗi khi kết nối máy chủ, vui lòng thử lại!");
+                        submitBtn.disabled = false;
+                        submitBtn.innerText = "NỘP BÀI THI";
+                    });
+                });
+            }
+        });
+    }
+});
 
             // Xử lý kéo thả (Draggable)
             const calcModal = document.getElementById('calc-modal');
