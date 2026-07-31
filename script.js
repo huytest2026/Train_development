@@ -1974,7 +1974,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 });
-}); font-weight: bold; cursor: pointer;">🧮 Calculator</button>
+ font-weight: bold; cursor: pointer;">🧮 Calculator</button>
                     <button id="btn-home" style="background: #607d8b; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">🏠 Trang chủ</button>
                     <div style="font-size: 15px; font-weight: bold; color: #333;">Đúng: <span id="count-dung" style="color: green; font-size: 18px;">0</span> | Sai: <span id="count-sai" style="color: red; font-size: 18px;">0</span></div>
                     <div style="font-size: 15px; font-weight: bold; color: #d32f2f; background: #ffebee; padding: 6px 12px; border-radius: 6px;">⏱ <span id="timer">30:00</span></div>
