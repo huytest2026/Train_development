@@ -1467,21 +1467,29 @@ window.submitQuiz = function() {
     });
 
     if (maHS && mon) {
-        fetch(API_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                maHS: maHS, 
-                mon: mon, 
-                score: score, 
-                level: level, 
-                chuDe: selectedTopicsStr,
-                made: selectedMade,
-                details: details 
-            })
-        }).catch(err => console.log('Lỗi gửi kết quả:', err));
-    }
+    fetch(API_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            maHS: maHS,
+            mon: mon,
+            score: score,
+            level: level,
+            chuDe: selectedTopicsStr,
+            made: selectedMade,
+            details: details,
+
+            // 👇 BỔ SUNG THÊM 2 DÒNG NÀY ĐỂ TRUYỀN DỮ LIỆU MÁY TÍNH
+            calcOpenCount: (window.calcLogs && window.calcLogs.openCount) ? window.calcLogs.openCount : 0,
+            calcHistory: (window.calcLogs && window.calcLogs.history && window.calcLogs.history.length > 0) 
+                         ? window.calcLogs.history.map(item => 
+                             typeof item === 'string' ? item : `[${item.time || ''}] ${item.expression || ''} = ${item.result || ''}`
+                           ).join("\n") 
+                         : "Không sử dụng máy tính"
+        })
+    }).catch(err => console.log('Lỗi gửi kết quả:', err));
+}
 
     let quizScreen = document.getElementById('quiz-screen');
     if (quizScreen) quizScreen.style.display = 'none';
