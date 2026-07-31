@@ -2152,7 +2152,7 @@ window.printQuiz = function() {
 };
 // ============================================================
 // ============================================================
-// BỘ SỬA LỖI HOÀN CHỈNH: ĐẾM MỞ MÁY TÍNH & LẤY ĐÚNG MÀN HÌNH MÁY TÍNH
+// BỘ ĐẾM & LƯU LỊCH SỬ MÁY TÍNH CHUẨN XÁC 100%
 // ============================================================
 if (!window.calcLogs) {
     window.calcLogs = { openCount: 0, history: [] };
@@ -2164,34 +2164,34 @@ document.addEventListener('click', function(e) {
     if (!btn) return;
 
     var text = (btn.innerText || btn.textContent || '').trim();
-    var id = (btn.id || '').toLowerCase();
-    var className = (btn.className || '').toLowerCase();
 
-    // 1. SỬA LỖI 1: BẮT CHÍNH XÁC NÚT MỞ MÁY TÍNH (Nút màu cam trên cùng)
-    if ((text.includes('Calculator') || id.includes('calc') || className.includes('calc')) && 
-        !btn.closest('.modal, [class*="calc-modal"], [id*="calc-modal"]')) {
-        
+    // 1. ĐẾM SỐ LẦN MỞ MÁY TÍNH (Nút màu cam trên cùng)
+    // Kiểm tra xem vị trí click có nằm TRONG khung popup máy tính hay không
+    var isInsideCalcModal = target.closest('.modal-content, .calc-body, .calculator-modal, #calcModal');
+    
+    if (text.includes('Calculator') && !isInsideCalcModal) {
         window.calcLogs.openCount = (window.calcLogs.openCount || 0) + 1;
         console.log("🔥 [ĐÃ ĐẾM MỞ] Số lần mở máy tính:", window.calcLogs.openCount);
     }
 
-    // 2. SỬA LỖI 2: BẮT CHÍNH XÁC NÚT BẰNG (=) VÀ LẤY ĐÚNG SỐ TRÊN MÁY TÍNH (TRÁNH LẤY TÊN "HUY")
+    // 2. LƯU LỊCH SỬ KHI BẤM DẤU BẰNG (=)
     if (text === '=') {
         setTimeout(function() {
             var calcDisplay = null;
             var allInputs = document.querySelectorAll('input');
 
-            // Lọc chính xác ô Input nằm TRONG bảng máy tính (Bỏ qua ô Mã học sinh)
+            // Tìm ô input hiển thị của máy tính khoa học
             allInputs.forEach(function(inp) {
                 if (inp.closest('.modal, [class*="calc"], [id*="calc"]') && inp.type !== 'hidden') {
                     calcDisplay = inp;
                 }
             });
 
-            // Nếu không tìm thấy bằng class, lấy ô input chứa giá trị là con số (như 75 trong ảnh)
+            // Dự phòng: Lấy ô input chứa giá trị số (Bỏ qua ô nhập Mã học sinh)
             if (!calcDisplay) {
                 allInputs.forEach(function(inp) {
-                    if (inp.value && !isNaN(inp.value) && inp.value !== 'Huy') {
+                    var valStr = String(inp.value || '').trim();
+                    if (valStr && !isNaN(valStr) && inp.type !== 'hidden' && inp.id !== 'maHS') {
                         calcDisplay = inp;
                     }
                 });
