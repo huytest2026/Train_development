@@ -2117,28 +2117,27 @@ document.addEventListener('DOMContentLoaded', () => {
             window.timerInterval = setInterval(() => {
                 timeLeft--;
                 let m = Math.floor(timeLeft / 60);
-                let s = timeLeft % 60;
-                let timerDisplay = document.getElementById('timer');
-                if (timerDisplay) {
-                    timerDisplay.innerText = `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
-                }
-                if (timeLeft <= 0) {
-                    clearInterval(window.timerInterval);
-                    alert("Hết thời gian làm bài!");
-                    document.getElementById('custom-submit-btn')?.click();
-                }
-            }, 1000);
+            let s = timeLeft % 60;
+            let timerDisplay = document.getElementById('timer-display');
+            if (timerDisplay) {
+                timerDisplay.innerText = `${m < 10 ? '0' + m : m}:${s < 10 ? '0' + s : s}`;
+            }
+            if (timeLeft <= 0) {
+                clearInterval(window.timerInterval);
+                alert("Hết thời gian làm bài!");
+                document.getElementById('custom-submit-btn').click();
+            }
+        }, 1000);
         });
     }
 
-    function resetBtn() {
-        const btn = document.getElementById('btn-tao-de-toan');
-        if (btn) {
-            btn.innerText = "🎯 Tạo đề tổng hợp Toán (30 phút - 21 câu)";
-            btn.disabled = false;
-        }
+   function resetBtn() {
+    const btn = document.getElementById('btn-tao-de-toan');
+    if (btn) {
+        btn.innerText = "🎯 Tạo đề tổng hợp Toán (30 phút - 21 câu)";
+        btn.disabled = false;
     }
-});
+}
 window.downloadPDF = function() {
     // 1. Lấy phần thẻ chứa danh sách câu hỏi / bài tập (ví dụ id="quiz-container")
     const element = document.getElementById('quiz-container'); 
