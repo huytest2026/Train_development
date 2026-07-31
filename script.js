@@ -2152,41 +2152,59 @@ window.printQuiz = function() {
 };
 // ============================================================
 // ============================================================
-// BỘ ĐẾM MÁY TÍNH SIÊU CẤP (BẮT TÍN HIỆU ƯU TIÊN HÀNG ĐẦU)
+// BỘ SỬA LỖI HOÀN CHỈNH: ĐẾM MỞ MÁY TÍNH & LẤY ĐÚNG MÀN HÌNH MÁY TÍNH
 // ============================================================
 if (!window.calcLogs) {
     window.calcLogs = { openCount: 0, history: [] };
 }
 
-// Tham số 'true' ở cuối giúp bắt sự kiện TRƯỚC KHI bị chặn
 document.addEventListener('click', function(e) {
     var target = e.target;
-    var btn = target.closest('button, a, div, span, input');
-    var text = btn ? (btn.innerText || btn.textContent || btn.value || '').trim() : '';
+    var btn = target.closest('button, a, div, span');
+    if (!btn) return;
 
-    // 1. NHẬN DIỆN NÚT MỞ MÁY TÍNH (Thẻ Calculator màu cam trên cùng)
-    if (text.includes('Calculator') && !target.closest('.modal, [class*="calc"], [id*="calc"]')) {
+    var text = (btn.innerText || btn.textContent || '').trim();
+    var id = (btn.id || '').toLowerCase();
+    var className = (btn.className || '').toLowerCase();
+
+    // 1. SỬA LỖI 1: BẮT CHÍNH XÁC NÚT MỞ MÁY TÍNH (Nút màu cam trên cùng)
+    if ((text.includes('Calculator') || id.includes('calc') || className.includes('calc')) && 
+        !btn.closest('.modal, [class*="calc-modal"], [id*="calc-modal"]')) {
+        
         window.calcLogs.openCount = (window.calcLogs.openCount || 0) + 1;
-        console.log("🔥 [ĐÃ BẮT ĐƯỢC] Số lần mở máy tính:", window.calcLogs.openCount);
+        console.log("🔥 [ĐÃ ĐẾM MỞ] Số lần mở máy tính:", window.calcLogs.openCount);
     }
 
-    // 2. NHẬN DIỆN NÚT BẰNG (=) TRÊN MÁY TÍNH
+    // 2. SỬA LỖI 2: BẮT CHÍNH XÁC NÚT BẰNG (=) VÀ LẤY ĐÚNG SỐ TRÊN MÁY TÍNH (TRÁNH LẤY TÊN "HUY")
     if (text === '=') {
         setTimeout(function() {
-            // Tìm ô hiển thị kết quả (Input đang chứa số 2700 như trong ảnh)
-            var displayInput = document.querySelector('input[value="2700"]') || 
-                               document.querySelector('.modal input') || 
-                               document.querySelector('input[type="text"]');
-            
-            var resultVal = displayInput ? displayInput.value : '';
+            var calcDisplay = null;
+            var allInputs = document.querySelectorAll('input');
+
+            // Lọc chính xác ô Input nằm TRONG bảng máy tính (Bỏ qua ô Mã học sinh)
+            allInputs.forEach(function(inp) {
+                if (inp.closest('.modal, [class*="calc"], [id*="calc"]') && inp.type !== 'hidden') {
+                    calcDisplay = inp;
+                }
+            });
+
+            // Nếu không tìm thấy bằng class, lấy ô input chứa giá trị là con số (như 75 trong ảnh)
+            if (!calcDisplay) {
+                allInputs.forEach(function(inp) {
+                    if (inp.value && !isNaN(inp.value) && inp.value !== 'Huy') {
+                        calcDisplay = inp;
+                    }
+                });
+            }
+
+            var val = calcDisplay ? calcDisplay.value : '0';
             var time = new Date().toLocaleTimeString('vi-VN');
 
             if (!window.calcLogs.history) window.calcLogs.history = [];
-            
-            var logText = "[" + time + "] Phép tính / Kết quả: " + (resultVal || "Đã bấm =");
+            var logText = "[" + time + "] Phép tính / Kết quả: " + val;
             window.calcLogs.history.push(logText);
-            
-            console.log("🔥 [ĐÃ BẮT ĐƯỢC] Phép tính:", logText);
+
+            console.log("🔥 [ĐÃ LƯU KẾT QUẢ CHUẨN]:", logText);
         }, 100);
     }
-}, true); // <--- RẤT QUAN TRỌNG: 'true' giúp vượt qua mọi lệnh chặn stopPropagation
+}, true);
