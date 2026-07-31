@@ -2103,7 +2103,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
         });
-    }
+    
 });
 
             document.getElementById('custom-submit-btn').addEventListener('click', () => {
