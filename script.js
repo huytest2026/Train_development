@@ -2123,10 +2123,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (timeLeft <= 0) {
                 clearInterval(window.timerInterval);
                 alert("Hết thời gian làm bài!");
-                document.getElementById('custom-submit-btn').click();
+                let submitBtn = document.getElementById('custom-submit-btn');
+                if (submitBtn) submitBtn.click();
             }
         }, 1000);
-       });
     
 
    function resetBtn() {
