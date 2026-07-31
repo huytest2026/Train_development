@@ -2127,7 +2127,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }, 1000);
         });
-    }
+    
 
    function resetBtn() {
     const btn = document.getElementById('btn-tao-de-toan');
