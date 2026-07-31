@@ -2104,8 +2104,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     
-});
-
             document.getElementById('custom-submit-btn').addEventListener('click', () => {
                 if (window.timerInterval) clearInterval(window.timerInterval);
                 alert(`Bạn đã hoàn thành bài thi!\n- Số câu đúng: ${scoreDung}\n- Số câu sai: ${scoreSai}`);
