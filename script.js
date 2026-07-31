@@ -2222,3 +2222,44 @@ document.addEventListener('click', function(e) {
         }, 100);
     }
 }, true);
+// ============================================================
+// BỘ TỰ ĐỘNG BẮT MỌI LẦN NỘP BÀI (ÁP DỤNG CẢ ĐỀ THƯỜNG VÀ ĐỀ TỔNG HỢP 21 CÂU)
+// ============================================================
+(function() {
+    var originalFetch = window.fetch;
+    window.fetch = function() {
+        var args = Array.prototype.slice.call(arguments);
+        var url = args[0];
+        var options = args[1];
+
+        // Tự động kiểm tra nếu là lệnh gửi kết quả (POST) về Google Sheets
+        if (options && options.method === 'POST' && options.body) {
+            try {
+                var data = JSON.parse(options.body);
+                
+                // 1. Tự động bổ sung tên Chủ đề nếu làm Đề tổng hợp 21 câu mà bị trống
+                if (!data.chuDe || data.chuDe === "" || data.chuDe === "undefined") {
+                    data.chuDe = "Đề tổng hợp Toán (21 câu)";
+                }
+                if (!data.mon || data.mon === "undefined") {
+                    data.mon = "Toán";
+                }
+
+                // 2. Tự động đính kèm Số lần mở & Lịch sử máy tính khoa học
+                data.calcOpenCount = (window.calcLogs && window.calcLogs.openCount) ? window.calcLogs.openCount : 0;
+                data.calcHistory = (window.calcLogs && window.calcLogs.history && window.calcLogs.history.length > 0) 
+                             ? window.calcLogs.history.map(item => 
+                                 typeof item === 'string' ? item : `[${item.time || ''}] ${item.expression || ''} = ${item.result || ''}`
+                               ).join("\n") 
+                             : "Không sử dụng máy tính";
+
+                // Cập nhật lại gói dữ liệu hoàn chỉnh trước khi gửi đi
+                options.body = JSON.stringify(data);
+                console.log("🚀 [ĐÃ BẮT HOÀN HẢO] Đã tự động đóng gói dữ liệu nộp bài:", data);
+            } catch(err) {
+                console.log("Lỗi tự đồng bộ payload:", err);
+            }
+        }
+        return originalFetch.apply(this, args);
+    };
+})();
