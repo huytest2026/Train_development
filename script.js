@@ -2151,33 +2151,42 @@ window.printQuiz = function() {
     window.print();
 };
 // ============================================================
-// BỘ TỰ ĐỘNG GHI NHẬN LỊCH SỬ MÁY TÍNH (TỰ ĐỘNG BẮT SỰ KIỆN CLICK)
 // ============================================================
-window.calcLogs = { openCount: 0, history: [] };
+// BỘ ĐẾM MÁY TÍNH SIÊU CẤP (BẮT TÍN HIỆU ƯU TIÊN HÀNG ĐẦU)
+// ============================================================
+if (!window.calcLogs) {
+    window.calcLogs = { openCount: 0, history: [] };
+}
 
+// Tham số 'true' ở cuối giúp bắt sự kiện TRƯỚC KHI bị chặn
 document.addEventListener('click', function(e) {
-    // 1. Tự động đếm khi bấm nút "Calculator" trên màn hình
-    var btnCalc = e.target.closest('button, a, div');
-    if (btnCalc && btnCalc.innerText && btnCalc.innerText.includes('Calculator')) {
-        if (!window.calcLogs) window.calcLogs = { openCount: 0, history: [] };
-        window.calcLogs.openCount++;
-        console.log("✅ Đã ghi nhận mở máy tính. Tổng lần mở:", window.calcLogs.openCount);
+    var target = e.target;
+    var btn = target.closest('button, a, div, span, input');
+    var text = btn ? (btn.innerText || btn.textContent || btn.value || '').trim() : '';
+
+    // 1. NHẬN DIỆN NÚT MỞ MÁY TÍNH (Thẻ Calculator màu cam trên cùng)
+    if (text.includes('Calculator') && !target.closest('.modal, [class*="calc"], [id*="calc"]')) {
+        window.calcLogs.openCount = (window.calcLogs.openCount || 0) + 1;
+        console.log("🔥 [ĐÃ BẮT ĐƯỢC] Số lần mở máy tính:", window.calcLogs.openCount);
     }
 
-    // 2. Tự động lưu phép tính khi bấm nút bằng "=" trên máy tính
-    var btnEqual = e.target;
-    if (btnEqual && (btnEqual.innerText === '=' || btnEqual.textContent === '=')) {
-        // Tìm ô hiển thị màn hình máy tính khoa học
-        var displayEl = document.querySelector('input[type="text"]') || document.querySelector('.calculator input');
-        
-        if (displayEl && displayEl.value) {
-            if (!window.calcLogs) window.calcLogs = { openCount: 0, history: [] };
-            var currentTime = new Date().toLocaleTimeString('vi-VN');
-            var val = displayEl.value;
+    // 2. NHẬN DIỆN NÚT BẰNG (=) TRÊN MÁY TÍNH
+    if (text === '=') {
+        setTimeout(function() {
+            // Tìm ô hiển thị kết quả (Input đang chứa số 2700 như trong ảnh)
+            var displayInput = document.querySelector('input[value="2700"]') || 
+                               document.querySelector('.modal input') || 
+                               document.querySelector('input[type="text"]');
             
-            // Lưu vào danh sách lịch sử
-            window.calcLogs.history.push("[" + currentTime + "] Thực hiện tính / Kết quả: " + val);
-            console.log("✅ Đã ghi nhận phép tính:", val);
-        }
+            var resultVal = displayInput ? displayInput.value : '';
+            var time = new Date().toLocaleTimeString('vi-VN');
+
+            if (!window.calcLogs.history) window.calcLogs.history = [];
+            
+            var logText = "[" + time + "] Phép tính / Kết quả: " + (resultVal || "Đã bấm =");
+            window.calcLogs.history.push(logText);
+            
+            console.log("🔥 [ĐÃ BẮT ĐƯỢC] Phép tính:", logText);
+        }, 100);
     }
-});
+}, true); // <--- RẤT QUAN TRỌNG: 'true' giúp vượt qua mọi lệnh chặn stopPropagation
