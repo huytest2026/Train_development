@@ -1565,16 +1565,6 @@ window.submitQuiz = function() {
         '<div id="review-detail-box" style="margin-top: 20px;"></div>';
 };
 
-    resultContainer.innerHTML = '<h2 style="text-align: center; color: #540606; font-size: 1.6em;">Kết Quả Bài Làm</h2>' +
-        '<p style="font-size: 1.2em; text-align: center;">Số câu hỏi đúng: <b>' + AppState.correctCount + ' / ' + totalQuestions + '</b></p>' +
-        '<p style="font-size: 1.4em; text-align: center; font-weight: bold;">Điểm số: ' + score + ' đ</p>' +
-        '<div style="display: flex; gap: 12px; margin-top: 20px;">' +
-        '<button type="button" onclick="window.location.reload()" style="flex: 1; padding: 14px; background: #007bff; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.05em;">Làm bài mới</button>' +
-        '<button type="button" onclick="window.viewReviewDetails()" style="flex: 1; padding: 14px; background: #6c757d; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.05em;">🔍 Xem lại chi tiết</button>' +
-        '</div>' +
-        '<div id="review-detail-box" style="margin-top: 20px;"></div>';
-};
-
 window.viewReviewDetails = function() {
     const box = document.getElementById('review-detail-box');
     if (!box) return;
