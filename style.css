@@ -213,18 +213,4 @@ button:active { transform: scale(0.98); }
         padding: 10px !important;
     }
 }
-/* 1. Khôi phục lại kích thước trang làm bài bình thường (nếu bị dính ảnh hưởng từ code trước) */
-.container {
-    max-width: 900px !important;
-    margin: 0 auto !important;
-}
 
-/* 2. Phóng to toàn bộ bảng máy tính lên (Ví dụ: phóng to 1.35 lần) */
-#calc-modal {
-    transform: scale(1.35) !important;
-    transform-origin: top right !important; /* Phóng to lan ra phía trong màn hình */
-    position: fixed !important;
-    right: 50px !important;
-    top: 90px !important;
-    z-index: 9999 !important;
-}
