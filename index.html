@@ -213,7 +213,7 @@
             <button type="button" id="btn-calc" onclick="window.openCalculatorModal()" style="display: none; background: #fd7e14; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🧮 Calculator</button>
             <button type="button" id="btn-dict" onclick="window.openDictionaryModal()" style="display: none; background: #17a2b8; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📖 Tra từ</button>
             <button type="button" id="btn-verbs" onclick="window.openIrregularVerbsModal()" style="display: none; background: #e0a800; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📚 ĐT Bất Quy Tắc</button>
-            <!-- NÚT IN / PDF CỐ ĐỊNH CHUẨN XÁC CẢ CHO ĐỀ THƯỜNG VÀ ĐỀ TỔNG HỢP -->
+            <!-- NÚT IN / PDF HIỂN THỊ ĐẦY ĐỦ CHO CẢ ĐỀ THƯỜNG VÀ ĐỀ TỔNG HỢP -->
             <button type="button" id="btn-print-pdf" onclick="window.printQuiz()" style="background: #28a745; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🖨️ In / PDF</button>
             <button type="button" onclick="window.backToHome()" style="background: #6c757d; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🏠 Trang chủ</button>
         </div>
@@ -301,7 +301,6 @@
                             ? subjectSelect.options[subjectSelect.selectedIndex].text 
                             : 'MÔN TOÁN';
 
-        // Kiểm tra xem có phải Đề Tổng Hợp không
         const quizContent = document.getElementById('quiz-screen')?.innerText || '';
         if (quizContent.includes('ĐỀ TỔNG HỢP TOÁN') || document.querySelector('#quiz-screen')?.dataset?.isDeTongHop === 'true') {
             subjectText = 'TỔNG HỢP TOÁN (21 CÂU)';
@@ -386,7 +385,6 @@
         }
     };
 
-    // Hàm nhận diện môn học và bật/tắt nút công cụ
     window.startQuizWithToolCheck = function() {
         const quizScreen = document.getElementById('quiz-screen');
         if (quizScreen) quizScreen.dataset.isDeTongHop = 'false';
@@ -420,7 +418,6 @@
         }
     };
 
-    // LOGIC TẠO ĐỀ TỔNG HỢP MÔN TOÁN
     document.addEventListener('DOMContentLoaded', () => {
         const btnTaoDeToan = document.getElementById('btn-tao-de-toan');
         
@@ -432,7 +429,6 @@
                     return;
                 }
 
-                // Lấy nguồn dữ liệu đầy đủ từ AppState
                 const poolData = (window.AppState && window.AppState.allQuizData) || window.allQuizData || [];
 
                 if (!poolData || poolData.length === 0) {
@@ -476,7 +472,6 @@
                 if (btnDict) btnDict.style.setProperty('display', 'none', 'important');
                 if (btnVerbs) btnVerbs.style.setProperty('display', 'none', 'important');
 
-                // Khởi tạo bài thi chuẩn ứng dụng
                 if (window.AppState) {
                     AppState.currentQuizData = selectedQuestions.map(item => {
                         let correctKeys = (typeof getCorrectKeys === 'function') ? getCorrectKeys(item) : [];
