@@ -1965,7 +1965,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 <!-- Popup Máy tính đã sửa lỗi vùng đen dư thừa bằng height: auto và display: inline-block -->
                 <div id="calc-modal" style="display: none; position: fixed; top: 120px; right: 50px; background: #222; padding: 10px; border-radius: 8px; z-index: 9999; box-shadow: 0 8px 20px rgba(0,0,0,0.4); width: 210px; height: auto !important; max-height: none !important; user-select: none;">
-                    
+                  <!-- BỔ SUNG NÚT IN PDF TẠI ĐÂY -->
+        <button type="button" onclick="window.printPDF()" style="background: #28a745; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">🖨️ In / PDF</button>
+        
+        <div style="font-weight: bold; font-size: 1.1em;">
+            Đúng: <span id="current-score-correct">0</span> | Sai: <span id="current-score-wrong">0</span>
+        </div>
+    </div>
+    ;
                     <!-- Thanh tiêu đề kéo thả -->
                     <div id="calc-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; cursor: move; background: #333; padding: 4px 8px; border-radius: 4px;">
                         <span style="color: #ff9800; font-weight: bold; font-size: 13px;">🧮 Máy tính</span>
