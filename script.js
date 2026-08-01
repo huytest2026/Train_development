@@ -2264,3 +2264,10 @@ document.addEventListener('click', function(e) {
         return originalFetch.apply(this, args);
     };
 })();
+window.printPDF = function() {
+    // Tự động mở rộng phần xem lại chi tiết để khi in/lưu PDF nội dung hiển thị đầy đủ
+    if (typeof window.viewReviewDetails === 'function') {
+        window.viewReviewDetails();
+    }
+    window.print();
+};
