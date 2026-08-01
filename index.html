@@ -32,29 +32,6 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         }
 
-        #floating-print-btn {
-            position: fixed;
-            bottom: 25px;
-            right: 25px;
-            background: #28a745;
-            color: white;
-            border: none;
-            padding: 14px 22px;
-            border-radius: 30px;
-            cursor: pointer;
-            font-size: 1.1em;
-            font-weight: bold;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            z-index: 999999;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: background 0.2s;
-        }
-        #floating-print-btn:hover {
-            background: #218838;
-        }
-
         #calc-modal {
             display: none;
             position: fixed;
@@ -121,7 +98,7 @@
             }
 
             #start-screen, #calc-modal, #dict-modal, #irregular-verbs-modal, 
-            .quiz-sticky-header, #submit-btn, #floating-print-btn {
+            .quiz-sticky-header, #submit-btn {
                 display: none !important;
             }
 
@@ -154,10 +131,6 @@
     </style>
 </head>
 <body>
-
-<button type="button" id="floating-print-btn" onclick="window.printQuiz()">
-    🖨️ In / Lưu PDF
-</button>
 
 <div class="container" id="start-screen">
     <h1 style="color: #540606; text-align: center; margin-bottom: 20px;">Bài Kiểm Tra Toán Anh</h1>
@@ -218,10 +191,14 @@
 
     <div class="quiz-sticky-header">
         <div>⏱️ <span id="timer-display" style="color: red; font-size: 1.15em;">--:--</span></div>
-        <div id="header-tools-group" style="display: flex; gap: 8px; align-items: center;">
+        <div id="header-tools-group" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
             <button type="button" id="btn-calc" onclick="window.openCalculatorModal()" style="display: none; background: #fd7e14; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🧮 Calculator</button>
             <button type="button" id="btn-dict" onclick="window.openDictionaryModal()" style="display: none; background: #17a2b8; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📖 Tra từ</button>
             <button type="button" id="btn-verbs" onclick="window.openIrregularVerbsModal()" style="display: none; background: #e0a800; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📚 ĐT Bất Quy Tắc</button>
+            
+            <!-- Nút In / PDF được tích hợp thẳng lên thanh menu trên cùng -->
+            <button type="button" onclick="window.printQuiz()" style="background: #28a745; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🖨️ In / PDF</button>
+
             <button type="button" onclick="window.backToHome()" style="background: #6c757d; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🏠 Trang chủ</button>
         </div>
         <div>Đúng: <span id="correct-count-display" style="color: green;">0</span> | Sai: <span id="wrong-count-display" style="color: red;">0</span></div>
@@ -482,7 +459,6 @@
                     if (typeof updateScoreDisplay === 'function') updateScoreDisplay();
                     if (typeof window.renderQuiz === 'function') window.renderQuiz();
 
-                    // Tự động ép chèn tiêu đề đề tổng hợp lên đầu vùng hiển thị câu hỏi
                     const quizDiv = document.getElementById('quiz');
                     if (quizDiv) {
                         quizDiv.innerHTML = '<h2 style="text-align: center; color: #540606; margin-bottom: 20px;">ĐỀ TỔNG HỢP TOÁN (21 CÂU)</h2>' + quizDiv.innerHTML;
