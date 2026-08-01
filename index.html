@@ -32,7 +32,6 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         }
 
-        /* Nút In / PDF nổi cố định góc dưới bên phải màn hình */
         #floating-print-btn {
             position: fixed;
             bottom: 25px;
@@ -156,7 +155,6 @@
 </head>
 <body>
 
-<!-- Nút In/PDF nổi hoàn toàn độc lập, không bị ảnh hưởng bởi script.js -->
 <button type="button" id="floating-print-btn" onclick="window.printQuiz()">
     🖨️ In / Lưu PDF
 </button>
@@ -483,6 +481,13 @@
 
                     if (typeof updateScoreDisplay === 'function') updateScoreDisplay();
                     if (typeof window.renderQuiz === 'function') window.renderQuiz();
+
+                    // Tự động ép chèn tiêu đề đề tổng hợp lên đầu vùng hiển thị câu hỏi
+                    const quizDiv = document.getElementById('quiz');
+                    if (quizDiv) {
+                        quizDiv.innerHTML = '<h2 style="text-align: center; color: #540606; margin-bottom: 20px;">ĐỀ TỔNG HỢP TOÁN (21 CÂU)</h2>' + quizDiv.innerHTML;
+                    }
+
                     if (typeof window.startTimerTotal === 'function') window.startTimerTotal(30 * 60);
                 }
             });
