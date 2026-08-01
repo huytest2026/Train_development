@@ -213,9 +213,4 @@ button:active { transform: scale(0.98); }
         padding: 10px !important;
     }
 }
-/* Dán đoạn này vào cuối file style.css của bạn */
-@media print {
-    body { background: #fff !important; color: #000 !important; }
-    button, #calc-modal, .dark-mode-btn { display: none !important; }
-    #result-container { box-shadow: none !important; border: none !important; padding: 0 !important; }
-}
+
