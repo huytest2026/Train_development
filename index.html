@@ -196,8 +196,8 @@
             <button type="button" id="btn-dict" onclick="window.openDictionaryModal()" style="display: none; background: #17a2b8; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📖 Tra từ</button>
             <button type="button" id="btn-verbs" onclick="window.openIrregularVerbsModal()" style="display: none; background: #e0a800; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📚 ĐT Bất Quy Tắc</button>
             
-            <!-- Nút In / PDF được tích hợp thẳng lên thanh menu trên cùng -->
-            <button type="button" onclick="window.printQuiz()" style="background: #28a745; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🖨️ In / PDF</button>
+            <!-- Nút In / PDF được tích hợp sẵn -->
+            <button type="button" id="btn-print-pdf-static" onclick="window.printQuiz()" style="background: #28a745; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🖨️ In / PDF</button>
 
             <button type="button" onclick="window.backToHome()" style="background: #6c757d; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🏠 Trang chủ</button>
         </div>
@@ -302,6 +302,28 @@
         }
         window.print();
     };
+
+    // Đoạn mã tự động theo dõi và tự động chèn nút In/PDF bảo vệ chống bị script.js ghi đè xóa mất
+    function ensurePrintButtonExists() {
+        const toolsGroup = document.getElementById('header-tools-group');
+        if (toolsGroup && !document.getElementById('btn-print-pdf-dynamic')) {
+            const printBtn = document.createElement('button');
+            printBtn.id = 'btn-print-pdf-dynamic';
+            printBtn.type = 'button';
+            printBtn.innerHTML = '🖨️ In / PDF';
+            printBtn.style.cssText = 'background: #28a745; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;';
+            printBtn.onclick = window.printQuiz;
+            
+            // Tìm nút Trang chủ để chèn trước nó
+            const homeBtn = Array.from(toolsGroup.querySelectorAll('button')).find(b => b.innerText.includes('Trang chủ'));
+            if (homeBtn) {
+                toolsGroup.insertBefore(printBtn, homeBtn);
+            } else {
+                toolsGroup.appendChild(printBtn);
+            }
+        }
+    }
+    setInterval(ensurePrintButtonExists, 300);
 
     document.addEventListener('DOMContentLoaded', () => {
         const calcModal = document.getElementById('calc-modal');
