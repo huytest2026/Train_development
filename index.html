@@ -14,6 +14,7 @@
         .option-box { background: #f8f9fa; border: 1px solid #540606; border-radius: 8px; padding: 14px 18px; margin: 10px 0; cursor: pointer; font-size: 1.1em; font-weight: 600; color: #111; }
         #topic-container { margin: 10px 0; padding: 14px; border: 1px solid #ddd; max-height: 180px; overflow-y: auto; background: #fff; border-radius: 8px; font-size: 1.05em; }
         
+        /* Thanh trạng thái cố định khi cuộn */
         .quiz-sticky-header {
             position: sticky;
             top: 0;
@@ -32,12 +33,15 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         }
 
+        /* --- CSS MÁY TÍNH KHOA HỌC NÂNG CAO --- */
         #calc-modal {
             display: none;
             position: fixed;
             top: 120px; right: 50px;
             width: 250px !important;
             height: auto !important;
+            min-height: unset !important;
+            max-height: unset !important;
             background: #222 !important;
             padding: 10px !important;
             border-radius: 8px !important;
@@ -45,7 +49,10 @@
             box-shadow: 0 8px 20px rgba(0,0,0,0.4) !important;
             flex-direction: column !important;
             user-select: none !important;
+            overflow: hidden !important;
         }
+
+        #calc-modal * { box-sizing: border-box !important; }
 
         #calc-header {
             display: flex !important;
@@ -70,6 +77,7 @@
             border: 1px solid #540606 !important;
         }
 
+        /* Modal chung (Tra từ & Động từ bất quy tắc) */
         #dict-modal, #irregular-verbs-modal {
             display: none;
             position: fixed;
@@ -87,18 +95,23 @@
             max-width: 650px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
             border: 2px solid #540606;
+            position: relative;
         }
 
+        /* Khung thông tin chỉ hiển thị khi in */
         .print-only-header { display: none; }
 
+        /* --- CẤU HÌNH ĐỊNH DẠNG KHI IN / XUẤT PDF --- */
         @media print {
             * {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
 
+            /* Ẩn các công cụ và thanh trạng thái khi in */
             #start-screen, #calc-modal, #dict-modal, #irregular-verbs-modal, 
-            .quiz-sticky-header, #submit-btn {
+            .quiz-sticky-header, #submit-btn, #btn-print-pdf,
+            div[style*="border: 2px solid red"], div[style*="border:2px solid red"] {
                 display: none !important;
             }
 
@@ -124,6 +137,7 @@
                 border: 1.5px solid #540606 !important;
                 box-shadow: none !important;
                 page-break-inside: avoid;
+                break-inside: avoid;
                 margin-bottom: 20px !important;
                 padding: 15px !important;
             }
@@ -154,6 +168,7 @@
         </select>
     </div>
 
+    <!-- KHUNG CHỌN MÃ ĐỀ -->
     <div style="margin-top: 15px; margin-bottom: 15px; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #540606;">
         <label style="cursor: pointer; font-weight: bold; color: #540606; display: flex; align-items: center; gap: 10px; font-size: 1.1em;">
             <input type="checkbox" id="toggle-made" onchange="window.toggleMadeMode()" style="width: 20px; height: 20px; cursor: pointer;"> 
@@ -174,6 +189,7 @@
     </div>
     <div id="topic-container">Chưa tải dữ liệu...</div>
 
+    <!-- NÚT TẠO ĐỀ TỔNG HỢP MÔN TOÁN -->
     <button type="button" id="btn-tao-de-toan" style="width: 100%; padding: 12px; background-color: #ffc107; color: #000; border: none; border-radius: 8px; font-weight: bold; font-size: 1em; margin-top: 10px; margin-bottom: 10px; cursor: pointer;">
         🎯 Tạo đề tổng hợp (30 phút - 21 câu)
     </button>
@@ -187,18 +203,18 @@
 </div>
 
 <div class="container" id="quiz-screen" style="display:none;">
+    
+    <!-- KHUNG TIÊU ĐỀ BÀI THI KHI IN / TẢI PDF -->
     <div id="print-only-header" class="print-only-header"></div>
 
     <div class="quiz-sticky-header">
         <div>⏱️ <span id="timer-display" style="color: red; font-size: 1.15em;">--:--</span></div>
-        <div id="header-tools-group" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+        <div id="header-tools-group" style="display: flex; gap: 8px; align-items: center;">
             <button type="button" id="btn-calc" onclick="window.openCalculatorModal()" style="display: none; background: #fd7e14; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🧮 Calculator</button>
             <button type="button" id="btn-dict" onclick="window.openDictionaryModal()" style="display: none; background: #17a2b8; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📖 Tra từ</button>
             <button type="button" id="btn-verbs" onclick="window.openIrregularVerbsModal()" style="display: none; background: #e0a800; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📚 ĐT Bất Quy Tắc</button>
-            
-            <!-- Nút In / PDF được tích hợp sẵn -->
-            <button type="button" id="btn-print-pdf-static" onclick="window.printQuiz()" style="background: #28a745; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🖨️ In / PDF</button>
-
+            <!-- NÚT IN / PDF CỐ ĐỊNH CHUẨN XÁC CẢ CHO ĐỀ THƯỜNG VÀ ĐỀ TỔNG HỢP -->
+            <button type="button" id="btn-print-pdf" onclick="window.printQuiz()" style="background: #28a745; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🖨️ In / PDF</button>
             <button type="button" onclick="window.backToHome()" style="background: #6c757d; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🏠 Trang chủ</button>
         </div>
         <div>Đúng: <span id="correct-count-display" style="color: green;">0</span> | Sai: <span id="wrong-count-display" style="color: red;">0</span></div>
@@ -208,6 +224,7 @@
     <button type="button" id="submit-btn" onclick="window.submitQuiz()" style="width: 100%; padding: 16px; background: #28a745; color: white; border: none; cursor: pointer; border-radius: 8px; font-weight: bold; font-size: 1.2em; margin-top: 15px;">Nộp bài</button>
 </div>
 
+<!-- MODAL MÁY TÍNH KHOA HỌC -->
 <div id="calc-modal">
     <div id="calc-header">
         <span style="color: #ff9800; font-weight: bold; font-size: 13px;">🧮 Máy tính khoa học</span>
@@ -243,6 +260,7 @@
     </div>
 </div>
 
+<!-- MODAL TRA TỪ ĐIỂN -->
 <div id="dict-modal">
     <div class="dict-content">
         <h3 style="color: #540606; margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
@@ -259,6 +277,7 @@
     </div>
 </div>
 
+<!-- MODAL BẢNG ĐỘNG TỪ BẤT QUY TẮC -->
 <div id="irregular-verbs-modal">
     <div class="dict-content" style="max-width: 700px;">
         <h3 style="color: #540606; margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
@@ -274,6 +293,7 @@
 
 <script src="script.js"></script>
 <script>
+    // --- HÀM IN & CHÈN TIÊU ĐỀ KHI XUẤT PDF ---
     window.printQuiz = function() {
         const studentCode = document.getElementById('student-code')?.value || 'Chưa nhập';
         const subjectSelect = document.getElementById('subject-select');
@@ -281,6 +301,7 @@
                             ? subjectSelect.options[subjectSelect.selectedIndex].text 
                             : 'MÔN TOÁN';
 
+        // Kiểm tra xem có phải Đề Tổng Hợp không
         const quizContent = document.getElementById('quiz-screen')?.innerText || '';
         if (quizContent.includes('ĐỀ TỔNG HỢP TOÁN') || document.querySelector('#quiz-screen')?.dataset?.isDeTongHop === 'true') {
             subjectText = 'TỔNG HỢP TOÁN (21 CÂU)';
@@ -303,32 +324,12 @@
         window.print();
     };
 
-    // Đoạn mã tự động theo dõi và tự động chèn nút In/PDF bảo vệ chống bị script.js ghi đè xóa mất
-    function ensurePrintButtonExists() {
-        const toolsGroup = document.getElementById('header-tools-group');
-        if (toolsGroup && !document.getElementById('btn-print-pdf-dynamic')) {
-            const printBtn = document.createElement('button');
-            printBtn.id = 'btn-print-pdf-dynamic';
-            printBtn.type = 'button';
-            printBtn.innerHTML = '🖨️ In / PDF';
-            printBtn.style.cssText = 'background: #28a745; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;';
-            printBtn.onclick = window.printQuiz;
-            
-            // Tìm nút Trang chủ để chèn trước nó
-            const homeBtn = Array.from(toolsGroup.querySelectorAll('button')).find(b => b.innerText.includes('Trang chủ'));
-            if (homeBtn) {
-                toolsGroup.insertBefore(printBtn, homeBtn);
-            } else {
-                toolsGroup.appendChild(printBtn);
-            }
-        }
-    }
-    setInterval(ensurePrintButtonExists, 300);
-
+    // --- Tính năng Kéo thả (Draggable) cho máy tính ---
     document.addEventListener('DOMContentLoaded', () => {
         const calcModal = document.getElementById('calc-modal');
         const calcHeader = document.getElementById('calc-header');
-        let isDragging = false, offsetX, offsetY;
+        let isDragging = false;
+        let offsetX, offsetY;
 
         if (calcHeader && calcModal) {
             calcHeader.addEventListener('mousedown', (e) => {
@@ -337,15 +338,18 @@
                 offsetY = e.clientY - calcModal.offsetTop;
                 calcModal.style.right = 'auto'; 
             });
+
             document.addEventListener('mousemove', (e) => {
                 if (!isDragging) return;
                 calcModal.style.left = (e.clientX - offsetX) + 'px';
                 calcModal.style.top = (e.clientY - offsetY) + 'px';
             });
+
             document.addEventListener('mouseup', () => { isDragging = false; });
         }
     });
 
+    // --- Các hàm Máy tính khoa học ---
     window.openCalculatorModal = function() {
         const modal = document.getElementById('calc-modal');
         if (modal) modal.style.display = 'flex';
@@ -382,6 +386,7 @@
         }
     };
 
+    // Hàm nhận diện môn học và bật/tắt nút công cụ
     window.startQuizWithToolCheck = function() {
         const quizScreen = document.getElementById('quiz-screen');
         if (quizScreen) quizScreen.dataset.isDeTongHop = 'false';
@@ -404,6 +409,10 @@
             if (btnCalc) btnCalc.style.display = 'none';
             if (btnDict) btnDict.style.display = 'inline-block';
             if (btnVerbs) btnVerbs.style.display = 'inline-block';
+        } else {
+            if (btnCalc) btnCalc.style.display = 'none';
+            if (btnDict) btnDict.style.display = 'none';
+            if (btnVerbs) btnVerbs.style.display = 'none';
         }
 
         if (typeof window.startQuiz === 'function') {
@@ -411,8 +420,10 @@
         }
     };
 
+    // LOGIC TẠO ĐỀ TỔNG HỢP MÔN TOÁN
     document.addEventListener('DOMContentLoaded', () => {
         const btnTaoDeToan = document.getElementById('btn-tao-de-toan');
+        
         if (btnTaoDeToan) {
             btnTaoDeToan.addEventListener('click', function() {
                 const selectMonHoc = document.getElementById('subject-select');
@@ -421,7 +432,9 @@
                     return;
                 }
 
+                // Lấy nguồn dữ liệu đầy đủ từ AppState
                 const poolData = (window.AppState && window.AppState.allQuizData) || window.allQuizData || [];
+
                 if (!poolData || poolData.length === 0) {
                     alert("Dữ liệu câu hỏi chưa được tải. Vui lòng bấm 'Xác nhận Mã & Tải đề' trước!");
                     return;
@@ -436,9 +449,13 @@
                 };
 
                 let selectedQuestions = [];
+
                 for (let chuDe in cauHinh) {
                     let countNeeded = cauHinh[chuDe];
-                    let pool = poolData.filter(q => q.chuDe && q.chuDe.trim().toLowerCase() === chuDe.toLowerCase());
+                    let pool = poolData.filter(q => 
+                        q.chuDe && q.chuDe.trim().toLowerCase() === chuDe.toLowerCase()
+                    );
+
                     pool = (typeof shuffleArray === 'function') ? shuffleArray(pool) : pool.sort(() => Math.random() - 0.5);
                     let picked = pool.slice(0, countNeeded);
                     selectedQuestions = selectedQuestions.concat(picked);
@@ -452,8 +469,14 @@
                 selectedQuestions = (typeof shuffleArray === 'function') ? shuffleArray(selectedQuestions) : selectedQuestions.sort(() => Math.random() - 0.5);
 
                 const btnCalc = document.getElementById('btn-calc');
+                const btnDict = document.getElementById('btn-dict');
+                const btnVerbs = document.getElementById('btn-verbs');
+                
                 if (btnCalc) btnCalc.style.setProperty('display', 'inline-block', 'important');
+                if (btnDict) btnDict.style.setProperty('display', 'none', 'important');
+                if (btnVerbs) btnVerbs.style.setProperty('display', 'none', 'important');
 
+                // Khởi tạo bài thi chuẩn ứng dụng
                 if (window.AppState) {
                     AppState.currentQuizData = selectedQuestions.map(item => {
                         let correctKeys = (typeof getCorrectKeys === 'function') ? getCorrectKeys(item) : [];
@@ -480,13 +503,9 @@
 
                     if (typeof updateScoreDisplay === 'function') updateScoreDisplay();
                     if (typeof window.renderQuiz === 'function') window.renderQuiz();
-
-                    const quizDiv = document.getElementById('quiz');
-                    if (quizDiv) {
-                        quizDiv.innerHTML = '<h2 style="text-align: center; color: #540606; margin-bottom: 20px;">ĐỀ TỔNG HỢP TOÁN (21 CÂU)</h2>' + quizDiv.innerHTML;
-                    }
-
                     if (typeof window.startTimerTotal === 'function') window.startTimerTotal(30 * 60);
+                } else {
+                    alert("Đã tạo đề nhưng có lỗi khởi tạo giao diện quiz.");
                 }
             });
         }
