@@ -213,32 +213,18 @@ button:active { transform: scale(0.98); }
         padding: 10px !important;
     }
 }
-/* 1. Mở rộng kích thước tổng thể khung máy tính */
+/* 1. Khôi phục lại kích thước trang làm bài bình thường (nếu bị dính ảnh hưởng từ code trước) */
+.container {
+    max-width: 900px !important;
+    margin: 0 auto !important;
+}
+
+/* 2. Phóng to toàn bộ bảng máy tính lên (Ví dụ: phóng to 1.35 lần) */
 #calc-modal {
-    width: 440px !important; /* Tăng độ rộng khung máy tính */
-    padding: 16px !important;
-}
-
-/* 2. Phóng to màn hình hiển thị kết quả */
-#calc-modal input, 
-#calc-modal .calc-display, 
-#calc-modal input[type="text"] {
-    font-size: 2.2em !important;
-    padding: 15px !important;
-    height: 65px !important;
-    text-align: right;
-}
-
-/* 3. Phóng to toàn bộ các phím bấm (bàn phím) */
-#calc-modal button {
-    padding: 20px 10px !important;
-    font-size: 1.6em !important;
-    font-weight: bold !important;
-    border-radius: 8px !important;
-}
-
-/* 4. Tăng khoảng cách giữa các phím bấm cho thoáng */
-#calc-modal div[style*="grid"], 
-#calc-modal .calculator-grid {
-    gap: 10px !important;
+    transform: scale(1.35) !important;
+    transform-origin: top right !important; /* Phóng to lan ra phía trong màn hình */
+    position: fixed !important;
+    right: 50px !important;
+    top: 90px !important;
+    z-index: 9999 !important;
 }
