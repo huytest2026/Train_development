@@ -775,20 +775,23 @@ window.renderLeaderboard = function(subjectFilter = null) {
     let bacList = [];
     let dongList = [];
 
-    // --- BỔ SUNG: Theo dõi số lần đạt 10 điểm theo Mã Đề để tính Kim Cương ---
+    // --- ĐỌC CHÍNH XÁC CỘT MADE (Cột N / made / maDe) ---
     let madeDiamondTracker = {}; 
 
     AppState.rankings.forEach(a => {
         let name = String(a.name || '').trim();
         let subj = standardizeSubject ? standardizeSubject(String(a.subject || '').trim()) : String(a.subject || '').trim();
-        let made = String(a.made || '').trim();
         let score = Number(a.score) || 0;
 
-        if (made && made !== "Đề tổng hợp" && score === 10) {
+        // Bắt chính xác các biến thể tên cột Mã đề từ Google Sheets
+        let made = String(a.MADE || a.made || a.maDe || a.code || '').trim();
+
+        // Nếu điểm đạt 10 và có chọn Mã đề cụ thể
+        if (made && made !== "" && score === 10) {
             let key = name + '___' + subj + '___' + made;
             madeDiamondTracker[key] = (madeDiamondTracker[key] || 0) + 1;
             
-            // Nếu đạt từ 2 lần 10 điểm trở lên ở một Mã Đề -> Đạt Kim Cương
+            // Nếu đạt từ 2 lần 10 điểm trở lên cho cùng một Mã đề
             if (madeDiamondTracker[key] >= 2) {
                 let kcKey = name + '___' + subj + '___' + made;
                 let infoText = `(Mã đề: ${made} - Đạt ${madeDiamondTracker[key]} lần điểm 10)`;
@@ -905,7 +908,7 @@ window.renderLeaderboard = function(subjectFilter = null) {
     }
 
     let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
-    html += buildGroupHtml('💎 Kim Cương (3 chủ đề khác nhau đạt 10 điểm liên tiếp hoặc đạt 2 lần 10 điểm cùng Mã đề)', '#007bff', kimCuongList);
+    html += buildGroupHtml('💎 Kim Cương (3 chủ đề khác nhau đạt 10 điểm liên tiếp HOẶC đạt 2 lần 10 điểm cùng Mã đề)', '#007bff', kimCuongList);
     html += buildGroupHtml('🥇 Vàng (Có ít nhất 1 lần đạt 10 điểm)', '#d9822b', vangList);
     html += buildGroupHtml('🥈 Bạc (Có ít nhất 1 lần đạt 9 điểm trở lên và nhỏ hơn 10)', '#6c757d', bacList);
     html += buildGroupHtml('🥉 Đồng (Có ít nhất 1 lần đạt 8 điểm trở lên và nhỏ hơn 9)', '#cd7f32', dongList);
