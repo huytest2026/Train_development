@@ -905,7 +905,7 @@ window.renderLeaderboard = function(subjectFilter = null) {
     }
 
     let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
-    html += buildGroupHtml('💎 Kim Cương (3 chủ đề khác nhau đạt 10 điểm liên tiếp HOẶC đạt 2 lần 10 điểm cùng Mã đề)', '#007bff', kimCuongList);
+    html += buildGroupHtml('💎 Kim Cương (3 chủ đề khác nhau đạt 10 điểm liên tiếp hoặc đạt 2 lần 10 điểm cùng Mã đề)', '#007bff', kimCuongList);
     html += buildGroupHtml('🥇 Vàng (Có ít nhất 1 lần đạt 10 điểm)', '#d9822b', vangList);
     html += buildGroupHtml('🥈 Bạc (Có ít nhất 1 lần đạt 9 điểm trở lên và nhỏ hơn 10)', '#6c757d', bacList);
     html += buildGroupHtml('🥉 Đồng (Có ít nhất 1 lần đạt 8 điểm trở lên và nhỏ hơn 9)', '#cd7f32', dongList);
