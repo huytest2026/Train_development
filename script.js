@@ -1510,44 +1510,37 @@ window.submitQuiz = function() {
         };
     });
 
-    // 1. Tự động bù tên Môn và Chủ đề nếu làm Đề tổng hợp (tránh bị undefined)
-var submitMon = mon || "Toán"; 
-var submitChuDe = selectedTopicsStr;
+    var submitMon = mon || "Toán"; 
+    var submitChuDe = selectedTopicsStr;
 
-// Nếu không có tên chủ đề lẻ, tự động đặt tên là "Đề tổng hợp Toán (21 câu)"
-if (!submitChuDe || submitChuDe === "") {
-    submitChuDe = "Đề tổng hợp Toán (21 câu)";
-}
+    if (!submitChuDe || submitChuDe === "") {
+        submitChuDe = "Đề tổng hợp Toán (21 câu)";
+    }
 
-// 2. Chỉ cần có Mã học sinh (maHS) là BẮT BUỘC gửi về Google Sheets
-if (maHS) {
-    fetch(API_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            maHS: maHS,
-            mon: submitMon,
-            score: score,
-            level: level || 1,
-            chuDe: submitChuDe,
-            made: selectedMade || "Đề tổng hợp",
-            details: details || [],
-
-            // Dữ liệu máy tính
-            calcOpenCount: (window.calcLogs && window.calcLogs.openCount) ? window.calcLogs.openCount : 0,
-            calcHistory: (window.calcLogs && window.calcLogs.history && window.calcLogs.history.length > 0) 
-                         ? window.calcLogs.history.map(item => 
-                             typeof item === 'string' ? item : `[${item.time || ''}] ${item.expression || ''} = ${item.result || ''}`
-                           ).join("\n") 
-                         : "Không sử dụng máy tính"
-        })
-    }).then(() => {
-        console.log("✅ Đã gửi bài thi tổng hợp thành công!");
-    }).catch(err => console.log('❌ Lỗi gửi kết quả:', err));
-} else {
-    console.warn("⚠️ Chưa có Mã học sinh (maHS) nên chưa gửi được!");
-}
+    if (maHS) {
+        fetch(API_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                maHS: maHS,
+                mon: submitMon,
+                score: score,
+                level: level || 1,
+                chuDe: submitChuDe,
+                made: selectedMade || "Đề tổng hợp",
+                details: details || [],
+                calcOpenCount: (window.calcLogs && window.calcLogs.openCount) ? window.calcLogs.openCount : 0,
+                calcHistory: (window.calcLogs && window.calcLogs.history && window.calcLogs.history.length > 0) 
+                             ? window.calcLogs.history.map(item => 
+                                 typeof item === 'string' ? item : `[${item.time || ''}] ${item.expression || ''} = ${item.result || ''}`
+                               ).join("\n") 
+                             : "Không sử dụng máy tính"
+            })
+        }).then(() => {
+            console.log("✅ Đã gửi bài thi tổng hợp thành công!");
+        }).catch(err => console.log('❌ Lỗi gửi kết quả:', err));
+    }
 
     let quizScreen = document.getElementById('quiz-screen');
     if (quizScreen) quizScreen.style.display = 'none';
@@ -1559,6 +1552,18 @@ if (maHS) {
         resultContainer.className = 'container';
         document.body.appendChild(resultContainer);
     }
+
+    // ĐÃ THÊM NÚT IN PDF VÀO ĐÂY
+    resultContainer.innerHTML = '<h2 style="text-align: center; color: #540606; font-size: 1.6em;">Kết Quả Bài Làm</h2>' +
+        '<p style="font-size: 1.2em; text-align: center;">Số câu hỏi đúng: <b>' + AppState.correctCount + ' / ' + totalQuestions + '</b></p>' +
+        '<p style="font-size: 1.4em; text-align: center; font-weight: bold;">Điểm số: ' + score + ' đ</p>' +
+        '<div style="display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap;">' +
+        '<button type="button" onclick="window.location.reload()" style="flex: 1; padding: 14px; background: #007bff; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.05em;">Làm bài mới</button>' +
+        '<button type="button" onclick="window.viewReviewDetails()" style="flex: 1; padding: 14px; background: #6c757d; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.05em;">🔍 Xem lại chi tiết</button>' +
+        '<button type="button" onclick="window.printPDF()" style="flex: 1; padding: 14px; background: #28a745; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.05em;">🖨️ In / Lưu PDF</button>' +
+        '</div>' +
+        '<div id="review-detail-box" style="margin-top: 20px;"></div>';
+};
 
     resultContainer.innerHTML = '<h2 style="text-align: center; color: #540606; font-size: 1.6em;">Kết Quả Bài Làm</h2>' +
         '<p style="font-size: 1.2em; text-align: center;">Số câu hỏi đúng: <b>' + AppState.correctCount + ' / ' + totalQuestions + '</b></p>' +
@@ -2307,3 +2312,10 @@ document.addEventListener('click', function(e) {
         return originalFetch.apply(this, args);
     };
 })();
+window.printPDF = function() {
+    // Tự động mở rộng phần xem lại chi tiết để khi in/lưu PDF nội dung hiển thị đầy đủ
+    if (typeof window.viewReviewDetails === 'function') {
+        window.viewReviewDetails();
+    }
+    window.print();
+};
