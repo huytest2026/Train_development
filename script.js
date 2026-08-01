@@ -775,6 +775,41 @@ window.renderLeaderboard = function(subjectFilter = null) {
     let bacList = [];
     let dongList = [];
 
+    // --- BỔ SUNG: Theo dõi số lần đạt 10 điểm theo Mã Đề để tính Kim Cương ---
+    let madeDiamondTracker = {}; 
+
+    AppState.rankings.forEach(a => {
+        let name = String(a.name || '').trim();
+        let subj = standardizeSubject ? standardizeSubject(String(a.subject || '').trim()) : String(a.subject || '').trim();
+        let made = String(a.made || '').trim();
+        let score = Number(a.score) || 0;
+
+        if (made && made !== "Đề tổng hợp" && score === 10) {
+            let key = name + '___' + subj + '___' + made;
+            madeDiamondTracker[key] = (madeDiamondTracker[key] || 0) + 1;
+            
+            // Nếu đạt từ 2 lần 10 điểm trở lên ở một Mã Đề -> Đạt Kim Cương
+            if (madeDiamondTracker[key] >= 2) {
+                let kcKey = name + '___' + subj + '___' + made;
+                let infoText = `(Mã đề: ${made} - Đạt ${madeDiamondTracker[key]} lần điểm 10)`;
+                let existingRecord = kimCuongList.find(x => x.kcKey === kcKey);
+                
+                if (!existingRecord) {
+                    kimCuongList.push({
+                        name: name,
+                        subject: subj,
+                        score: 10,
+                        date: a.date || '',
+                        info: infoText,
+                        kcKey: kcKey
+                    });
+                } else {
+                    existingRecord.info = infoText;
+                }
+            }
+        }
+    });
+
     for (let key in studentSubjects) {
         let st = studentSubjects[key];
         if (activeSubject && cleanKey(st.subject) !== cleanKey(activeSubject)) continue;
@@ -801,13 +836,14 @@ window.renderLeaderboard = function(subjectFilter = null) {
             name: st.name,
             subject: st.subject,
             score: bestScore,
-            date: latestAttempt.date || ''
+            date: latestAttempt.date || '',
+            info: ''
         };
 
         if (hasExplicitLevel) {
             attempts.forEach(a => {
                 let lvl = String(a.level || '').trim();
-                let rec = { name: st.name, subject: st.subject, score: Number(a.score) || bestScore, date: a.date || '' };
+                let rec = { name: st.name, subject: st.subject, score: Number(a.score) || bestScore, date: a.date || '', info: '' };
                 if (lvl === "Kim Cương" && !kimCuongList.some(x => x.name === st.name && x.subject === st.subject)) kimCuongList.push(rec);
                 if (lvl === "Vàng" && !vangList.some(x => x.name === st.name && x.subject === st.subject)) vangList.push(rec);
                 if (lvl === "Bạc" && !bacList.some(x => x.name === st.name && x.subject === st.subject)) bacList.push(rec);
@@ -819,7 +855,7 @@ window.renderLeaderboard = function(subjectFilter = null) {
             let count8 = attempts.filter(a => a._parsedScore >= 8).length;
 
             let sortedAttempts = [...attempts].sort((a, b) => parseCustomDate(a.date) - parseCustomDate(b.date));
-            let isKimCuong = false;
+            let isKimCuongTopic = false;
             if (sortedAttempts.length >= 3) {
                 for (let i = 0; i <= sortedAttempts.length - 3; i++) {
                     let s1 = sortedAttempts[i]._parsedScore;
@@ -831,17 +867,21 @@ window.renderLeaderboard = function(subjectFilter = null) {
 
                     if (s1 === 10 && s2 === 10 && s3 === 10) {
                         if (!t1 || !t2 || !t3 || (t1 !== t2 && t2 !== t3 && t1 !== t3)) {
-                            isKimCuong = true;
+                            isKimCuongTopic = true;
                             break;
                         }
                     }
                 }
             }
 
-            if (isKimCuong) kimCuongList.push(record);
-            if (count10 > 0) vangList.push(record);
-            if (count9 >= 2) bacList.push(record);
-            if (count8 >= 2) dongList.push(record);
+            if (isKimCuongTopic && !kimCuongList.some(x => x.name === st.name && x.subject === st.subject)) {
+                record.info = "(3 lần liên tiếp đạt 10 điểm, khác chủ đề)";
+                kimCuongList.push(record);
+            }
+
+            if (count10 > 0 && !vangList.some(x => x.name === st.name && x.subject === st.subject)) vangList.push(record);
+            if (count9 >= 2 && !bacList.some(x => x.name === st.name && x.subject === st.subject)) bacList.push(record);
+            if (count8 >= 2 && !dongList.some(x => x.name === st.name && x.subject === st.subject)) dongList.push(record);
         }
     }
 
@@ -854,9 +894,10 @@ window.renderLeaderboard = function(subjectFilter = null) {
         if (listItems.length === 0) {
             return `<div style="margin-bottom: 12px; font-size: 1.02em;"><b>${title}:</b> <span style="color: #888; font-style: italic;">Chưa có học sinh đạt chuẩn</span></div>`;
         }
-        let itemsHtml = listItems.map(item => 
-            `<li style="margin: 6px 0;"><b>${escapeHTML(item.name)}</b> (Môn: <span style="color: #007bff; font-weight: 600;">${escapeHTML(item.subject)}</span> - Điểm cao nhất: ${item.score} đ)</li>`
-        ).join('');
+        let itemsHtml = listItems.map(item => {
+            let infoStr = item.info ? ` <span style="color: #666; font-size: 0.9em; font-style: italic;">${escapeHTML(item.info)}</span>` : '';
+            return `<li style="margin: 6px 0;"><b>${escapeHTML(item.name)}</b> (Môn: <span style="color: #007bff; font-weight: 600;">${escapeHTML(item.subject)}</span> - Điểm: ${item.score} đ)${infoStr}</li>`;
+        }).join('');
         return `<div style="margin-bottom: 16px;">
                     <b style="color: ${color}; font-size: 1.1em;">${title}:</b>
                     <ul style="margin: 6px 0 0 20px; padding: 0; font-size: 1.05em;">${itemsHtml}</ul>
@@ -864,7 +905,7 @@ window.renderLeaderboard = function(subjectFilter = null) {
     }
 
     let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
-    html += buildGroupHtml('💎 Kim Cương (3 lần liên tiếp đạt 10 điểm, khác chủ đề)', '#007bff', kimCuongList);
+    html += buildGroupHtml('💎 Kim Cương (3 chủ đề khác nhau đạt 10 điểm liên tiếp HOẶC đạt 2 lần 10 điểm cùng Mã đề)', '#007bff', kimCuongList);
     html += buildGroupHtml('🥇 Vàng (Có ít nhất 1 lần đạt 10 điểm)', '#d9822b', vangList);
     html += buildGroupHtml('🥈 Bạc (Có ít nhất 1 lần đạt 9 điểm trở lên và nhỏ hơn 10)', '#6c757d', bacList);
     html += buildGroupHtml('🥉 Đồng (Có ít nhất 1 lần đạt 8 điểm trở lên và nhỏ hơn 9)', '#cd7f32', dongList);
@@ -879,7 +920,7 @@ function extractTopicFlexible(att) {
     
     for (let key in att) {
         let val = att[key];
-        if (typeof val === 'string' && val.length > 2 && !['name', 'subject', 'date', 'score', 'Họ tên', 'Môn', 'Ngày', 'Điểm'].includes(key)) {
+        if (typeof val === 'string' && val.length > 2 && !['name', 'subject', 'date', 'score', 'made', 'Họ tên', 'Môn', 'Ngày', 'Điểm', 'Mã đề'].includes(key)) {
             return cleanKey(val);
         }
     }
