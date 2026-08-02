@@ -328,6 +328,7 @@ window.speakQuestion = function(index) {
 
     const chuDeLower = (item.chuDe || '').toLowerCase();
     const isVietAnh = chuDeLower.includes('việt anh') || chuDeLower.includes('viet anh');
+    const isAnhViet = chuDeLower.includes('anh việt') || chuDeLower.includes('anh - việt') || chuDeLower.includes('anh-việt');
 
     // 2. KIỂM TRA TRẠNG THÁI TRẢ LỜI
     let hasAnswered = false;
@@ -339,10 +340,9 @@ window.speakQuestion = function(index) {
                       item._isAnswered;
     }
 
-    // 3. XỬ LÝ LẤY ĐÚNG NỘI DUNG CÂU HỎI (TRÁNH BỊ LẪN VỚI ĐOẠN VĂN / HƯỚNG DẪN CHUNG CỦA MADE)
+    // 3. XỬ LÝ LẤY ĐÚNG NỘI DUNG CÂU HỎI
     let questionText = '';
     
-    // Ưu tiên lấy từ DOM của thẻ câu hỏi hiện tại trên màn hình nếu có (đảm bảo đọc chính xác câu đang hiển thị)
     if (quizCards[index]) {
         const qElement = quizCards[index].querySelector('.question-content') || quizCards[index].querySelector('.question-text');
         if (qElement && qElement.innerText.trim()) {
@@ -350,10 +350,8 @@ window.speakQuestion = function(index) {
         }
     }
     
-    // Nếu không lấy được từ DOM, lọc từ item dữ liệu (tránh lấy nhầm passage hướng dẫn)
     if (!questionText) {
         questionText = item.question || '';
-        // Nếu item.question bị trùng với đoạn văn/hướng dẫn chung, cố gắng tìm trường khác hoặc dùng tạm
         if (!questionText && item.passage && !item.passage.includes("Chọn phần gạch chân")) {
             questionText = item.passage;
         }
@@ -369,7 +367,7 @@ window.speakQuestion = function(index) {
 
     let textToRead = '';
 
-    // 4. XỬ LÝ LỌC TEXT CHO TỪNG LOẠI BÀI
+    // 4. XỬ LÝ LỌC TEXT CHỈ ĐỌC TIẾNG ANH CHO TỪNG CHỦ ĐỀ
     if (isListeningType) {
         textToRead = questionText;
         if (correctAnswerStr) {
@@ -381,10 +379,19 @@ window.speakQuestion = function(index) {
         }
     } else {
         if (!hasAnswered) {
-            textToRead = questionText;
+            // Nếu là Việt - Anh, chưa trả lời thì không đọc câu hỏi tiếng Việt
+            if (isVietAnh) {
+                textToRead = ""; 
+            } else {
+                textToRead = questionText; 
+            }
         } else {
             if (isVietAnh) {
+                // Chủ đề Việt - Anh: Chỉ đọc đáp án tiếng Anh, bỏ qua tiếng Việt
                 textToRead = correctAnswerStr;
+            } else if (isAnhViet) {
+                // Chủ đề Anh - Việt: Chỉ đọc câu hỏi tiếng Anh, bỏ qua đáp án tiếng Việt
+                textToRead = questionText;
             } else if (questionText.match(/_{2,}|\.{3,}/) && correctAnswerStr) {
                 textToRead = questionText.replace(/_{2,}|\.{3,}/g, " " + correctAnswerStr + " ");
             } else {
@@ -393,7 +400,7 @@ window.speakQuestion = function(index) {
         }
     }
 
-    // 5. PHÁT FILE ÂM THANH ONLINE
+    // 5. PHÁT FILE ÂM THANH ONLINE (NẾU CÓ)
     if (textToRead && (textToRead.startsWith('http://') || textToRead.startsWith('https://')) && 
         (textToRead.endsWith('.mp3') || textToRead.endsWith('.wav') || textToRead.endsWith('.m4a') || textToRead.includes('drive.google.com'))) {
         new Audio(textToRead).play().catch(() => alert("Không thể phát file âm thanh."));
