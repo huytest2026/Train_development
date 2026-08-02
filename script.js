@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbziLW_zgJ_tCEqPE8QaEWKRFgVE7gzZ-hnpMG9ROWqgfkxgpm1Q04NiePtqplAegQMK/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbw0wLQ2xlqyiaNHtOa-ttWqvvihNl-CvXxenUXW2iK7t8lD-7-Bbz24V8WtP-SjFUif/exec";
 
 let AppState = {
     allQuizData: [],
@@ -1845,7 +1845,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let dataList = null;
 
             try {
-                let webAppUrl = "https://script.google.com/macros/s/AKfycbziLW_zgJ_tCEqPE8QaEWKRFgVE7gzZ-hnpMG9ROWqgfkxgpm1Q04NiePtqplAegQMK/exec"; 
+                let webAppUrl = "https://script.google.com/macros/s/AKfycbw0wLQ2xlqyiaNHtOa-ttWqvvihNl-CvXxenUXW2iK7t8lD-7-Bbz24V8WtP-SjFUif/exec"; 
                 
                 let response = await fetch(webAppUrl);
                 let result = await response.json();
