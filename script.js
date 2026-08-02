@@ -330,19 +330,18 @@ window.speakQuestion = function(index) {
     const isVietAnh = chuDeLower.includes('việt anh') || chuDeLower.includes('viet anh');
     const isAnhViet = chuDeLower.includes('anh việt') || chuDeLower.includes('anh - việt') || chuDeLower.includes('anh-việt');
 
-    // 2. KIỂM TRA TRẠNG THÁI TRẢ LỜI
-    let hasAnswered = false;
-    const quizCards = document.querySelectorAll('.quiz-card');
-    if (quizCards[index]) {
-        hasAnswered = quizCards[index].querySelector('.option-box.selected-option') !== null || 
-                      quizCards[index].querySelector('input[type="checkbox"]:checked') !== null ||
-                      quizCards[index].querySelector('input:disabled') !== null ||
-                      item._isAnswered;
+    // 2. LẤY ĐÁP ÁN ĐÚNG TIẾNG ANH (Ưu tiên lấy sớm)
+    let correctAnswerStr = '';
+    let correctKeys = item._correctKeys || (typeof getCorrectKeys === 'function' ? getCorrectKeys(item) : []);
+    if (correctKeys.length > 0 && item[correctKeys[0]]) {
+        correctAnswerStr = typeof cleanOptionText === 'function' ? cleanOptionText(item[correctKeys[0]]) : item[correctKeys[0]].replace(/^[A-D][\.\)]\s*/, '');
+    } else if (item.correct) {
+        correctAnswerStr = typeof cleanOptionText === 'function' ? cleanOptionText(item.correct) : item.correct;
     }
 
-    // 3. XỬ LÝ LẤY ĐÚNG NỘI DUNG CÂU HỎI
+    // 3. XỬ LÝ LẤY NỘI DUNG CÂU HỎI
     let questionText = '';
-    
+    const quizCards = document.querySelectorAll('.quiz-card');
     if (quizCards[index]) {
         const qElement = quizCards[index].querySelector('.question-content') || quizCards[index].querySelector('.question-text');
         if (qElement && qElement.innerText.trim()) {
@@ -357,17 +356,9 @@ window.speakQuestion = function(index) {
         }
     }
 
-    let correctAnswerStr = '';
-    let correctKeys = item._correctKeys || (typeof getCorrectKeys === 'function' ? getCorrectKeys(item) : []);
-    if (correctKeys.length > 0 && item[correctKeys[0]]) {
-        correctAnswerStr = typeof cleanOptionText === 'function' ? cleanOptionText(item[correctKeys[0]]) : item[correctKeys[0]].replace(/^[A-D][\.\)]\s*/, '');
-    } else if (item.correct) {
-        correctAnswerStr = typeof cleanOptionText === 'function' ? cleanOptionText(item.correct) : item.correct;
-    }
-
     let textToRead = '';
 
-    // 4. XỬ LÝ LỌC TEXT CHỈ ĐỌC TIẾNG ANH CHO TỪNG CHỦ ĐỀ
+    // 4. XỬ LÝ LỌC TEXT CHỈ ĐỌC TIẾNG ANH THEO TỪNG CHỦ ĐỀ
     if (isListeningType) {
         textToRead = questionText;
         if (correctAnswerStr) {
@@ -377,26 +368,30 @@ window.speakQuestion = function(index) {
                 textToRead = textToRead.replace(/\.{3,}/g, " " + correctAnswerStr + " ");
             }
         }
+    } else if (isVietAnh) {
+        // Chủ đề Việt - Anh: Câu hỏi là tiếng Việt, bấm Nghe sẽ đọc từ tiếng Anh (đáp án đúng)
+        textToRead = correctAnswerStr;
+    } else if (isAnhViet) {
+        // Chủ đề Anh - Việt: Câu hỏi là tiếng Anh, bấm Nghe sẽ đọc câu hỏi tiếng Anh
+        textToRead = questionText;
     } else {
-        if (!hasAnswered) {
-            // Nếu là Việt - Anh, chưa trả lời thì không đọc câu hỏi tiếng Việt
-            if (isVietAnh) {
-                textToRead = ""; 
-            } else {
-                textToRead = questionText; 
-            }
-        } else {
-            if (isVietAnh) {
-                // Chủ đề Việt - Anh: Chỉ đọc đáp án tiếng Anh, bỏ qua tiếng Việt
-                textToRead = correctAnswerStr;
-            } else if (isAnhViet) {
-                // Chủ đề Anh - Việt: Chỉ đọc câu hỏi tiếng Anh, bỏ qua đáp án tiếng Việt
-                textToRead = questionText;
-            } else if (questionText.match(/_{2,}|\.{3,}/) && correctAnswerStr) {
+        // Các chủ đề khác (kiểm tra trạng thái đã trả lời chưa)
+        let hasAnswered = false;
+        if (quizCards[index]) {
+            hasAnswered = quizCards[index].querySelector('.option-box.selected-option') !== null || 
+                          quizCards[index].querySelector('input[type="checkbox"]:checked') !== null ||
+                          quizCards[index].querySelector('input:disabled') !== null ||
+                          item._isAnswered;
+        }
+        
+        if (hasAnswered) {
+            if (questionText.match(/_{2,}|\.{3,}/) && correctAnswerStr) {
                 textToRead = questionText.replace(/_{2,}|\.{3,}/g, " " + correctAnswerStr + " ");
             } else {
                 textToRead = questionText + ". " + correctAnswerStr;
             }
+        } else {
+            textToRead = questionText;
         }
     }
 
