@@ -146,14 +146,12 @@
 <body>
 
 <div class="container" id="start-screen">
-    <!-- TIÊU ĐỀ VÀ BỘ 3 NÚT CÔNG CỤ (MÁY TÍNH, TRA TỪ, TỐI) -->
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 8px;">
-        <h1 style="color: #540606; margin: 0; font-size: 1.5em; flex: 1;">Bài Kiểm Tra Toán Anh</h1>
-        <div style="display: flex; gap: 5px; align-items: center; flex-shrink: 0;">
-            <button type="button" onclick="window.openCalculatorModal()" style="background: #fd7e14; color: white; border: none; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.85em; white-space: nowrap;">🧮 Máy tính</button>
-            <button type="button" onclick="window.openDictionaryModal()" style="background: #17a2b8; color: white; border: none; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.85em; white-space: nowrap;">📖 Tra từ</button>
-            <button type="button" id="dark-mode-toggle" style="background: #e0a800; color: white; border: none; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.85em; white-space: nowrap;">🌙 Tối</button>
-        </div>
+    <!-- TIÊU ĐỀ VÀ BỘ 3 NÚT CÔNG CỤ NẰM DƯỚI, HỠ ĐỀU -->
+    <h1 style="color: #540606; margin: 0 0 12px 0; font-size: 1.6em;">Bài Kiểm Tra Toán Anh</h1>
+    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+        <button type="button" onclick="window.openCalculatorModal()" style="flex: 1; background: #fd7e14; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.95em; white-space: nowrap;">🧮 Máy tính</button>
+        <button type="button" onclick="window.openDictionaryModal()" style="flex: 1; background: #17a2b8; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.95em; white-space: nowrap;">📖 Tra từ</button>
+        <button type="button" id="dark-mode-toggle" style="flex: 1; background: #e0a800; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.95em; white-space: nowrap;">🌙 Tối</button>
     </div>
     
     <label for="student-code">Mã học sinh:</label>
