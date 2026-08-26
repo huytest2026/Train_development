@@ -1,3 +1,5 @@
+
+
 const API_URL = "https://script.google.com/macros/s/AKfycbw0wLQ2xlqyiaNHtOa-ttWqvvihNl-CvXxenUXW2iK7t8lD-7-Bbz24V8WtP-SjFUif/exec";
 
 let AppState = {
@@ -6,9 +8,16 @@ let AppState = {
     rankings: [],
     currentQuizData: [],
     timerInterval: null,
+    timerEndAt: 0,
     correctCount: 0,
     wrongCount: 0,
-    wrongQuestions: []
+    wrongQuestions: [],
+    quizSubmitted: false,
+    dataLoading: false,
+    questionIndex: { bySubject: new Map(), bySubjectTopic: new Map(), bySubjectMade: new Map() },
+    dictionaryCache: new Map(),
+    dictionaryRequestId: 0,
+    dictionaryAbortController: null
 };
 
 // Hàm chặn tắt/đóng/load lại trang khi đang làm bài
@@ -32,9 +41,15 @@ function removeDiacritics(str) {
     return String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
 }
 
+const _cleanKeyCache = new Map();
 function cleanKey(str) {
-    if (!str) return ''; 
-    return removeDiacritics(str).toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!str) return '';
+    const raw = String(str);
+    if (_cleanKeyCache.has(raw)) return _cleanKeyCache.get(raw);
+    const result = removeDiacritics(raw).toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (_cleanKeyCache.size > 3000) _cleanKeyCache.clear();
+    _cleanKeyCache.set(raw, result);
+    return result;
 }
 
 function standardizeSubject(monStr) {
@@ -44,6 +59,125 @@ function standardizeSubject(monStr) {
     if (cleanM.includes('toan') || cleanM.includes('math')) return 'Toán';
     if (cleanM.includes('tiengviet') || cleanM.includes('tv')) return 'Tiếng Việt';
     return monStr.trim();
+}
+
+// ----------------------------------------------------------
+// INDEX CÂU HỎI: tránh filter toàn bộ mảng lặp đi lặp lại
+// ----------------------------------------------------------
+function rebuildQuestionIndex() {
+    const bySubject = new Map();
+    const bySubjectTopic = new Map();
+    const bySubjectMade = new Map();
+
+    for (const item of AppState.allQuizData) {
+        const subjectKey = cleanKey(item.mon);
+        if (!subjectKey || !item.question) continue;
+
+        if (!bySubject.has(subjectKey)) bySubject.set(subjectKey, []);
+        bySubject.get(subjectKey).push(item);
+
+        const topicKey = cleanKey(item.chuDe);
+        if (topicKey) {
+            const key = subjectKey + '::' + topicKey;
+            if (!bySubjectTopic.has(key)) bySubjectTopic.set(key, []);
+            bySubjectTopic.get(key).push(item);
+        }
+
+        const madeKey = String(item.made || '').trim();
+        if (madeKey) {
+            const key = subjectKey + '::' + madeKey.toLowerCase();
+            if (!bySubjectMade.has(key)) bySubjectMade.set(key, []);
+            bySubjectMade.get(key).push(item);
+        }
+    }
+
+    AppState.questionIndex = { bySubject, bySubjectTopic, bySubjectMade };
+}
+
+function getQuestionsBySubject(subject) {
+    return AppState.questionIndex.bySubject.get(cleanKey(subject)) || [];
+}
+
+function getQuestionsBySubjectTopic(subject, topic) {
+    return AppState.questionIndex.bySubjectTopic.get(cleanKey(subject) + '::' + cleanKey(topic)) || [];
+}
+
+function getQuestionsBySubjectMade(subject, made) {
+    const key = cleanKey(subject) + '::' + String(made || '').trim().toLowerCase();
+    return AppState.questionIndex.bySubjectMade.get(key) || [];
+}
+
+function setQuizActive(active) {
+    if (active) {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+        window.addEventListener('beforeunload', handleBeforeUnload);
+    } else {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+    }
+}
+
+// Bộ phân tích biểu thức đơn giản cho máy tính. Không dùng eval/new Function.
+function safeEvaluate(expression) {
+    let expr = String(expression || '')
+        .replace(/×/g, '*').replace(/÷/g, '/')
+        .replace(/Math\.sqrt/g, 'sqrt').replace(/Math\.sin/g, 'sin')
+        .replace(/Math\.cos/g, 'cos').replace(/Math\.tan/g, 'tan')
+        .replace(/Math\.PI/g, 'pi').replace(/\s+/g, '');
+    if (!expr || !/^[0-9+\-*/().%^a-zA-Z_]+$/.test(expr)) throw new Error('Biểu thức không hợp lệ');
+    expr = expr.replace(/\*\*/g, '^');
+
+    const tokens = [];
+    let i = 0;
+    while (i < expr.length) {
+        const ch = expr[i];
+        if (/\d|\./.test(ch)) {
+            let j = i + 1;
+            while (j < expr.length && /[\d.eE+-]/.test(expr[j])) {
+                if ((expr[j] === '+' || expr[j] === '-') && !/[eE]/.test(expr[j-1])) break;
+                j++;
+            }
+            const n = Number(expr.slice(i, j));
+            if (!Number.isFinite(n)) throw new Error('Số không hợp lệ');
+            tokens.push({type:'number', value:n}); i=j; continue;
+        }
+        if (/[a-zA-Z_]/.test(ch)) {
+            let j=i+1; while (j<expr.length && /[a-zA-Z_]/.test(expr[j])) j++;
+            const name=expr.slice(i,j).toLowerCase();
+            if (!['sqrt','sin','cos','tan','pi'].includes(name)) throw new Error('Hàm không được hỗ trợ');
+            tokens.push({type:name==='pi'?'number':'func', value:name==='pi'?Math.PI:name}); i=j; continue;
+        }
+        if ('+-*/%^()'.includes(ch)) { tokens.push({type:'op',value:ch}); i++; continue; }
+        throw new Error('Ký tự không hợp lệ');
+    }
+
+    const output=[]; const ops=[]; const prec={'+':1,'-':1,'*':2,'/':2,'%':2,'^':3};
+    let prev='start';
+    for (const t of tokens) {
+        if (t.type==='number') { output.push(t); prev='value'; continue; }
+        if (t.type==='func') { ops.push(t); prev='func'; continue; }
+        const op=t.value;
+        if (op==='(') { ops.push(t); prev='left'; continue; }
+        if (op===')') {
+            let found=false; while(ops.length){ const top=ops.pop(); if(top.value==='('){found=true;break;} output.push(top); }
+            if(!found) throw new Error('Thiếu ngoặc');
+            if(ops.length && ops[ops.length-1].type==='func') output.push(ops.pop());
+            prev='value'; continue;
+        }
+        if ((op==='+'||op==='-') && (prev==='start'||prev==='op'||prev==='left')) output.push({type:'number',value:0});
+        while(ops.length){ const top=ops[ops.length-1]; if(top.value==='(') break; const p1=prec[op]||0,p2=prec[top.value]||4; if(p2>p1 || (p2===p1 && op!=='^')) output.push(ops.pop()); else break; }
+        ops.push(t); prev='op';
+    }
+    while(ops.length){ const top=ops.pop(); if(top.value==='(') throw new Error('Thiếu ngoặc'); output.push(top); }
+    const stack=[];
+    for(const t of output){
+        if(t.type==='number'){stack.push(t.value);continue;}
+        if(t.type==='func'){ const a=stack.pop(); if(a===undefined) throw new Error('Thiếu tham số'); stack.push({sqrt:Math.sqrt,sin:Math.sin,cos:Math.cos,tan:Math.tan}[t.value](a)); continue;}
+        const b=stack.pop(),a=stack.pop(); if(a===undefined||b===undefined) throw new Error('Thiếu toán hạng');
+        let r; if(t.value==='+')r=a+b; else if(t.value==='-')r=a-b; else if(t.value==='*')r=a*b; else if(t.value==='/')r=a/b; else if(t.value==='%')r=a%b; else r=a**b;
+        if(!Number.isFinite(r)) throw new Error('Kết quả không hợp lệ'); stack.push(r);
+    }
+    if(stack.length!==1 || !Number.isFinite(stack[0])) throw new Error('Biểu thức không hợp lệ');
+    return stack[0];
 }
 
 function speakWord(text) {
@@ -64,6 +198,166 @@ function speakWord(text) {
         alert("Trình duyệt của bạn không hỗ trợ tính năng phát âm.");
     }
 }
+
+// ==========================================
+// V10: KIỂM TRA PHÁT ÂM BẰNG MICROPHONE
+// ==========================================
+const PronunciationState = {
+    recognition: null,
+    target: '',
+    listening: false,
+    attempts: 0,
+    bestScore: 0
+};
+
+function normalizePronunciationText(text) {
+    return String(text || '')
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9'\s-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function levenshteinDistance(a, b) {
+    a = String(a || ''); b = String(b || '');
+    const prev = new Array(b.length + 1);
+    const curr = new Array(b.length + 1);
+    for (let j = 0; j <= b.length; j++) prev[j] = j;
+    for (let i = 1; i <= a.length; i++) {
+        curr[0] = i;
+        for (let j = 1; j <= b.length; j++) {
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+            curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+        }
+        for (let j = 0; j <= b.length; j++) prev[j] = curr[j];
+    }
+    return prev[b.length];
+}
+
+function calculatePronunciationScore(target, transcript) {
+    const t = normalizePronunciationText(target);
+    const r = normalizePronunciationText(transcript);
+    if (!t || !r) return 0;
+    if (t === r) return 100;
+
+    // Chấm cả chuỗi và từng từ, giúp xử lý trường hợp trình nhận diện thêm từ phụ.
+    const charScore = Math.max(0, 100 * (1 - levenshteinDistance(t, r) / Math.max(t.length, r.length)));
+    const tw = t.split(/\s+/);
+    const rw = r.split(/\s+/);
+    let matched = 0;
+    tw.forEach(word => {
+        if (rw.some(x => x === word || levenshteinDistance(word, x) <= Math.max(1, Math.floor(word.length * 0.2)))) matched++;
+    });
+    const wordScore = 100 * matched / tw.length;
+    return Math.round(Math.max(0, Math.min(100, charScore * 0.65 + wordScore * 0.35)));
+}
+
+function pronunciationFeedbackHTML(target, statusHtml) {
+    const id = 'pronunciation-feedback';
+    const existing = document.getElementById(id);
+    if (existing) {
+        existing.innerHTML = statusHtml;
+        return;
+    }
+    const resultBox = document.getElementById('dict-result');
+    if (!resultBox) return;
+    const panel = document.createElement('div');
+    panel.id = id;
+    panel.className = 'pronunciation-feedback';
+    panel.innerHTML = statusHtml;
+    resultBox.prepend(panel);
+}
+
+function pronunciationScoreClass(score) {
+    if (score >= 85) return 'pronunciation-good';
+    if (score >= 65) return 'pronunciation-mid';
+    return 'pronunciation-low';
+}
+
+window.startPronunciationCheck = function(targetText) {
+    const target = String(targetText || '').trim();
+    if (!target) return;
+
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) {
+        pronunciationFeedbackHTML(target,
+            '<b>⚠️ Trình duyệt chưa hỗ trợ nhận diện giọng nói.</b><br>Hãy dùng Google Chrome hoặc Microsoft Edge và cho phép truy cập microphone.');
+        return;
+    }
+
+    if (PronunciationState.recognition) {
+        try { PronunciationState.recognition.abort(); } catch (e) {}
+        PronunciationState.recognition = null;
+    }
+
+    const recognition = new Recognition();
+    PronunciationState.recognition = recognition;
+    PronunciationState.target = target;
+    PronunciationState.listening = true;
+    PronunciationState.attempts++;
+
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.continuous = false;
+    recognition.maxAlternatives = 3;
+
+    pronunciationFeedbackHTML(target,
+        `<b>🎙️ Đang nghe...</b> Hãy đọc: <strong>${escapeHTML(target)}</strong><br><span style="color:#666;">Nói rõ một lần rồi chờ hệ thống chấm.</span>\n        <div style="margin-top:7px;"><button class="pronunciation-btn stop" type="button" onclick="stopPronunciationCheck()">⏹ Dừng</button></div>`);
+
+    recognition.onresult = function(event) {
+        const alternatives = [];
+        for (let i = 0; i < event.results.length; i++) {
+            const result = event.results[i];
+            for (let j = 0; j < result.length; j++) alternatives.push(result[j].transcript || '');
+        }
+        const bestTranscript = alternatives
+            .map(x => ({ text:x.trim(), score:calculatePronunciationScore(target, x) }))
+            .sort((a,b) => b.score - a.score)[0] || {text:'', score:0};
+
+        const score = bestTranscript.score;
+        PronunciationState.bestScore = Math.max(PronunciationState.bestScore, score);
+        let title = score >= 90 ? '🌟 Xuất sắc!' : score >= 80 ? '👏 Rất tốt!' : score >= 65 ? '👍 Khá tốt' : '💪 Cần luyện thêm';
+        const cls = pronunciationScoreClass(score);
+        const tips = score >= 85
+            ? 'Phát âm khá sát từ mẫu. Hãy tiếp tục luyện trọng âm và âm cuối.'
+            : 'Hãy bấm “Nghe mẫu”, nghe kỹ rồi đọc lại chậm và rõ hơn.';
+
+        pronunciationFeedbackHTML(target,
+            `<div><b>${title}</b> — điểm khớp <span class="pronunciation-score ${cls}">${score}/100</span></div>\n             <div class="pronunciation-transcript">🎧 Hệ thống nghe được: <b>${escapeHTML(bestTranscript.text || '(không nhận được âm thanh)')}</b></div>\n             <div style="margin-top:5px;color:#555;">🎯 Từ mẫu: <b>${escapeHTML(target)}</b></div>\n             <div style="margin-top:5px;font-size:.9em;color:#666;">${tips}</div>\n             <div style="margin-top:8px;"><button class="pronunciation-btn listen" type="button" onclick="speakWord('${escapeHTML(target)}')">🔊 Nghe lại mẫu</button> <button class="pronunciation-btn check" type="button" onclick="startPronunciationCheck('${escapeHTML(target)}')">🎙️ Thử lại</button></div>`);
+    };
+
+    recognition.onerror = function(event) {
+        let msg = 'Không nhận được giọng nói.';
+        if (event.error === 'not-allowed') msg = 'Microphone chưa được cấp quyền. Hãy cho phép microphone cho trang web rồi thử lại.';
+        else if (event.error === 'no-speech') msg = 'Chưa nghe thấy giọng nói. Hãy thử đọc to và rõ hơn.';
+        else if (event.error === 'audio-capture') msg = 'Không truy cập được microphone. Hãy kiểm tra microphone của máy.';
+        pronunciationFeedbackHTML(target, `<b>⚠️ ${msg}</b><div style="margin-top:8px;"><button class="pronunciation-btn check" type="button" onclick="startPronunciationCheck('${escapeHTML(target)}')">🎙️ Thử lại</button></div>`);
+    };
+
+    recognition.onend = function() {
+        PronunciationState.listening = false;
+        if (PronunciationState.recognition === recognition) PronunciationState.recognition = null;
+    };
+
+    try {
+        recognition.start();
+    } catch (e) {
+        PronunciationState.listening = false;
+        PronunciationState.recognition = null;
+        pronunciationFeedbackHTML(target, `<b>⚠️ Không thể bắt đầu microphone.</b><br>Hãy thử lại sau vài giây.`);
+    }
+};
+
+window.stopPronunciationCheck = function() {
+    if (PronunciationState.recognition) {
+        try { PronunciationState.recognition.stop(); } catch (e) {}
+        PronunciationState.recognition = null;
+    }
+    PronunciationState.listening = false;
+    const target = PronunciationState.target;
+    if (target) pronunciationFeedbackHTML(target, `<b>⏹ Đã dừng kiểm tra.</b> Bạn có thể thử lại từ <strong>${escapeHTML(target)}</strong>.`);
+};
 
 // 1. Quản lý Tra từ điển (Đã tích hợp Anh - Việt)
 // 1. Quản lý Tra từ điển (Đã tích hợp Anh - Việt, Phiên âm & Phát âm)
@@ -86,91 +380,772 @@ window.closeDictionaryModal = function() {
     if (modal) modal.style.display = 'none';
 };
 
-window.lookupWord = async function() {
+// ==========================================
+// TRA TỪ NÂNG CAO + HỌ TỪ (WORD FAMILY)
+// ==========================================
+
+// ==========================================
+// V11 DICTIONARY SPEED LAYER
+// Memory -> IndexedDB -> localStorage fallback
+// Progressive loading + stale-while-revalidate
+// ==========================================
+const DICT_V11_CACHE_VERSION = 'v14-offline-10k-hybrid';
+const DICT_V11_DB_NAME = 'EnglishDictionaryCacheV15';
+const DICT_V11_STORE = 'entries';
+const DICT_V11_TTL = 1000 * 60 * 60 * 24 * 30; // 30 ngày
+let dictV11DBPromise = null;
+
+function dictV11NormalizeWord(value) {
+    return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+
+// ==========================================
+// V16 INSTANT OFFLINE DICTIONARY – 50.000 TỪ
+// Lazy shards + IndexedDB + Memory Cache.
+// Chỉ tải shard cần thiết; sau đó giữ shard trong IndexedDB.
+// ==========================================
+const V16_DICT_DB_NAME = 'EnglishDictionaryOffline50K_V16';
+const V16_DICT_STORE = 'shards';
+const V16_DICT_VERSION = 1;
+const V16_DICT_PATH = 'dictionary-50k/';
+const V16_DICT_COUNT = 50000;
+const V16_DICT_MEMORY = new Map();
+const V16_DICT_LOADING = new Map();
+let v16DictDBPromise = null;
+
+function v16OpenDictDB() {
+    if (v16DictDBPromise) return v16DictDBPromise;
+    v16DictDBPromise = new Promise((resolve) => {
+        if (!('indexedDB' in window)) { resolve(null); return; }
+        const req = indexedDB.open(V16_DICT_DB_NAME, V16_DICT_VERSION);
+        req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains(V16_DICT_STORE)) {
+                db.createObjectStore(V16_DICT_STORE, { keyPath: 'id' });
+            }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => resolve(null);
+    });
+    return v16DictDBPromise;
+}
+
+function v16ShardForWord(word) {
+    const w = dictV11NormalizeWord(word);
+    const c = w.charAt(0);
+    return /^[a-z]$/.test(c) ? c : 'other';
+}
+
+async function v16ReadShardFromIDB(shard) {
+    const db = await v16OpenDictDB();
+    if (!db) return null;
+    return new Promise(resolve => {
+        try {
+            const tx = db.transaction(V16_DICT_STORE, 'readonly');
+            const req = tx.objectStore(V16_DICT_STORE).get(shard);
+            req.onsuccess = () => resolve(req.result?.data || null);
+            req.onerror = () => resolve(null);
+        } catch (e) { resolve(null); }
+    });
+}
+
+async function v16WriteShardToIDB(shard, data) {
+    const db = await v16OpenDictDB();
+    if (!db) return;
+    try {
+        await new Promise(resolve => {
+            const tx = db.transaction(V16_DICT_STORE, 'readwrite');
+            tx.objectStore(V16_DICT_STORE).put({ id: shard, data, savedAt: Date.now() });
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => resolve();
+            tx.onabort = () => resolve();
+        });
+    } catch (e) {}
+}
+
+async function v16LoadShard(shard) {
+    if (V16_DICT_MEMORY.has(shard)) return V16_DICT_MEMORY.get(shard);
+    if (V16_DICT_LOADING.has(shard)) return V16_DICT_LOADING.get(shard);
+
+    const promise = (async () => {
+        let data = await v16ReadShardFromIDB(shard);
+        if (!data) {
+            try {
+                const response = await fetch(`${V16_DICT_PATH}${shard}.json`, { cache: 'force-cache' });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                data = await response.json();
+                v16WriteShardToIDB(shard, data).catch(() => {});
+            } catch (e) {
+                data = null;
+            }
+        }
+        if (data) V16_DICT_MEMORY.set(shard, data);
+        return data;
+    })();
+
+    V16_DICT_LOADING.set(shard, promise);
+    try {
+        return await promise;
+    } finally {
+        V16_DICT_LOADING.delete(shard);
+    }
+}
+
+async function getOffline50KEntry(word) {
+    const key = dictV11NormalizeWord(word);
+    if (!key) return null;
+    const data = await v16LoadShard(v16ShardForWord(key));
+    return data?.[key] || null;
+}
+
+function v16BackgroundPreload() {
+    if (navigator.connection?.saveData) return;
+    const letters = "abcdefghijklmnopqrstuvwxyz".split("");
+    const run = async () => {
+        for (const letter of letters) {
+            if (!V16_DICT_MEMORY.has(letter)) {
+                await v16LoadShard(letter);
+            }
+        }
+    };
+    if ('requestIdleCallback' in window) {
+        requestIdleCallback(run, { timeout: 2500 });
+    } else {
+        setTimeout(run, 2500);
+    }
+}
+
+function buildOffline10KHTML(word, entry) {
+    const ipa = entry?.ipa || '';
+    return `
+        <div class="dict-offline-card" style="background:#eef7ff;border:1px solid #b8d8f0;border-radius:10px;padding:14px;margin-bottom:10px;">
+            <div class="dict-word-head" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <b style="font-size:1.45em;color:#540606;">${escapeHTML(word)}</b>
+                <span style="font-size:.82em;background:#dff1ff;color:#145a86;padding:4px 8px;border-radius:999px;">⚡ OFFLINE 50K</span>
+                ${speechButtonHTML(word)}
+            </div>
+            ${ipa ? `<div style="margin-top:9px;font-size:1.12em;"><b>🔤 IPA:</b> <code style="font-size:1.1em;">${escapeHTML(ipa)}</code></div>` : ''}
+            <div style="margin-top:10px;color:#555;font-size:.92em;">
+                📚 Từ này có trong kho offline 50.000 từ. Phiên âm có thể xem và luyện phát âm ngay cả khi không có Internet.
+            </div>
+            <div id="dict-offline-online-slot" style="margin-top:12px;"></div>
+        </div>`;
+}
+
+async function enrichOfflineWordOnline(word, requestId, controller, resultBox) {
+    // V14: cập nhật lớp dữ liệu online lên bản Offline hiện tại; không thay thế
+    // toàn bộ kết quả bằng cache cũ trong quá trình này.
+    try {
+        const url = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`;
+        const data = await dictV11FetchJSON(url, 4500, controller.signal);
+        if (!dictV11IsCurrent(requestId) || !Array.isArray(data) || !data.length) return false;
+        const entries = data;
+        const onlineHtml = buildDictionaryBaseHTML(entries, word);
+        const transUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|vi`;
+        let vi = '';
+        try {
+            const td = await dictV11FetchJSON(transUrl, 2500, controller.signal);
+            vi = td?.responseData?.translatedText || '';
+        } catch(e) {}
+        const familyHtml = await renderWordFamily(word).catch(() => '');
+        if (!dictV11IsCurrent(requestId)) return false;
+        const slot = resultBox.querySelector('#dict-offline-online-slot');
+        if (slot) {
+            slot.innerHTML = `<div class="dict-v11-meta" style="margin-bottom:8px;">🌐 Đã bổ sung dữ liệu online.</div>${onlineHtml}${vi ? `<div style="padding:10px;background:#e8f5e9;border-radius:7px;margin-top:8px;"><b>🇻🇳 Nghĩa:</b> ${escapeHTML(vi)}</div>` : ''}${familyHtml}`;
+        }
+        // Chỉ lưu sau khi đã ghép dữ liệu online vào bản Offline.
+        await dictV11Save(word, resultBox.innerHTML);
+        return true;
+    } catch(e) {
+        return false;
+    }
+}
+
+function dictV11OpenDB() {
+    if (dictV11DBPromise) return dictV11DBPromise;
+    if (!('indexedDB' in window)) return Promise.resolve(null);
+    dictV11DBPromise = new Promise(resolve => {
+        try {
+            const req = indexedDB.open(DICT_V11_DB_NAME, 1);
+            req.onupgradeneeded = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains(DICT_V11_STORE)) {
+                    db.createObjectStore(DICT_V11_STORE, { keyPath: 'key' });
+                }
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => resolve(null);
+        } catch (e) { resolve(null); }
+    });
+    return dictV11DBPromise;
+}
+
+async function dictV11IDBGet(key) {
+    const db = await dictV11OpenDB();
+    if (!db) return null;
+    return new Promise(resolve => {
+        try {
+            const tx = db.transaction(DICT_V11_STORE, 'readonly');
+            const req = tx.objectStore(DICT_V11_STORE).get(key);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => resolve(null);
+        } catch (e) { resolve(null); }
+    });
+}
+
+async function dictV11IDBSet(entry) {
+    const db = await dictV11OpenDB();
+    if (!db) return false;
+    return new Promise(resolve => {
+        try {
+            const tx = db.transaction(DICT_V11_STORE, 'readwrite');
+            tx.objectStore(DICT_V11_STORE).put(entry);
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
+            tx.onabort = () => resolve(false);
+        } catch (e) { resolve(false); }
+    });
+}
+
+function dictV11LocalKey(key) {
+    return 'dict_v11_' + cleanKey(key);
+}
+
+function dictV11LocalGet(key) {
+    try {
+        const raw = localStorage.getItem(dictV11LocalKey(key));
+        return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+}
+
+function dictV11LocalSet(key, html) {
+    try {
+        localStorage.setItem(dictV11LocalKey(key), JSON.stringify({
+            key, html, version: DICT_V11_CACHE_VERSION, savedAt: Date.now()
+        }));
+        return true;
+    } catch (e) { return false; }
+}
+
+function dictV11IsFresh(entry) {
+    return !!(entry && entry.html && entry.version === DICT_V11_CACHE_VERSION &&
+        (Date.now() - Number(entry.savedAt || 0) < DICT_V11_TTL));
+}
+
+async function dictV11Get(key) {
+    const normalized = dictV11NormalizeWord(key);
+    const memory = AppState.dictionaryCache.get(cleanKey(normalized));
+    if (typeof memory === 'string') {
+        return { html: memory, source: 'memory', fresh: true };
+    }
+
+    const idb = await dictV11IDBGet(cleanKey(normalized));
+    if (dictV11IsFresh(idb)) {
+        AppState.dictionaryCache.set(cleanKey(normalized), idb.html);
+        return { html: idb.html, source: 'indexeddb', fresh: true };
+    }
+
+    const local = dictV11LocalGet(normalized);
+    if (dictV11IsFresh(local)) {
+        AppState.dictionaryCache.set(cleanKey(normalized), local.html);
+        // Đưa dần dữ liệu từ localStorage sang IndexedDB.
+        dictV11IDBSet({ key: cleanKey(normalized), html: local.html, version: DICT_V11_CACHE_VERSION, savedAt: local.savedAt });
+        return { html: local.html, source: 'localstorage', fresh: true };
+    }
+    return null;
+}
+
+async function dictV11Save(key, html) {
+    const normalized = dictV11NormalizeWord(key);
+    const entry = { key: cleanKey(normalized), html: String(html || ''), version: DICT_V11_CACHE_VERSION, savedAt: Date.now() };
+    if (!entry.html) return;
+    AppState.dictionaryCache.set(entry.key, entry.html);
+    await Promise.allSettled([
+        dictV11IDBSet(entry),
+        Promise.resolve(dictV11LocalSet(normalized, entry.html))
+    ]);
+}
+
+function dictV11ShowRecent() {
+    const box = document.getElementById('dict-recent');
+    if (!box) return;
+    let recent = [];
+    try { recent = JSON.parse(localStorage.getItem('dict_v11_recent') || '[]'); } catch(e) {}
+    recent = Array.isArray(recent) ? recent.filter(Boolean).slice(0, 8) : [];
+    if (!recent.length) { box.innerHTML = ''; return; }
+    box.innerHTML = '<span style="font-size:.84em;color:#777;align-self:center;">🕘 Gần đây:</span>' +
+        recent.map(w => `<button type="button" title="Tra ${escapeHTML(w)}" onclick="window.lookupWord('${escapeHTML(w)}')">${escapeHTML(w)}</button>`).join('');
+}
+
+function dictV11RememberRecent(word) {
+    const w = dictV11NormalizeWord(word);
+    if (!w) return;
+    let recent = [];
+    try { recent = JSON.parse(localStorage.getItem('dict_v11_recent') || '[]'); } catch(e) {}
+    recent = Array.isArray(recent) ? recent : [];
+    recent = [w, ...recent.filter(x => x !== w)].slice(0, 8);
+    try { localStorage.setItem('dict_v11_recent', JSON.stringify(recent)); } catch(e) {}
+    dictV11ShowRecent();
+}
+
+async function dictV11FetchJSON(url, timeoutMs = 4500, externalSignal = null) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let removeExternal = null;
+    try {
+        if (externalSignal) {
+            const abortFromParent = () => controller.abort();
+            if (externalSignal.aborted) controller.abort();
+            else {
+                externalSignal.addEventListener('abort', abortFromParent, { once: true });
+                removeExternal = () => externalSignal.removeEventListener('abort', abortFromParent);
+            }
+        }
+        const res = await fetch(url, { signal: controller.signal, cache: 'force-cache' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return await res.json();
+    } finally {
+        clearTimeout(timer);
+        if (removeExternal) removeExternal();
+    }
+}
+
+function dictV11SetSlot(id, html) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = html;
+}
+
+function dictV11IsCurrent(requestId) {
+    return requestId === AppState.dictionaryRequestId;
+}
+
+// Các họ từ quan trọng được định nghĩa sẵn để bảo đảm kết quả chính xác.
+// Có thể tiếp tục bổ sung dần mà không ảnh hưởng đến API.
+const WORD_FAMILY_MAP = {
+    advice: [
+        { word:'advice', pos:'noun', meaning:'lời khuyên, lời tư vấn' },
+        { word:'advise', pos:'verb', meaning:'khuyên, tư vấn' },
+        { word:'advised', pos:'verb/adj', meaning:'đã khuyên; được khuyên, sáng suốt' },
+        { word:'advising', pos:'verb', meaning:'đang tư vấn, việc tư vấn' },
+        { word:'adviser', pos:'noun', meaning:'cố vấn, người tư vấn' },
+        { word:'advisor', pos:'noun', meaning:'cố vấn, người tư vấn' },
+        { word:'advisable', pos:'adjective', meaning:'nên làm, thích hợp, đáng khuyên' },
+        { word:'advisory', pos:'adjective/noun', meaning:'mang tính tư vấn; khuyến cáo, thông báo tư vấn' },
+        { word:'advisement', pos:'noun', meaning:'sự tư vấn, sự cân nhắc' },
+        { word:'advisability', pos:'noun', meaning:'tính thích hợp, tính đáng làm' },
+        { word:'advisably', pos:'adverb', meaning:'một cách khôn ngoan, hợp lý' },
+        { word:'advisedly', pos:'adverb', meaning:'một cách có cân nhắc' }
+    ],
+    advise: [
+        { word:'advice', pos:'noun', meaning:'lời khuyên, lời tư vấn' },
+        { word:'advise', pos:'verb', meaning:'khuyên, tư vấn' },
+        { word:'advised', pos:'verb/adj', meaning:'đã khuyên; được khuyên, sáng suốt' },
+        { word:'advising', pos:'verb', meaning:'đang tư vấn, việc tư vấn' },
+        { word:'adviser', pos:'noun', meaning:'cố vấn, người tư vấn' },
+        { word:'advisor', pos:'noun', meaning:'cố vấn, người tư vấn' },
+        { word:'advisable', pos:'adjective', meaning:'nên làm, thích hợp, đáng khuyên' },
+        { word:'advisory', pos:'adjective/noun', meaning:'mang tính tư vấn; khuyến cáo' },
+        { word:'advisement', pos:'noun', meaning:'sự tư vấn, sự cân nhắc' }
+    ]
+};
+
+const WORD_FAMILY_POS = {
+    noun:'Danh từ (noun)', verb:'Động từ (verb)', adjective:'Tính từ (adjective)',
+    adverb:'Trạng từ (adverb)', 'verb/adj':'Động từ / Tính từ',
+    'adjective/noun':'Tính từ / Danh từ', 'noun/verb':'Danh từ / Động từ'
+};
+
+function wordFamilyLabel(pos) {
+    return WORD_FAMILY_POS[pos] || pos || 'Từ loại khác';
+}
+
+function getFamilyPrefixCandidates(word) {
+    const w = cleanKey(word).replace(/[^a-z]/g, '');
+    if (w.length < 4) return [];
+    const prefixes = new Set();
+
+    // Prefix dài giúp giảm từ không liên quan; nhiều prefix để xử lý các biến thể.
+    prefixes.add(w.slice(0, Math.min(6, w.length)));
+    prefixes.add(w.slice(0, Math.min(5, w.length)));
+    prefixes.add(w.slice(0, 4));
+
+    // Một số dạng biến đổi phổ biến.
+    if (w.endsWith('e')) prefixes.add(w.slice(0, -1).slice(0, 6));
+    if (w.endsWith('y')) prefixes.add(w.slice(0, -1).slice(0, 6));
+    if (w.endsWith('ing')) prefixes.add(w.slice(0, -3).slice(0, 6));
+    if (w.endsWith('ed')) prefixes.add(w.slice(0, -2).slice(0, 6));
+    if (w.endsWith('ly')) prefixes.add(w.slice(0, -2).slice(0, 6));
+    if (w.endsWith('ness')) prefixes.add(w.slice(0, -4).slice(0, 6));
+    if (w.endsWith('ment')) prefixes.add(w.slice(0, -4).slice(0, 6));
+    if (w.endsWith('tion')) prefixes.add(w.slice(0, -4).slice(0, 6));
+    if (w.endsWith('sion')) prefixes.add(w.slice(0, -4).slice(0, 6));
+    return Array.from(prefixes).filter(x => x.length >= 4);
+}
+
+async function discoverWordFamily(word) {
+    const exact = WORD_FAMILY_MAP[cleanKey(word)];
+    if (exact) return exact;
+
+    const prefixes = getFamilyPrefixCandidates(word);
+    if (!prefixes.length) return [];
+
+    const found = new Map();
+    const requests = prefixes.slice(0, 3).map(async prefix => {
+        try {
+            const url = `https://api.datamuse.com/words?sp=${encodeURIComponent(prefix)}*&md=p&max=40`;
+            const res = await fetch(url);
+            if (!res.ok) return;
+            const data = await res.json();
+            if (!Array.isArray(data)) return;
+            data.forEach(item => {
+                const candidate = String(item.word || '').toLowerCase().trim();
+                if (!/^[a-z]+$/.test(candidate)) return;
+                if (candidate === cleanKey(word)) return;
+
+                // Chỉ nhận từ có chung phần đầu đủ dài; tránh các từ ngẫu nhiên.
+                const shared = prefixes.some(p => candidate.startsWith(p));
+                if (!shared || candidate.length > 24) return;
+
+                const tags = Array.isArray(item.tags) ? item.tags : [];
+                const posTag = tags.find(t => ['n','v','adj','adv'].includes(t));
+                const pos = {n:'noun',v:'verb',adj:'adjective',adv:'adverb'}[posTag] || '';
+                if (!found.has(candidate)) found.set(candidate, {
+                    word: candidate,
+                    pos,
+                    meaning: ''
+                });
+            });
+        } catch(e) {}
+    });
+
+    await Promise.all(requests);
+
+    // Giới hạn để giao diện không quá dài.
+    return Array.from(found.values())
+        .sort((a,b) => a.word.length - b.word.length || a.word.localeCompare(b.word))
+        .slice(0, 12);
+}
+
+async function enrichFamilyItem(item) {
+    const cacheKey = 'family::' + cleanKey(item.word);
+    const cached = AppState.dictionaryCache.get(cacheKey);
+    if (cached && cached.__familyMeta) return cached.__familyMeta;
+
+    try {
+        const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(item.word)}`);
+        if (res.ok) {
+            const data = await res.json();
+            const entries = Array.isArray(data) ? data : [];
+            const meanings = entries.flatMap(e => Array.isArray(e.meanings) ? e.meanings : []);
+            const first = meanings.find(m => m && m.definitions && m.definitions.length);
+            const phonetics = entries.flatMap(e => Array.isArray(e.phonetics) ? e.phonetics : []);
+            const ipa = entries.map(e => e.phonetic).find(Boolean) || phonetics.map(p => p.text).find(Boolean) || '';
+            const audio = phonetics.map(p => p.audio).find(Boolean) || '';
+            const pos = item.pos || first?.partOfSpeech || '';
+            const def = first?.definitions?.[0]?.definition || '';
+            const result = { ...item, pos, meaning: item.meaning || '', definition: def, ipa, audio };
+            AppState.dictionaryCache.set(cacheKey, {__familyMeta: result});
+            return result;
+        }
+    } catch(e) {}
+    return item;
+}
+
+async function renderWordFamily(word, fallbackHtml = '') {
+    const seed = cleanKey(word);
+    let family = WORD_FAMILY_MAP[seed] || await discoverWordFamily(seed);
+
+    if (!family.length) return '';
+
+    // Với họ từ định nghĩa sẵn, không cần gọi API hàng loạt.
+    if (!WORD_FAMILY_MAP[seed]) {
+        family = await Promise.all(family.slice(0, 12).map(enrichFamilyItem));
+    }
+
+    // Không hiển thị lại từ chính ở đầu danh sách; từ chính vẫn nằm ở header.
+    const unique = [];
+    const seen = new Set();
+    family.forEach(item => {
+        const w = cleanKey(item.word);
+        if (!w || seen.has(w)) return;
+        seen.add(w);
+        unique.push(item);
+    });
+
+    let html = `<div class="dict-family">
+        <div class="dict-family-title">🌿 Họ từ / Word Family</div>
+        <div class="dict-family-grid">`;
+
+    unique.forEach(item => {
+        const wordText = item.word;
+        const posText = wordFamilyLabel(item.pos);
+        const meaning = item.meaning || '';
+        const definition = item.definition || '';
+        html += `<div class="dict-family-item">
+            <div>
+                <span class="dict-family-word">${escapeHTML(wordText)}</span>
+                ${item.ipa ? `<span class="dict-family-ipa">${escapeHTML(item.ipa)}</span>` : ''}
+                ${item.audio ? `<button class="dict-family-speak" title="Nghe audio phát âm" onclick="window.playDictionaryAudio('${escapeHTML(item.audio)}')">🔊</button>` : `<button class="dict-family-speak" title="Nghe phát âm mẫu" onclick="speakWord('${escapeHTML(wordText)}')">🔊</button>`}
+                <button class="dict-family-check" title="Kiểm tra phát âm" onclick="startPronunciationCheck('${escapeHTML(wordText)}')">🎙️</button>
+            </div>
+            ${item.ipa ? `<div class="dict-family-ipa-label">🔤 IPA: <b>${escapeHTML(item.ipa)}</b></div>` : ''}
+            <div class="dict-family-pos">${escapeHTML(posText)}</div>
+            ${meaning ? `<div class="dict-family-meaning">🇻🇳 ${escapeHTML(meaning)}</div>` : ''}
+            ${definition ? `<div class="dict-family-def">EN: ${escapeHTML(definition)}</div>` : ''}
+        </div>`;
+    });
+
+    html += `</div>
+        <div style="margin-top:8px;color:#777;font-size:.86em;">
+            💡 Bấm 🔊 để nghe từng từ. Nhập một từ trong họ từ vào ô tra để xem đầy đủ định nghĩa và ví dụ.
+        </div>
+    </div>`;
+    return html;
+}
+
+function buildDictionaryBaseHTML(entries, word) {
+    const mainEntry = entries[0] || {};
+    const mainWord = mainEntry.word || word;
+    const phonetics = entries.flatMap(e => Array.isArray(e.phonetics) ? e.phonetics : []);
+    const ipaList = [];
+    entries.forEach(e => { if (e.phonetic) ipaList.push(e.phonetic); });
+    phonetics.forEach(p => { if (p.text) ipaList.push(p.text); });
+    const uniqueIPA = [...new Set(ipaList.filter(Boolean))];
+    const audioUrl = phonetics.map(p => p.audio).find(Boolean) || '';
+
+    let html = `<div class="dict-word-head">
+        <b style="font-size:1.45em;color:#540606;">${escapeHTML(mainWord)}</b>
+        ${audioUrl ? `<button class="tool-small-btn" style="background:#ffc107;" onclick="window.playDictionaryAudio('${escapeHTML(audioUrl)}')">🔊 Audio chuẩn</button>` : ''}
+        ${speechButtonHTML(mainWord)}
+    </div>`;
+
+    html += `<div class="dict-pronunciation-card">
+        <div class="dict-pronunciation-title">🔤 Phiên âm IPA</div>`;
+    if (uniqueIPA.length) {
+        uniqueIPA.forEach((ipa, i) => {
+            html += `<div class="dict-ipa-row"><span class="dict-ipa-label">${uniqueIPA.length > 1 ? 'Phiên âm ' + (i + 1) : 'IPA'}</span><code>${escapeHTML(ipa)}</code></div>`;
+        });
+    } else {
+        html += '<div class="dict-ipa-missing">Chưa có dữ liệu IPA từ nguồn từ điển.</div>';
+    }
+    html += `<div class="dict-ipa-note">💡 IPA là phiên âm quốc tế; nút 🔊 dùng audio chuẩn nếu nguồn cung cấp, nếu không sẽ dùng giọng đọc của trình duyệt.</div>
+    </div>
+    <div id="dict-translation-slot" class="dict-v11-loading">⏳ Đang lấy nghĩa tiếng Việt...</div>
+    <div id="dict-main-definitions">`;
+
+    const allSynonyms = new Set();
+    let posCount = 0;
+    entries.forEach(entry => {
+        (entry.meanings || []).forEach(meaning => {
+            posCount++;
+            const pos = meaning.partOfSpeech || 'other';
+            const posLabel = {
+                noun:'Danh từ (noun)', verb:'Động từ (verb)', adjective:'Tính từ (adjective)',
+                adverb:'Trạng từ (adverb)', pronoun:'Đại từ (pronoun)', preposition:'Giới từ (preposition)',
+                conjunction:'Liên từ (conjunction)', interjection:'Thán từ (interjection)',
+                determiner:'Từ hạn định (determiner)'
+            }[pos] || pos;
+            html += `<div class="dict-pos-block">
+                <div style="font-weight:800;color:#007bff;font-size:1.08em;">${escapeHTML(posLabel)}</div>`;
+            const defs = Array.isArray(meaning.definitions) ? meaning.definitions : [];
+            defs.slice(0, 12).forEach((def, idx) => {
+                html += `<div class="dict-definition"><b>${idx + 1}.</b> ${escapeHTML(def.definition || '')}`;
+                if (def.example) html += `<div class="dict-example">💬 Ví dụ: “${escapeHTML(def.example)}”</div>`;
+                html += `</div>`;
+                (def.synonyms || []).forEach(x => allSynonyms.add(x));
+            });
+            (meaning.synonyms || []).forEach(x => allSynonyms.add(x));
+            html += `</div>`;
+        });
+    });
+    if (allSynonyms.size) html += `<div class="dict-synonyms"><b>🔗 Từ đồng nghĩa:</b> ${Array.from(allSynonyms).slice(0, 40).map(escapeHTML).join(', ')}</div>`;
+    if (!posCount) html += '<div>Không có dữ liệu từ loại chi tiết.</div>';
+    html += `</div>
+        <div id="dict-family-slot" class="dict-v11-loading">🌿 Đang tải họ từ...</div>
+        <div class="dict-v11-meta">⚡ Kết quả chính được hiển thị trước; nghĩa tiếng Việt và họ từ được tải bổ sung ở nền.</div>`;
+    return html;
+}
+
+function dictV11SetTranslation(meaning, word) {
+    const el = document.getElementById('dict-translation-slot');
+    if (!el) return;
+    if (meaning && meaning.toLowerCase() !== word.toLowerCase()) {
+        el.innerHTML = `<div style="margin:8px 0;padding:10px;background:#e8f5e9;border:1px solid #c8e6c9;border-radius:7px;">
+            <b style="color:#2e7d32;">🇻🇳 Nghĩa nổi bật:</b>
+            <span style="font-weight:700;color:#1b5e20;">${escapeHTML(meaning)}</span>
+        </div>`;
+    } else {
+        el.innerHTML = '';
+    }
+}
+
+window.lookupWord = async function(requestedWord = '') {
     const input = document.getElementById('dict-input');
     const resultBox = document.getElementById('dict-result');
     if (!input || !resultBox) return;
 
-    let word = input.value.trim().toLowerCase();
+    const typed = String(requestedWord || input.value || '').trim();
+    const word = dictV11NormalizeWord(typed);
     if (!word) {
-        resultBox.innerHTML = '<span style="color: red;">Vui lòng nhập từ cần tra!</span>';
+        resultBox.innerHTML = '<span style="color:red;">Vui lòng nhập từ cần tra!</span>';
+        return;
+    }
+    input.value = word;
+    dictV11RememberRecent(word);
+
+    const requestId = ++AppState.dictionaryRequestId;
+    if (AppState.dictionaryAbortController) {
+        try { AppState.dictionaryAbortController.abort(); } catch(e) {}
+    }
+    const controller = new AbortController();
+    AppState.dictionaryAbortController = controller;
+
+    // V13: Offline-first. Nếu có trong kho 10K, hiển thị IPA ngay lập tức,
+    // sau đó mới bổ sung nghĩa/định nghĩa online ở chế độ nền.
+    const offlineEntry = await getOffline50KEntry(word);
+    if (offlineEntry) {
+        // V14: luôn hiển thị bản Offline trước. Cache cũ không được phép ghi đè
+        // bản Offline ngay lập tức. Nếu đã có cache giàu dữ liệu từ lần online trước,
+        // ta dùng nó như lớp nâng cao rồi vẫn revalidate online ở nền.
+        resultBox.innerHTML = buildOffline10KHTML(word, offlineEntry);
+        const offlineMeta = document.createElement('div');
+        offlineMeta.className = 'dict-v11-meta';
+        offlineMeta.innerHTML = `<span class="cache">⚡ Offline 50K · ${window.OFFLINE_DICTIONARY_50K_COUNT || 50000} từ</span>`;
+        resultBox.prepend(offlineMeta);
+
+        // Lấy cache giàu dữ liệu ở nền, nhưng chỉ chấp nhận cache V14 đã được
+        // bổ sung online (có dấu hiệu Word Family / nghĩa / dữ liệu online).
+        try {
+            const cachedRich = await dictV11Get(word);
+            if (!dictV11IsCurrent(requestId)) return;
+            const richHtml = cachedRich?.html || '';
+            const isRichCache = richHtml.includes('🌐 Đã bổ sung dữ liệu online.') ||
+                richHtml.includes('dict-family-slot') ||
+                richHtml.includes('dict-translation-slot');
+            if (cachedRich && cachedRich.fresh && isRichCache) {
+                resultBox.innerHTML = richHtml;
+                const meta = document.createElement('div');
+                meta.className = 'dict-v11-meta';
+                meta.innerHTML = `<span class="cache">⚡ Offline 50K + Cache ${cachedRich.source === 'indexeddb' ? 'IndexedDB' : 'trình duyệt'}</span>`;
+                resultBox.prepend(meta);
+            }
+        } catch (e) {}
+
+        // Luôn kiểm tra Online ở nền để bổ sung/cập nhật nghĩa, từ loại, ví dụ,
+        // synonyms và Word Family khi có Internet. Nếu mất mạng, kết quả Offline
+        // hoặc cache giàu dữ liệu vẫn được giữ nguyên.
+        enrichOfflineWordOnline(word, requestId, controller, resultBox).catch(() => {});
         return;
     }
 
-    resultBox.innerHTML = 'Đang tra từ Anh - Việt...';
+    // Tầng 1: bộ nhớ RAM.
+    const memoryHtml = AppState.dictionaryCache.get(cleanKey(word));
+    if (typeof memoryHtml === 'string' && memoryHtml) {
+        resultBox.innerHTML = memoryHtml;
+        const meta = document.createElement('div');
+        meta.className = 'dict-v11-meta';
+        meta.innerHTML = '<span class="cache">⚡ Hiển thị từ bộ nhớ đệm</span>';
+        resultBox.prepend(meta);
+        // Không chờ cache: dữ liệu đã có thì hiển thị ngay.
+        return;
+    }
+
+    // Tầng 2: IndexedDB/localStorage.
+    resultBox.innerHTML = `<div class="dict-v11-loading"><b>⚡ Đang kiểm tra bộ nhớ nhanh...</b><div class="dict-v11-skeleton"><span></span><span></span><span></span></div></div>`;
+    const persistent = await dictV11Get(word);
+    if (!dictV11IsCurrent(requestId)) return;
+    if (persistent && persistent.html) {
+        resultBox.innerHTML = persistent.html;
+        const meta = document.createElement('div');
+        meta.className = 'dict-v11-meta';
+        meta.innerHTML = `<span class="cache">⚡ Cache ${persistent.source === 'indexeddb' ? 'IndexedDB' : 'trình duyệt'}</span>`;
+        resultBox.prepend(meta);
+        return;
+    }
+
+    // Nếu có bản offline, đã hiển thị ngay; tiếp tục gọi API nền nhưng không hiển thị skeleton lần nữa.
+    const hasOfflinePreview = !!offlineEntry;
+    if (!hasOfflinePreview) {
+    // Tầng 3: API. Chỉ chờ Dictionary API để có kết quả chính.
+    resultBox.innerHTML = `<div class="dict-v11-loading"><b>🔎 Đang tra ${escapeHTML(word)}...</b><div class="dict-v11-skeleton"><span></span><span></span><span></span></div></div>`;
+    }
+
+    const dictUrl = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`;
+    let data = null;
     try {
-        let [dictResponse, transResponse] = await Promise.all([
-            fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`).catch(() => null),
-            fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|vi`).catch(() => null)
-        ]);
-
-        let vietnameseMeaning = '';
-        if (transResponse && transResponse.ok) {
-            let transData = await transResponse.json();
-            if (transData && transData.responseData && transData.responseData.translatedText) {
-                vietnameseMeaning = transData.responseData.translatedText;
-            }
-        }
-
-        // Trường hợp không tìm thấy trong Dictionary API chính nhưng có nghĩa dịch từ MyMemory
-        if (!dictResponse || !dictResponse.ok) {
-            if (vietnameseMeaning && vietnameseMeaning.toLowerCase() !== word) {
-                resultBox.innerHTML = `<div style="margin-bottom: 8px;">` +
-                                      `<b style="font-size: 1.2em; color: #540606;">${escapeHTML(word)}</b> ` +
-                                      `<button type="button" onclick="speakWord('${escapeHTML(word)}')" style="background:#ffc107; border:none; border-radius:4px; padding:2px 8px; cursor:pointer; font-weight:bold; margin-left: 6px;">🔊 Đọc</button>` +
-                                      `</div>` +
-                                      `<div style="margin-top: 8px; padding: 10px; background: #e8f5e9; border-radius: 6px; border: 1px solid #c8e6c9;">` +
-                                      `<b style="color: #2e7d32;">🇻🇳 Nghĩa tiếng Việt:</b> <span style="color: #1b5e20; font-weight: bold; font-size: 1.1em;">${escapeHTML(vietnameseMeaning)}</span>` +
-                                      `</div>`;
-                return;
-            }
-            resultBox.innerHTML = `<span style="color: red;">Không tìm thấy từ "${escapeHTML(word)}" trong từ điển.</span>`;
+        data = await dictV11FetchJSON(dictUrl, 5000, controller.signal);
+    } catch (e) {
+        if (!dictV11IsCurrent(requestId)) return;
+        // Fallback chỉ khi Dictionary API không trả lời. Nếu đã có offline preview, giữ nguyên và báo trạng thái.
+        if (offlineEntry) {
+            const slot = resultBox.querySelector('#dict-offline-online-slot');
+            if (slot) slot.innerHTML = '<div class="dict-v11-meta">📴 Không có Internet: đang dùng dữ liệu offline 50K (IPA + phát âm).</div>';
             return;
         }
-
-        let data = await dictResponse.json();
-        if (data && data.length > 0) {
-            let entry = data[0];
-            let phonetic = entry.phonetic || (entry.phonetics && entry.phonetics.find(p => p.text)?.text) || '';
-            let audioUrl = entry.phonetics && entry.phonetics.find(p => p.audio)?.audio || '';
-
-            // Hiển thị từ, phiên âm và nút phát âm
-            let html = `<div style="margin-bottom: 8px;"><b style="font-size: 1.2em; color: #540606;">${escapeHTML(entry.word)}</b>`;
-            if (phonetic) {
-                html += ` <span style="color: #d9534f; font-family: monospace; font-style: italic; margin-left: 6px;">${escapeHTML(phonetic)}</span>`;
-            }
-            
-            // Nút nghe Audio chuẩn từ API (nếu có)
-            if (audioUrl) {
-                html += ` <button type="button" onclick="new Audio('${audioUrl}').play()" style="background:#ffc107; border:none; border-radius:4px; padding:2px 8px; cursor:pointer; font-weight:bold; margin-left: 6px;">🔊 Nghe Audio</button>`;
-            }
-            
-            // Nút đọc dự phòng bằng Web Speech API (speakWord)
-            html += ` <button type="button" onclick="speakWord('${escapeHTML(entry.word)}')" style="background:#ffc107; border:none; border-radius:4px; padding:2px 8px; cursor:pointer; font-weight:bold; margin-left: 4px;">🔊 Đọc TTS</button>`;
-            html += `</div>`;
-
-            if (vietnameseMeaning && vietnameseMeaning.toLowerCase() !== word) {
-                html += `<div style="margin-top: 8px; padding: 10px; background: #e8f5e9; border-radius: 6px; border: 1px solid #c8e6c9;">` +
-                        `<b style="color: #2e7d32;">🇻🇳 Nghĩa tiếng Việt:</b> <span style="color: #1b5e20; font-weight: bold; font-size: 1.1em;">${escapeHTML(vietnameseMeaning)}</span>` +
-                        `</div>`;
-            }
-
-            entry.meanings.forEach(meaning => {
-                html += `<div style="margin-top: 10px;"><b style="color: #007bff;">(${escapeHTML(meaning.partOfSpeech)})</b>`;
-                meaning.definitions.slice(0, 2).forEach((def) => {
-                    html += `<div style="margin-left: 10px; margin-top: 4px;">• ${escapeHTML(def.definition)}`;
-                    if (def.example) {
-                        html += `<br><span style="color: #555; font-size: 0.95em; font-style: italic;">Ví dụ: "${escapeHTML(def.example)}"</span>`;
-                    }
-                    html += `</div>`;
-                });
-                html += `</div>`;
-            });
-            resultBox.innerHTML = html;
+        try {
+            const transUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|vi`;
+            const transData = await dictV11FetchJSON(transUrl, 3000, controller.signal);
+            const vietnameseMeaning = transData?.responseData?.translatedText || '';
+            const familyHtml = await renderWordFamily(word).catch(() => '');
+            if (!dictV11IsCurrent(requestId)) return;
+            resultBox.innerHTML = `<div class="dict-word-head"><b style="font-size:1.35em;color:#540606;">${escapeHTML(word)}</b>${speechButtonHTML(word)}</div>
+                ${vietnameseMeaning ? `<div style="padding:12px;background:#e8f5e9;border-radius:7px;"><b>🇻🇳 Nghĩa tiếng Việt:</b> ${escapeHTML(vietnameseMeaning)}</div>` : '<div style="color:#b00020;">Không lấy được nghĩa tiếng Việt.</div>'}
+                ${familyHtml}
+                <div class="dict-v11-meta">⚠️ Dictionary API không phản hồi; đang dùng nguồn dự phòng.</div>`;
+            await dictV11Save(word, resultBox.innerHTML);
+            return;
+        } catch (fallbackError) {
+            if (!dictV11IsCurrent(requestId)) return;
+            resultBox.innerHTML = `<span style="color:red;">Không tìm thấy hoặc API đang chậm. Vui lòng thử lại sau!</span><div style="margin-top:8px;color:#666;">💡 Nếu đây là từ mới, hệ thống sẽ lưu vào cache sau lần tra thành công.</div>`;
+            return;
         }
-    } catch(e) {
-        resultBox.innerHTML = '<span style="color: red;">Lỗi kết nối khi tra từ. Vui lòng thử lại sau!</span>';
     }
+
+    if (!Array.isArray(data) || !data.length) {
+        resultBox.innerHTML = `<span style="color:red;">Không tìm thấy từ <b>${escapeHTML(word)}</b>. Hãy thử dạng từ nguyên mẫu.</span>`;
+        return;
+    }
+    if (!dictV11IsCurrent(requestId)) return;
+
+    const entries = data;
+    const baseHtml = buildDictionaryBaseHTML(entries, word);
+    resultBox.innerHTML = baseHtml;
+
+    // Cache ngay phần chính: lần sau mở ra gần như tức thì.
+    await dictV11Save(word, resultBox.innerHTML);
+
+    // Tải bổ sung song song, nhưng không chặn kết quả chính.
+    const transPromise = (async () => {
+        try {
+            const transUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|vi`;
+            const transData = await dictV11FetchJSON(transUrl, 3000, controller.signal);
+            return transData?.responseData?.translatedText || '';
+        } catch(e) { return ''; }
+    })();
+
+    const familyPromise = renderWordFamily(word).catch(() => '');
+
+    const [vietnameseMeaning, familyHtml] = await Promise.all([transPromise, familyPromise]);
+    if (!dictV11IsCurrent(requestId)) return;
+
+    dictV11SetTranslation(vietnameseMeaning, word);
+    const familySlot = document.getElementById('dict-family-slot');
+    if (familySlot) familySlot.innerHTML = familyHtml || '<div style="color:#777;">🌿 Chưa tìm thấy họ từ mở rộng.</div>';
+
+    const finalHtml = resultBox.innerHTML;
+    await dictV11Save(word, finalHtml);
+};
+
+function speechButtonHTML(text) {
+    const safe = escapeHTML(String(text || ''));
+    return `<button class="pronunciation-btn listen" type="button" onclick="speakWord('${safe}')">🔊 Nghe mẫu</button>
+            <button class="pronunciation-btn check" type="button" onclick="startPronunciationCheck('${safe}')">🎙️ Kiểm tra</button>`;
+}
+
+window.playDictionaryAudio = function(url) {
+    if (!url) return;
+    try { new Audio(url).play().catch(() => speakWord('')); } catch(e) {}
 };
 
 // Lưu nhớ trạng thái môn và chủ đề đã chọn
@@ -312,6 +1287,9 @@ function saveStoredWrongQuestions(maHS, mon, wrongs) {
 if ('speechSynthesis' in window) {
     window.speechSynthesis.getVoices();
 }
+
+// V11: hiển thị các từ tra gần đây ngay khi mở trang.
+document.addEventListener('DOMContentLoaded', () => { dictV11ShowRecent(); });
 
 document.addEventListener('click', function(e) {
     const optionBox = e.target.closest('.option-box');
@@ -643,6 +1621,7 @@ window.initInterface = function() {
 };
 
 window.loadData = function() {
+    if (AppState.dataLoading) return;
     const maHS = document.getElementById('student-code').value.trim();
     if (!maHS) return alert("Vui lòng nhập mã học sinh!");
     
@@ -655,14 +1634,16 @@ window.loadData = function() {
     const container = document.getElementById('topic-container');
     if (container) container.innerHTML = "Đang tải dữ liệu...";
 
+    AppState.dataLoading = true;
     const script = document.createElement('script');
     script.src = API_URL + '?ma=' + encodeURIComponent(maHS) + '&callback=handleQuizData';
     script.onerror = () => { 
+        AppState.dataLoading = false;
         script.remove(); 
         if (container) container.innerHTML = "Lỗi kết nối mạng khi tải dữ liệu."; 
     };
     document.body.appendChild(script);
-    script.onload = () => script.remove();
+    script.onload = () => { AppState.dataLoading = false; script.remove(); };
 };
 
 window.handleQuizData = function(data) {
@@ -693,6 +1674,8 @@ window.handleQuizData = function(data) {
 
             return item;
         }).filter(item => item && item.question !== '' && item.mon !== '' && cleanKey(item.mon) !== 'id');
+
+        rebuildQuestionIndex();
 
         AppState.userPermissions = (data.permissions || []).map(p => ({
             maHS: String(p.maHS || p[0] || '').trim(),
@@ -1021,7 +2004,7 @@ window.startQuiz = function() {
     const cleanM = standardizeSubject(mon);
 
     if (selectedMade) {
-        rawSelectedQuestions = AppState.allQuizData.filter(i => cleanKey(i.mon) === cleanKey(mon) && String(i.made).trim() === selectedMade && i.question !== '');
+        rawSelectedQuestions = getQuestionsBySubjectMade(mon, selectedMade).filter(i => i.question !== '');
         totalSeconds = 45 * 60;
     } else {
         if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
@@ -1039,11 +2022,11 @@ window.startQuiz = function() {
         let storedWrongs = getStoredWrongQuestions(maHS, mon);
         let targetCount = 20;
 
-        let topicPool = AppState.allQuizData.filter(i => 
-            cleanKey(i.mon) === cleanKey(mon) && 
-            selectedTopics.includes(i.chuDe) && 
-            i.question !== ''
-        );
+        let topicPool = [];
+        for (const topic of selectedTopics) {
+            topicPool.push(...getQuestionsBySubjectTopic(mon, topic));
+        }
+        topicPool = topicPool.filter(i => i.question !== '');
 
         let uniquePool = [];
         let seenQ = new Set();
@@ -1155,8 +2138,9 @@ window.startQuiz = function() {
     const quizScreen = document.getElementById('quiz-screen');
     if (quizScreen) quizScreen.style.display = 'block';
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    setQuizActive(true);
 
+    AppState.quizSubmitted = false;
     updateScoreDisplay();
     window.renderQuiz();
     window.startTimerTotal(totalSeconds);
@@ -1200,8 +2184,9 @@ window.startWrongQuiz = function() {
     const quizScreen = document.getElementById('quiz-screen');
     if (quizScreen) quizScreen.style.display = 'block';
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    setQuizActive(true);
 
+    AppState.quizSubmitted = false;
     updateScoreDisplay();
     window.renderQuiz();
     window.startTimerTotal(10 * 60);
@@ -1402,28 +2387,34 @@ window.submitTextAnswer = function(index) {
 
 window.startTimerTotal = function(durationSeconds) {
     clearInterval(AppState.timerInterval);
-    let remainingTime = durationSeconds;
+    const duration = Math.max(0, Number(durationSeconds) || 0);
+    AppState.timerEndAt = Date.now() + duration * 1000;
     const timerDisplay = document.getElementById('timer-display');
-    
-    AppState.timerInterval = setInterval(() => {
-        remainingTime--;
-        let minutes = Math.floor(remainingTime / 60);
-        let seconds = remainingTime % 60;
-        if (timerDisplay) {
-            timerDisplay.innerHTML = minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
-        }
-        if (remainingTime <= 0) {
+
+    const tick = () => {
+        const remaining = Math.max(0, Math.ceil((AppState.timerEndAt - Date.now()) / 1000));
+        const minutes = Math.floor(remaining / 60);
+        const seconds = remaining % 60;
+        if (timerDisplay) timerDisplay.textContent = minutes + ':' + String(seconds).padStart(2, '0');
+        if (remaining <= 0) {
             clearInterval(AppState.timerInterval);
-            alert("Đã hết thời gian làm bài!");
-            window.submitQuiz();
+            AppState.timerInterval = null;
+            if (!AppState.quizSubmitted) {
+                alert("Đã hết thời gian làm bài!");
+                window.submitQuiz();
+            }
         }
-    }, 1000);
+    };
+    tick();
+    AppState.timerInterval = setInterval(tick, 500);
 };
 
 window.submitQuiz = function() {
-    if (typeof handleBeforeUnload !== 'undefined') {
-        window.removeEventListener('beforeunload', handleBeforeUnload);
-    }
+    if (AppState.quizSubmitted) return;
+    AppState.quizSubmitted = true;
+    clearInterval(AppState.timerInterval);
+    AppState.timerInterval = null;
+    setQuizActive(false);
 
     let maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
     let mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
@@ -1645,82 +2636,232 @@ document.addEventListener('touchend', function() {
 // QUẢN LÝ BẢNG ĐỘNG TỪ BẤT QUY TẮC (CÓ IPA & PHÁT ÂM)
 // ==========================================
 const IRREGULAR_VERBS_DATA = [
-    { v1: "be", ipa1: "/biː/", v2: "was / were", ipa2: "/wɒz / wɜː/", v3: "been", ipa3: "/biːn/", meaning: "là, ở" },
-    { v1: "beat", ipa1: "/biːt/", v2: "beat", ipa2: "/biːt/", v3: "beaten", ipa3: "/ˈbiːtn/", meaning: "đánh, đập" },
-    { v1: "become", ipa1: "/bɪˈkʌm/", v2: "became", ipa2: "/bɪˈkeɪm/", v3: "become", ipa3: "/bɪˈkʌm/", meaning: "trở thành" },
-    { v1: "begin", ipa1: "/bɪˈɡɪn/", v2: "began", ipa2: "/bɪˈɡæn/", v3: "begun", ipa3: "/bɪˈɡʌn/", meaning: "bắt đầu" },
-    { v1: "bite", ipa1: "/baɪt/", v2: "bit", ipa2: "/bɪt/", v3: "bitten", ipa3: "/ˈbɪtn/", meaning: "cắn" },
-    { v1: "blow", ipa1: "/bləʊ/", v2: "blew", ipa2: "/bluː/", v3: "blown", ipa3: "/bləʊn/", meaning: "thổi" },
-    { v1: "break", ipa1: "/breɪk/", v2: "broke", ipa2: "/brəʊk/", v3: "broken", ipa3: "/ˈbrəʊkən/", meaning: "làm vỡ, gãy" },
-    { v1: "bring", ipa1: "/brɪŋ/", v2: "brought", ipa2: "/brɔːt/", v3: "brought", ipa3: "/brɔːt/", meaning: "mang lại" },
-    { v1: "build", ipa1: "/bɪld/", v2: "built", ipa2: "/bɪlt/", v3: "built", ipa3: "/bɪlt/", meaning: "xây dựng" },
-    { v1: "buy", ipa1: "/baɪ/", v2: "bought", ipa2: "/brɔːt/", v3: "bought", ipa3: "/brɔːt/", meaning: "mua" },
-    { v1: "catch", ipa1: "/kætʃ/", v2: "caught", ipa2: "/kɔːt/", v3: "caught", ipa3: "/kɔːt/", meaning: "bắt, tóm" },
-    { v1: "choose", ipa1: "/tʃuːz/", v2: "chose", ipa2: "/tʃəʊz/", v3: "chosen", ipa3: "/ˈtʃəʊzn/", meaning: "chọn, lựa" },
-    { v1: "come", ipa1: "/kʌm/", v2: "came", ipa2: "/keɪm/", v3: "come", ipa3: "/kʌm/", meaning: "đến, đi đến" },
-    { v1: "cost", ipa1: "/kɒst/", v2: "cost", ipa2: "/kɒst/", v3: "cost", ipa3: "/kɒst/", meaning: "có giá là" },
-    { v1: "cut", ipa1: "/kʌt/", v2: "cut", ipa2: "/kʌt/", v3: "cut", ipa3: "/kʌt/", meaning: "cắt" },
-    { v1: "do", ipa1: "/duː/", v2: "did", ipa2: "/dɪd/", v3: "done", ipa3: "/dʌn/", meaning: "làm" },
-    { v1: "draw", ipa1: "/drɔː/", v2: "drew", ipa2: "/druː/", v3: "drawn", ipa3: "/drɔːn/", meaning: "vẽ, kéo" },
-    { v1: "drink", ipa1: "/drɪŋk/", v2: "drank", ipa2: "/dræŋk/", v3: "drunk", ipa3: "/drʌŋk/", meaning: "uống" },
-    { v1: "drive", ipa1: "/draɪv/", v2: "drove", ipa2: "/drəʊv/", v3: "driven", ipa3: "/ˈdrɪvn/", meaning: "lái xe" },
-    { v1: "eat", ipa1: "/iːt/", v2: "ate", ipa2: "/et/", v3: "eaten", ipa3: "/ˈiːtn/", meaning: "ăn" },
-    { v1: "fall", ipa1: "/fɔːl/", v2: "fell", ipa2: "/fel/", v3: "fallen", ipa3: "/ˈfɔːlən/", meaning: "ngã, rơi" },
-    { v1: "feel", ipa1: "/fiːl/", v2: "felt", ipa2: "/felt/", v3: "felt", ipa3: "/felt/", meaning: "cảm thấy" },
-    { v1: "find", ipa1: "/faɪnd/", v2: "found", ipa2: "/faʊnd/", v3: "found", ipa3: "/faʊnd/", meaning: "tìm thấy" },
-    { v1: "fly", ipa1: "/flaɪ/", v2: "flew", ipa2: "/fluː/", v3: "flown", ipa3: "/fləʊn/", meaning: "bay" },
-    { v1: "forget", ipa1: "/fəˈɡet/", v2: "forgot", ipa2: "/fəˈɡɒt/", v3: "forgotten", ipa3: "/fəˈɡɒtn/", meaning: "quên" },
-    { v1: "get", ipa1: "/ɡet/", v2: "got", ipa2: "/ɡɒt/", v3: "got / gotten", ipa3: "/ɡɒt / ˈɡɒtn/", meaning: "được, nhận" },
-    { v1: "give", ipa1: "/ɡɪv/", v2: "gave", ipa2: "/ɡeɪv/", v3: "given", ipa3: "/ˈɡɪvn/", meaning: "cho, tặng" },
-    { v1: "go", ipa1: "/ɡəʊ/", v2: "went", ipa2: "/went/", v3: "gone", ipa3: "/ɡɒn/", meaning: "đi" },
-    { v1: "grow", ipa1: "/ɡrəʊ/", v2: "grew", ipa2: "/ɡruː/", v3: "grown", ipa3: "/ɡrəʊn/", meaning: "mọc, phát triển" },
-    { v1: "have", ipa1: "/hæv/", v2: "had", ipa2: "/hæd/", v3: "had", ipa3: "/hæd/", meaning: "có" },
-    { v1: "hear", ipa1: "/hɪər/", v2: "heard", ipa2: "/hɜːd/", v3: "heard", ipa3: "/hɜːd/", meaning: "nghe" },
-    { v1: "hide", ipa1: "/haɪd/", v2: "hid", ipa2: "/hɪd/", v3: "hidden", ipa3: "/ˈhɪdn/", meaning: "trốn, giấu" },
-    { v1: "hit", ipa1: "/hɪt/", v2: "hit", ipa2: "/hɪt/", v3: "hit", ipa3: "/hɪt/", meaning: "đánh" },
-    { v1: "hold", ipa1: "/həʊld/", v2: "held", ipa2: "/held/", v3: "held", ipa3: "/held/", meaning: "cầm, nắm" },
-    { v1: "hurt", ipa1: "/hɜːt/", v2: "hurt", ipa2: "/hɜːt/", v3: "hurt", ipa3: "/hɜːt/", meaning: "làm đau" },
-    { v1: "keep", ipa1: "/kiːp/", v2: "kept", ipa2: "/kept/", v3: "kept", ipa3: "/kept/", meaning: "giữ" },
-    { v1: "know", ipa1: "/nəʊ/", v2: "knew", ipa2: "/njuː/", v3: "known", ipa3: "/nəʊn/", meaning: "biết" },
-    { v1: "leave", ipa1: "/liːv/", v2: "left", ipa2: "/left/", v3: "left", ipa3: "/left/", meaning: "rời đi, để lại" },
-    { v1: "lend", ipa1: "/lend/", v2: "lent", ipa2: "/lent/", v3: "lent", ipa3: "/lent/", meaning: "cho mượn" },
-    { v1: "let", ipa1: "/let/", v2: "let", ipa2: "/let/", v3: "let", ipa3: "/let/", meaning: "cho phép" },
-    { v1: "lie", ipa1: "/laɪ/", v2: "lay", ipa2: "/leɪ/", v3: "lain", ipa3: "/leɪn/", meaning: "nằm" },
-    { v1: "lose", ipa1: "/luːz/", v2: "lost", ipa2: "/lɒst/", v3: "lost", ipa3: "/lɒst/", meaning: "mất, thua" },
-    { v1: "make", ipa1: "/meɪk/", v2: "made", ipa2: "/meɪd/", v3: "made", ipa3: "/meɪd/", meaning: "làm, chế tạo" },
-    { v1: "meet", ipa1: "/miːt/", v2: "met", ipa2: "/met/", v3: "met", ipa3: "/met/", meaning: "gặp" },
-    { v1: "pay", ipa1: "/peɪ/", v2: "paid", ipa2: "/peɪd/", v3: "paid", ipa3: "/peɪd/", meaning: "trả tiền" },
-    { v1: "put", ipa1: "/pʊt/", v2: "put", ipa2: "/pʊt/", v3: "put", ipa3: "/pʊt/", meaning: "đặt, để" },
-    { v1: "read", ipa1: "/riːd/", v2: "read", ipa2: "/red/", v3: "read", ipa3: "/red/", meaning: "đọc" },
-    { v1: "ride", ipa1: "/raɪd/", v2: "rode", ipa2: "/rəʊd/", v3: "ridden", ipa3: "/ˈrɪdn/", meaning: "cưỡi, lái" },
-    { v1: "ring", ipa1: "/rɪŋ/", v2: "rang", ipa2: "/ræŋ/", v3: "rung", ipa3: "/rʌŋ/", meaning: "reo, rung chuông" },
-    { v1: "rise", ipa1: "/raɪz/", v2: "rose", ipa2: "/rəʊz/", v3: "risen", ipa3: "/ˈrɪzn/", meaning: "mọc, tăng lên" },
-    { v1: "run", ipa1: "/rʌn/", v2: "ran", ipa2: "/ræn/", v3: "run", ipa3: "/rʌn/", meaning: "chạy" },
-    { v1: "say", ipa1: "/seɪ/", v2: "said", ipa2: "/sed/", v3: "said", ipa3: "/sed/", meaning: "nói" },
-    { v1: "see", ipa1: "/siː/", v2: "saw", ipa2: "/sɔː/", v3: "seen", ipa3: "/siːn/", meaning: "nhìn thấy" },
-    { v1: "sell", ipa1: "/sel/", v2: "sold", ipa2: "/səʊld/", v3: "sold", ipa3: "/səʊld/", meaning: "bán" },
-    { v1: "send", ipa1: "/send/", v2: "sent", ipa2: "/sent/", v3: "sent", ipa3: "/sent/", meaning: "gửi" },
-    { v1: "show", ipa1: "/ʃəʊ/", v2: "showed", ipa2: "/ʃəʊd/", v3: "shown", ipa3: "/ʃəʊn/", meaning: "trình bày, chỉ" },
-    { v1: "shut", ipa1: "/ʃʌt/", v2: "shut", ipa2: "/ʃʌt/", v3: "shut", ipa3: "/ʃʌt/", meaning: "đóng lại" },
-    { v1: "sing", ipa1: "/sɪŋ/", v2: "sang", ipa2: "/sæŋ/", v3: "sung", ipa3: "/sʌŋ/", meaning: "hát" },
-    { v1: "sit", ipa1: "/sɪt/", v2: "sat", ipa2: "/sæt/", v3: "sat", ipa3: "/sæt/", meaning: "ngồi" },
-    { v1: "sleep", ipa1: "/sliːp/", v2: "slept", ipa2: "/slept/", v3: "slept", ipa3: "/slept/", meaning: "ngủ" },
-    { v1: "speak", ipa1: "/spiːk/", v2: "spoke", ipa2: "/spəʊk/", v3: "spoken", ipa3: "/ˈspəʊkən/", meaning: "nói" },
-    { v1: "spend", ipa1: "/spend/", v2: "spent", ipa2: "/spent/", v3: "spent", ipa3: "/spent/", meaning: "tiêu xài, trải qua" },
-    { v1: "stand", ipa1: "/stænd/", v2: "stood", ipa2: "/stʊd/", v3: "stood", ipa3: "/stʊd/", meaning: "đứng" },
-    { v1: "swim", ipa1: "/swɪm/", v2: "swam", ipa2: "/swæm/", v3: "swum", ipa3: "/swʌm/", meaning: "bơi" },
-    { v1: "take", ipa1: "/teɪk/", v2: "took", ipa2: "/tʊk/", v3: "taken", ipa3: "/ˈteɪkən/", meaning: "cầm, lấy" },
-    { v1: "teach", ipa1: "/tiːtʃ/", v2: "taught", ipa2: "/tɔːt/", v3: "taught", ipa3: "/tɔːt/", meaning: "dạy" },
-    { v1: "tear", ipa1: "/teər/", v2: "tore", ipa2: "/tɔːr/", v3: "torn", ipa3: "/tɔːrn/", meaning: "xé" },
-    { v1: "tell", ipa1: "/tel/", v2: "told", ipa2: "/təʊld/", v3: "told", ipa3: "/təʊld/", meaning: "kể, bảo" },
-    { v1: "think", ipa1: "/θɪŋk/", v2: "thought", ipa2: "/θɔːt/", v3: "thought", ipa3: "/θɔːt/", meaning: "suy nghĩ" },
-    { v1: "throw", ipa1: "/θrəʊ/", v2: "threw", ipa2: "/θruː/", v3: "thrown", ipa3: "/θrəʊn/", meaning: "ném, quăng" },
-    { v1: "understand", ipa1: "/ˌʌndəˈstænd/", v2: "understood", ipa2: "/ˌʌndəˈstʊd/", v3: "understood", ipa3: "/ˌʌndəˈstʊd/", meaning: "hiểu" },
-    { v1: "wake", ipa1: "/weɪk/", v2: "woke", ipa2: "/wəʊk/", v3: "woken", ipa3: "/ˈwəʊkən/", meaning: "thức dậy" },
-    { v1: "wear", ipa1: "/weər/", v2: "wore", ipa2: "/wɔːr/", v3: "worn", ipa3: "/wɔːrn/", meaning: "mặc" },
-    { v1: "win", ipa1: "/wɪn/", v2: "won", ipa2: "/wʌn/", v3: "won", ipa3: "/wʌn/", meaning: "thắng, chiến thắng" },
-    { v1: "write", ipa1: "/raɪt/", v2: "wrote", ipa2: "/rəʊt/", v3: "written", ipa3: "/ˈrɪtn/", meaning: "viết" }
+    { v1: 'abide', v2: 'abode / abided', v3: 'abode / abided', meaning: "" },
+    { v1: 'arise', v2: 'arose', v3: 'arisen', meaning: "" },
+    { v1: 'awake', v2: 'awoke / awakened', v3: 'awoken / awakened', meaning: "" },
+    { v1: 'be', v2: 'was / were', v3: 'been', meaning: "" },
+    { v1: 'bear', v2: 'bore', v3: 'born / borne', meaning: "" },
+    { v1: 'beat', v2: 'beat', v3: 'beaten', meaning: "" },
+    { v1: 'become', v2: 'became', v3: 'become', meaning: "" },
+    { v1: 'befall', v2: 'befell', v3: 'befallen', meaning: "" },
+    { v1: 'beget', v2: 'begot / begat', v3: 'begotten', meaning: "" },
+    { v1: 'begin', v2: 'began', v3: 'begun', meaning: "" },
+    { v1: 'behold', v2: 'beheld', v3: 'beheld', meaning: "" },
+    { v1: 'bend', v2: 'bent', v3: 'bent', meaning: "" },
+    { v1: 'bereave', v2: 'bereft / bereaved', v3: 'bereft / bereaved', meaning: "" },
+    { v1: 'beseech', v2: 'besought / beseeched', v3: 'besought / beseeched', meaning: "" },
+    { v1: 'beset', v2: 'beset', v3: 'beset', meaning: "" },
+    { v1: 'bespeak', v2: 'bespoke', v3: 'bespoken', meaning: "" },
+    { v1: 'bestride', v2: 'bestrode', v3: 'bestridden', meaning: "" },
+    { v1: 'bet', v2: 'bet', v3: 'bet', meaning: "" },
+    { v1: 'betake', v2: 'betook', v3: 'betaken', meaning: "" },
+    { v1: 'bid', v2: 'bid / bade', v3: 'bid / bidden', meaning: "" },
+    { v1: 'bind', v2: 'bound', v3: 'bound', meaning: "" },
+    { v1: 'bite', v2: 'bit', v3: 'bitten', meaning: "" },
+    { v1: 'bleed', v2: 'bled', v3: 'bled', meaning: "" },
+    { v1: 'blow', v2: 'blew', v3: 'blown', meaning: "" },
+    { v1: 'break', v2: 'broke', v3: 'broken', meaning: "" },
+    { v1: 'breed', v2: 'bred', v3: 'bred', meaning: "" },
+    { v1: 'bring', v2: 'brought', v3: 'brought', meaning: "" },
+    { v1: 'broadcast', v2: 'broadcast / broadcasted', v3: 'broadcast / broadcasted', meaning: "" },
+    { v1: 'build', v2: 'built', v3: 'built', meaning: "" },
+    { v1: 'burn', v2: 'burnt / burned', v3: 'burnt / burned', meaning: "" },
+    { v1: 'burst', v2: 'burst', v3: 'burst', meaning: "" },
+    { v1: 'buy', v2: 'bought', v3: 'bought', meaning: "" },
+    { v1: 'cast', v2: 'cast', v3: 'cast', meaning: "" },
+    { v1: 'catch', v2: 'caught', v3: 'caught', meaning: "" },
+    { v1: 'choose', v2: 'chose', v3: 'chosen', meaning: "" },
+    { v1: 'cling', v2: 'clung', v3: 'clung', meaning: "" },
+    { v1: 'clothe', v2: 'clad / clothed', v3: 'clad / clothed', meaning: "" },
+    { v1: 'come', v2: 'came', v3: 'come', meaning: "" },
+    { v1: 'cost', v2: 'cost', v3: 'cost', meaning: "" },
+    { v1: 'creep', v2: 'crept', v3: 'crept', meaning: "" },
+    { v1: 'cut', v2: 'cut', v3: 'cut', meaning: "" },
+    { v1: 'deal', v2: 'dealt', v3: 'dealt', meaning: "" },
+    { v1: 'dig', v2: 'dug', v3: 'dug', meaning: "" },
+    { v1: 'dive', v2: 'dived / dove', v3: 'dived', meaning: "" },
+    { v1: 'do', v2: 'did', v3: 'done', meaning: "" },
+    { v1: 'draw', v2: 'drew', v3: 'drawn', meaning: "" },
+    { v1: 'dream', v2: 'dreamt / dreamed', v3: 'dreamt / dreamed', meaning: "" },
+    { v1: 'drink', v2: 'drank', v3: 'drunk', meaning: "" },
+    { v1: 'drive', v2: 'drove', v3: 'driven', meaning: "" },
+    { v1: 'dwell', v2: 'dwelt / dwelled', v3: 'dwelt / dwelled', meaning: "" },
+    { v1: 'eat', v2: 'ate', v3: 'eaten', meaning: "" },
+    { v1: 'fall', v2: 'fell', v3: 'fallen', meaning: "" },
+    { v1: 'feed', v2: 'fed', v3: 'fed', meaning: "" },
+    { v1: 'feel', v2: 'felt', v3: 'felt', meaning: "" },
+    { v1: 'fight', v2: 'fought', v3: 'fought', meaning: "" },
+    { v1: 'find', v2: 'found', v3: 'found', meaning: "" },
+    { v1: 'flee', v2: 'fled', v3: 'fled', meaning: "" },
+    { v1: 'fling', v2: 'flung', v3: 'flung', meaning: "" },
+    { v1: 'fly', v2: 'flew', v3: 'flown', meaning: "" },
+    { v1: 'forbid', v2: 'forbade / forbad', v3: 'forbidden', meaning: "" },
+    { v1: 'forecast', v2: 'forecast / forecasted', v3: 'forecast / forecasted', meaning: "" },
+    { v1: 'foresee', v2: 'foresaw', v3: 'foreseen', meaning: "" },
+    { v1: 'foretell', v2: 'foretold', v3: 'foretold', meaning: "" },
+    { v1: 'forget', v2: 'forgot', v3: 'forgotten', meaning: "" },
+    { v1: 'forgive', v2: 'forgave', v3: 'forgiven', meaning: "" },
+    { v1: 'forsake', v2: 'forsook', v3: 'forsaken', meaning: "" },
+    { v1: 'freeze', v2: 'froze', v3: 'frozen', meaning: "" },
+    { v1: 'get', v2: 'got', v3: 'got / gotten', meaning: "" },
+    { v1: 'give', v2: 'gave', v3: 'given', meaning: "" },
+    { v1: 'go', v2: 'went', v3: 'gone', meaning: "" },
+    { v1: 'grind', v2: 'ground', v3: 'ground', meaning: "" },
+    { v1: 'grow', v2: 'grew', v3: 'grown', meaning: "" },
+    { v1: 'hang', v2: 'hung / hanged', v3: 'hung / hanged', meaning: "" },
+    { v1: 'have', v2: 'had', v3: 'had', meaning: "" },
+    { v1: 'hear', v2: 'heard', v3: 'heard', meaning: "" },
+    { v1: 'hide', v2: 'hid', v3: 'hidden', meaning: "" },
+    { v1: 'hit', v2: 'hit', v3: 'hit', meaning: "" },
+    { v1: 'hold', v2: 'held', v3: 'held', meaning: "" },
+    { v1: 'hurt', v2: 'hurt', v3: 'hurt', meaning: "" },
+    { v1: 'keep', v2: 'kept', v3: 'kept', meaning: "" },
+    { v1: 'kneel', v2: 'knelt / kneeled', v3: 'knelt / kneeled', meaning: "" },
+    { v1: 'know', v2: 'knew', v3: 'known', meaning: "" },
+    { v1: 'lay', v2: 'laid', v3: 'laid', meaning: "" },
+    { v1: 'lead', v2: 'led', v3: 'led', meaning: "" },
+    { v1: 'lean', v2: 'leant / leaned', v3: 'leant / leaned', meaning: "" },
+    { v1: 'leap', v2: 'leapt / leaped', v3: 'leapt / leaped', meaning: "" },
+    { v1: 'learn', v2: 'learnt / learned', v3: 'learnt / learned', meaning: "" },
+    { v1: 'leave', v2: 'left', v3: 'left', meaning: "" },
+    { v1: 'lend', v2: 'lent', v3: 'lent', meaning: "" },
+    { v1: 'let', v2: 'let', v3: 'let', meaning: "" },
+    { v1: 'lie', v2: 'lay', v3: 'lain', meaning: "" },
+    { v1: 'light', v2: 'lit / lighted', v3: 'lit / lighted', meaning: "" },
+    { v1: 'lose', v2: 'lost', v3: 'lost', meaning: "" },
+    { v1: 'make', v2: 'made', v3: 'made', meaning: "" },
+    { v1: 'mean', v2: 'meant', v3: 'meant', meaning: "" },
+    { v1: 'meet', v2: 'met', v3: 'met', meaning: "" },
+    { v1: 'mow', v2: 'mowed', v3: 'mown / mowed', meaning: "" },
+    { v1: 'overcome', v2: 'overcame', v3: 'overcome', meaning: "" },
+    { v1: 'overdo', v2: 'overdid', v3: 'overdone', meaning: "" },
+    { v1: 'overdraw', v2: 'overdrew', v3: 'overdrawn', meaning: "" },
+    { v1: 'overeat', v2: 'overate', v3: 'overeaten', meaning: "" },
+    { v1: 'overhear', v2: 'overheard', v3: 'overheard', meaning: "" },
+    { v1: 'overlay', v2: 'overlaid', v3: 'overlaid', meaning: "" },
+    { v1: 'overtake', v2: 'overtook', v3: 'overtaken', meaning: "" },
+    { v1: 'overthrow', v2: 'overthrew', v3: 'overthrown', meaning: "" },
+    { v1: 'pay', v2: 'paid', v3: 'paid', meaning: "" },
+    { v1: 'plead', v2: 'pleaded / pled', v3: 'pleaded / pled', meaning: "" },
+    { v1: 'prove', v2: 'proved', v3: 'proven / proved', meaning: "" },
+    { v1: 'put', v2: 'put', v3: 'put', meaning: "" },
+    { v1: 'quit', v2: 'quit / quitted', v3: 'quit / quitted', meaning: "" },
+    { v1: 'read', v2: 'read', v3: 'read', meaning: "" },
+    { v1: 'rid', v2: 'rid / ridded', v3: 'rid / ridded', meaning: "" },
+    { v1: 'ride', v2: 'rode', v3: 'ridden', meaning: "" },
+    { v1: 'ring', v2: 'rang', v3: 'rung', meaning: "" },
+    { v1: 'rise', v2: 'rose', v3: 'risen', meaning: "" },
+    { v1: 'run', v2: 'ran', v3: 'run', meaning: "" },
+    { v1: 'say', v2: 'said', v3: 'said', meaning: "" },
+    { v1: 'see', v2: 'saw', v3: 'seen', meaning: "" },
+    { v1: 'seek', v2: 'sought', v3: 'sought', meaning: "" },
+    { v1: 'sell', v2: 'sold', v3: 'sold', meaning: "" },
+    { v1: 'send', v2: 'sent', v3: 'sent', meaning: "" },
+    { v1: 'set', v2: 'set', v3: 'set', meaning: "" },
+    { v1: 'sew', v2: 'sewed', v3: 'sewn / sewed', meaning: "" },
+    { v1: 'shake', v2: 'shook', v3: 'shaken', meaning: "" },
+    { v1: 'shave', v2: 'shaved', v3: 'shaven / shaved', meaning: "" },
+    { v1: 'shear', v2: 'sheared', v3: 'shorn / sheared', meaning: "" },
+    { v1: 'shed', v2: 'shed', v3: 'shed', meaning: "" },
+    { v1: 'shine', v2: 'shone / shined', v3: 'shone / shined', meaning: "" },
+    { v1: 'shoot', v2: 'shot', v3: 'shot', meaning: "" },
+    { v1: 'show', v2: 'showed', v3: 'shown / showed', meaning: "" },
+    { v1: 'shrink', v2: 'shrank / shrunk', v3: 'shrunk / shrunken', meaning: "" },
+    { v1: 'shut', v2: 'shut', v3: 'shut', meaning: "" },
+    { v1: 'sing', v2: 'sang', v3: 'sung', meaning: "" },
+    { v1: 'sink', v2: 'sank / sunk', v3: 'sunk / sunken', meaning: "" },
+    { v1: 'sit', v2: 'sat', v3: 'sat', meaning: "" },
+    { v1: 'sleep', v2: 'slept', v3: 'slept', meaning: "" },
+    { v1: 'slide', v2: 'slid', v3: 'slid', meaning: "" },
+    { v1: 'sling', v2: 'slung', v3: 'slung', meaning: "" },
+    { v1: 'slit', v2: 'slit', v3: 'slit', meaning: "" },
+    { v1: 'smell', v2: 'smelt / smelled', v3: 'smelt / smelled', meaning: "" },
+    { v1: 'sow', v2: 'sowed', v3: 'sown / sowed', meaning: "" },
+    { v1: 'speak', v2: 'spoke', v3: 'spoken', meaning: "" },
+    { v1: 'speed', v2: 'sped / speeded', v3: 'sped / speeded', meaning: "" },
+    { v1: 'spell', v2: 'spelt / spelled', v3: 'spelt / spelled', meaning: "" },
+    { v1: 'spend', v2: 'spent', v3: 'spent', meaning: "" },
+    { v1: 'spill', v2: 'spilt / spilled', v3: 'spilt / spilled', meaning: "" },
+    { v1: 'spin', v2: 'spun', v3: 'spun', meaning: "" },
+    { v1: 'spit', v2: 'spat / spit', v3: 'spat / spit', meaning: "" },
+    { v1: 'split', v2: 'split', v3: 'split', meaning: "" },
+    { v1: 'spoil', v2: 'spoilt / spoiled', v3: 'spoilt / spoiled', meaning: "" },
+    { v1: 'spread', v2: 'spread', v3: 'spread', meaning: "" },
+    { v1: 'spring', v2: 'sprang / sprung', v3: 'sprung', meaning: "" },
+    { v1: 'stand', v2: 'stood', v3: 'stood', meaning: "" },
+    { v1: 'steal', v2: 'stole', v3: 'stolen', meaning: "" },
+    { v1: 'stick', v2: 'stuck', v3: 'stuck', meaning: "" },
+    { v1: 'sting', v2: 'stung', v3: 'stung', meaning: "" },
+    { v1: 'stink', v2: 'stank / stunk', v3: 'stunk', meaning: "" },
+    { v1: 'stride', v2: 'strode', v3: 'stridden', meaning: "" },
+    { v1: 'strike', v2: 'struck', v3: 'struck / stricken', meaning: "" },
+    { v1: 'string', v2: 'strung', v3: 'strung', meaning: "" },
+    { v1: 'swear', v2: 'swore', v3: 'sworn', meaning: "" },
+    { v1: 'sweep', v2: 'swept', v3: 'swept', meaning: "" },
+    { v1: 'swell', v2: 'swelled', v3: 'swollen / swelled', meaning: "" },
+    { v1: 'swim', v2: 'swam', v3: 'swum', meaning: "" },
+    { v1: 'swing', v2: 'swung', v3: 'swung', meaning: "" },
+    { v1: 'take', v2: 'took', v3: 'taken', meaning: "" },
+    { v1: 'teach', v2: 'taught', v3: 'taught', meaning: "" },
+    { v1: 'tear', v2: 'tore', v3: 'torn', meaning: "" },
+    { v1: 'tell', v2: 'told', v3: 'told', meaning: "" },
+    { v1: 'think', v2: 'thought', v3: 'thought', meaning: "" },
+    { v1: 'throw', v2: 'threw', v3: 'thrown', meaning: "" },
+    { v1: 'tread', v2: 'trod', v3: 'trodden / trod', meaning: "" },
+    { v1: 'understand', v2: 'understood', v3: 'understood', meaning: "" },
+    { v1: 'undertake', v2: 'undertook', v3: 'undertaken', meaning: "" },
+    { v1: 'undo', v2: 'undid', v3: 'undone', meaning: "" },
+    { v1: 'uphold', v2: 'upheld', v3: 'upheld', meaning: "" },
+    { v1: 'upset', v2: 'upset', v3: 'upset', meaning: "" },
+    { v1: 'wake', v2: 'woke / waked', v3: 'woken / waked', meaning: "" },
+    { v1: 'wear', v2: 'wore', v3: 'worn', meaning: "" },
+    { v1: 'weep', v2: 'wept', v3: 'wept', meaning: "" },
+    { v1: 'win', v2: 'won', v3: 'won', meaning: "" },
+    { v1: 'wind', v2: 'wound', v3: 'wound', meaning: "" },
+    { v1: 'withdraw', v2: 'withdrew', v3: 'withdrawn', meaning: "" },
+    { v1: 'withstand', v2: 'withstood', v3: 'withstood', meaning: "" },
+    { v1: 'wring', v2: 'wrung', v3: 'wrung', meaning: "" },
+    { v1: 'write', v2: 'wrote', v3: 'written', meaning: "" },
+    { v1: 'misdeal', v2: 'misdealt', v3: 'misdealt', meaning: "" },
+    { v1: 'misdo', v2: 'misdid', v3: 'misdone', meaning: "" },
+    { v1: 'mishear', v2: 'misheard', v3: 'misheard', meaning: "" },
+    { v1: 'mislead', v2: 'misled', v3: 'misled', meaning: "" },
+    { v1: 'misread', v2: 'misread', v3: 'misread', meaning: "" },
+    { v1: 'misspell', v2: 'misspelt / misspelled', v3: 'misspelt / misspelled', meaning: "" },
+    { v1: 'misspend', v2: 'misspent', v3: 'misspent', meaning: "" },
+    { v1: 'mistake', v2: 'mistook', v3: 'mistaken', meaning: "" },
+    { v1: 'misunderstand', v2: 'misunderstood', v3: 'misunderstood', meaning: "" },
+    { v1: 'miswrite', v2: 'miswrote', v3: 'miswritten', meaning: "" },
+    { v1: 'outbid', v2: 'outbid', v3: 'outbid', meaning: "" },
+    { v1: 'outdo', v2: 'outdid', v3: 'outdone', meaning: "" },
+    { v1: 'outdraw', v2: 'outdrew', v3: 'outdrawn', meaning: "" },
+    { v1: 'outgrow', v2: 'outgrew', v3: 'outgrown', meaning: "" },
+    { v1: 'outshine', v2: 'outshone', v3: 'outshone', meaning: "" },
+    { v1: 'outshoot', v2: 'outshot', v3: 'outshot', meaning: "" },
+    { v1: 'outsell', v2: 'outsold', v3: 'outsold', meaning: "" },
+    { v1: 'outspend', v2: 'outspent', v3: 'outspent', meaning: "" },
+    { v1: 'outswim', v2: 'outswam', v3: 'outswum', meaning: "" },
+    { v1: 'outthink', v2: 'outthought', v3: 'outthought', meaning: "" },
+    { v1: 'outwrite', v2: 'outwrote', v3: 'outwritten', meaning: "" },
+    { v1: 'rebuild', v2: 'rebuilt', v3: 'rebuilt', meaning: "" },
+    { v1: 'redo', v2: 'redid', v3: 'redone', meaning: "" },
+    { v1: 'repay', v2: 'repaid', v3: 'repaid', meaning: "" },
+    { v1: 'resell', v2: 'resold', v3: 'resold', meaning: "" },
+    { v1: 'resend', v2: 'resent', v3: 'resent', meaning: "" },
+    { v1: 'reset', v2: 'reset', v3: 'reset', meaning: "" },
+    { v1: 'retake', v2: 'retook', v3: 'retaken', meaning: "" },
+    { v1: 'retell', v2: 'retold', v3: 'retold', meaning: "" },
+    { v1: 'rethink', v2: 'rethought', v3: 'rethought', meaning: "" },
+    { v1: 'rewrite', v2: 'rewrote', v3: 'rewritten', meaning: "" },
+    { v1: 'withhold', v2: 'withheld', v3: 'withheld', meaning: "" },
+    { v1: 'withdraw', v2: 'withdrew', v3: 'withdrawn', meaning: "" },
 ];
+
+function getIrregularVerbSearchText(item) {
+    return removeDiacritics([item.v1, item.v2, item.v3, item.meaning || ''].join(' ').toLowerCase());
+}
+
+const IRREGULAR_VERB_DETAIL_CACHE = new Map();
 
 window.openIrregularVerbsModal = function() {
     const modal = document.getElementById('irregular-verbs-modal');
@@ -1740,62 +2881,79 @@ window.closeIrregularVerbsModal = function() {
 window.renderIrregularVerbsTable = function(dataArray) {
     const resultList = document.getElementById('iv-result-list');
     if (!resultList) return;
-
-    if (dataArray.length === 0) {
-        resultList.innerHTML = '<div style="text-align: center; color: #888; padding: 15px;">Không tìm thấy động từ phù hợp.</div>';
+    if (!dataArray.length) {
+        resultList.innerHTML = '<div style="text-align:center;color:#888;padding:20px;">Không tìm thấy động từ phù hợp.</div>';
         return;
     }
 
-    let html = '<table style="width: 100%; border-collapse: collapse; font-size: 1.02em;">';
-    html += '<tr style="background: #540606; color: white; text-align: left;">' +
-            '<th style="padding: 10px; border: 1px solid #ddd;">V1 (Base)</th>' +
-            '<th style="padding: 10px; border: 1px solid #ddd;">V2 (Past)</th>' +
-            '<th style="padding: 10px; border: 1px solid #ddd;">V3 (Participle)</th>' +
-            '<th style="padding: 10px; border: 1px solid #ddd;">Ý nghĩa</th>' +
-            '</tr>';
+    let html = `<div style="margin-bottom:8px;color:#555;"><b>${dataArray.length}</b> động từ đang hiển thị. Nhấp vào V1/V2/V3 để nghe; bấm <b>🎙️</b> để kiểm tra phát âm; bấm <b>📖 Tra nghĩa</b> để lấy nghĩa và ví dụ.</div>`;
+    html += '<div class="iv-table-wrap"><table class="iv-table">';
+    html += '<thead><tr style="background:#540606;color:#fff;text-align:left;">' +
+        '<th style="padding:10px;border:1px solid #ddd;">#</th>' +
+        '<th style="padding:10px;border:1px solid #ddd;">V1 (Base)</th>' +
+        '<th style="padding:10px;border:1px solid #ddd;">V2 (Past)</th>' +
+        '<th style="padding:10px;border:1px solid #ddd;">V3 (Past Participle)</th>' +
+        '<th style="padding:10px;border:1px solid #ddd;">Nghĩa / Ví dụ</th></tr></thead><tbody>';
 
     dataArray.forEach((item, index) => {
-        let bg = index % 2 === 0 ? '#ffffff' : '#f1f3f5';
-        html += `<tr style="background: ${bg};">` +
-                `<td style="padding: 8px 10px; border: 1px solid #ddd;">` +
-                    `<div style="font-weight: bold; color: #007bff; cursor: pointer;" title="Nhấp để nghe phát âm" onclick="speakWord('${escapeHTML(item.v1)}')">${escapeHTML(item.v1)} 🔊</div>` +
-                    `<div style="color: #d9534f; font-family: monospace; font-size: 0.88em;">${escapeHTML(item.ipa1 || '')}</div>` +
-                `</td>` +
-                `<td style="padding: 8px 10px; border: 1px solid #ddd;">` +
-                    `<div style="font-weight: bold; color: #333; cursor: pointer;" title="Nhấp để nghe phát âm" onclick="speakWord('${escapeHTML(item.v2)}')">${escapeHTML(item.v2)} 🔊</div>` +
-                    `<div style="color: #d9534f; font-family: monospace; font-size: 0.88em;">${escapeHTML(item.ipa2 || '')}</div>` +
-                `</td>` +
-                `<td style="padding: 8px 10px; border: 1px solid #ddd;">` +
-                    `<div style="font-weight: bold; color: #333; cursor: pointer;" title="Nhấp để nghe phát âm" onclick="speakWord('${escapeHTML(item.v3)}')">${escapeHTML(item.v3)} 🔊</div>` +
-                    `<div style="color: #d9534f; font-family: monospace; font-size: 0.88em;">${escapeHTML(item.ipa3 || '')}</div>` +
-                `</td>` +
-                `<td style="padding: 8px 10px; border: 1px solid #ddd; font-style: italic;">${escapeHTML(item.meaning)}</td>` +
-                `</tr>`;
+        const bg = index % 2 === 0 ? '#fff' : '#f7f8fa';
+        const id = 'iv-' + index + '-' + cleanKey(item.v1).replace(/[^a-z0-9]/g,'');
+        html += `<tr style="background:${bg};">` +
+            `<td style="padding:8px;border:1px solid #ddd;">${index + 1}</td>` +
+            `<td style="padding:8px;border:1px solid #ddd;"><span class="iv-verb" style="color:#007bff;" onclick="speakWord('${escapeHTML(item.v1)}')">${escapeHTML(item.v1)} 🔊</span><button class="iv-pron-btn" title="Kiểm tra phát âm" onclick="startPronunciationCheck('${escapeHTML(item.v1)}')">🎙️</button></td>` +
+            `<td style="padding:8px;border:1px solid #ddd;"><span class="iv-verb" onclick="speakWord('${escapeHTML(item.v2)}')">${escapeHTML(item.v2)} 🔊</span><button class="iv-pron-btn" title="Kiểm tra phát âm" onclick="startPronunciationCheck('${escapeHTML(item.v2)}')">🎙️</button></td>` +
+            `<td style="padding:8px;border:1px solid #ddd;"><span class="iv-verb" onclick="speakWord('${escapeHTML(item.v3)}')">${escapeHTML(item.v3)} 🔊</span><button class="iv-pron-btn" title="Kiểm tra phát âm" onclick="startPronunciationCheck('${escapeHTML(item.v3)}')">🎙️</button></td>` +
+            `<td style="padding:8px;border:1px solid #ddd;"><div id="${id}">${item.meaning ? escapeHTML(item.meaning) : '<span style="color:#888;">Chưa tải nghĩa</span>'} <button class="tool-small-btn" style="background:#17a2b8;color:#fff;" onclick="window.lookupIrregularVerbDetail('${escapeHTML(item.v1)}','${id}')">📖 Tra nghĩa</button></div></td>` +
+            `</tr>`;
     });
-    html += '</table>';
+    html += '</tbody></table></div>';
     resultList.innerHTML = html;
+};
+
+window.lookupIrregularVerbDetail = async function(verb, targetId) {
+    const target = document.getElementById(targetId);
+    if (!target) return;
+    const key = cleanKey(verb);
+    if (IRREGULAR_VERB_DETAIL_CACHE.has(key)) {
+        target.innerHTML = IRREGULAR_VERB_DETAIL_CACHE.get(key);
+        return;
+    }
+    target.innerHTML = '<span style="color:#007bff;">🔎 Đang tra...</span>';
+    try {
+        const [dictResponse, transResponse] = await Promise.all([
+            fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(verb)}`).catch(() => null),
+            fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(verb)}&langpair=en|vi`).catch(() => null)
+        ]);
+        let vi = '';
+        if (transResponse?.ok) {
+            const t = await transResponse.json();
+            vi = t?.responseData?.translatedText || '';
+        }
+        let html = `<b style="color:#2e7d32;">${escapeHTML(vi || 'Đang cập nhật nghĩa')}</b>`;
+        if (dictResponse?.ok) {
+            const data = await dictResponse.json();
+            const entry = data?.[0];
+            const examples = [];
+            (entry?.meanings || []).slice(0, 4).forEach(m => {
+                (m.definitions || []).slice(0, 2).forEach(d => {
+                    if (d.example) examples.push(`<span class="iv-detail">💬 ${escapeHTML(d.example)}</span>`);
+                });
+            });
+            if (examples.length) html += '<div style="margin-top:5px;">' + examples.slice(0,3).join('<br>') + '</div>';
+        }
+        IRREGULAR_VERB_DETAIL_CACHE.set(key, html);
+        target.innerHTML = html;
+    } catch(e) {
+        target.innerHTML = '<span style="color:#d9534f;">Không lấy được dữ liệu lúc này.</span>';
+    }
 };
 
 window.filterIrregularVerbs = function() {
     const input = document.getElementById('iv-search-input');
     if (!input) return;
-    let keyword = removeDiacritics(input.value.trim().toLowerCase());
-
-    if (!keyword) {
-        window.renderIrregularVerbsTable(IRREGULAR_VERBS_DATA);
-        return;
-    }
-
-    let filtered = IRREGULAR_VERBS_DATA.filter(item => 
-        removeDiacritics(item.v1.toLowerCase()).includes(keyword) ||
-        removeDiacritics(item.v2.toLowerCase()).includes(keyword) ||
-        removeDiacritics(item.v3.toLowerCase()).includes(keyword) ||
-        removeDiacritics(item.meaning.toLowerCase()).includes(keyword) ||
-        (item.ipa1 && item.ipa1.toLowerCase().includes(keyword)) ||
-        (item.ipa2 && item.ipa2.toLowerCase().includes(keyword)) ||
-        (item.ipa3 && item.ipa3.toLowerCase().includes(keyword))
-    );
-
+    const keyword = removeDiacritics(input.value.trim().toLowerCase());
+    if (!keyword) return window.renderIrregularVerbsTable(IRREGULAR_VERBS_DATA);
+    const filtered = IRREGULAR_VERBS_DATA.filter(item => getIrregularVerbSearchText(item).includes(keyword));
     window.renderIrregularVerbsTable(filtered);
 };
 
@@ -1832,7 +2990,7 @@ window.calcCalculate = function() {
 
     try {
         let expression = display.value.replace(/×/g, '*').replace(/÷/g, '/');
-        let result = new Function(`return ${expression}`)();
+        let result = safeEvaluate(expression);
         
         if (result !== undefined && !isNaN(result)) {
             display.value = result;
@@ -1904,7 +3062,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 'Đổi đơn vị': 6,
                 'Phân số': 4,
                 'Phép tính số thập phân': 4,
-                'So sánh phân số': 6
+                'So sánh phân số': 5
             };
 
             let selectedQuestions = [];
@@ -2069,7 +3227,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 try {
                     let expression = display.value.replace(/×/g, '*').replace(/÷/g, '/');
-                    let result = new Function(`return ${expression}`)();
+                    let result = safeEvaluate(expression);
                     
                     if (result !== undefined && !isNaN(result)) {
                         display.value = result;
@@ -2287,3 +3445,5 @@ window.printPDF = function() {
     }
     window.print();
 };
+
+window.addEventListener('load', () => { try { v16BackgroundPreload(); } catch (e) {} });
