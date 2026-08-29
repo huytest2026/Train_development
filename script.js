@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbxnKslS1g4eZ1pqnzoi35CRRbzC7AWbOqQG-sbZ8qruNB4YznnSC7KXme-RbF4R9-cO/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbyVe4lxouXJ6mUc2dMOBdCbMDFr_OFffFMfNE7hWeg7QkwM12BU37PZTiX7vqPWFret/exec";
 let AppState = {
     allQuizData: [],
     userPermissions: [],
