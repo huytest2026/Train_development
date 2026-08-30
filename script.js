@@ -1,4 +1,13 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbyVe4lxouXJ6mUc2dMOBdCbMDFr_OFffFMfNE7hWeg7QkwM12BU37PZTiX7vqPWFret/exec";
+// ============================================================
+// V33 — SINGLE DICTIONARY ENGINE + ROBUST DUAL-PRONUNCIATION UI
+// - Chỉ script.js sở hữu window.lookupWord
+// - Không dùng V17/V18 wrapper, không dùng V28 patch
+// - Không dùng MutationObserver để chèn từ gốc
+// - Từ gốc được tính trước khi tra và được render trong cùng luồng
+// - V33: giữ 2 thẻ TỪ BẠN TRA / TỪ GỐC, IPA + nút nghe riêng và tăng độ ổn định khi dữ liệu phát âm tải chậm
+// ============================================================
+
 let AppState = {
     allQuizData: [],
     userPermissions: [],
@@ -527,7 +536,7 @@ window.closeDictionaryModal = function() {
 // Memory -> IndexedDB -> localStorage fallback
 // Progressive loading + stale-while-revalidate
 // ==========================================
-const DICT_V11_CACHE_VERSION = 'v14-offline-10k-hybrid';
+const DICT_V11_CACHE_VERSION = 'v31-single-engine-dual-pronunciation';
 const DICT_V11_DB_NAME = 'EnglishDictionaryCacheV15';
 const DICT_V11_STORE = 'entries';
 const DICT_V11_TTL = 1000 * 60 * 60 * 24 * 30; // 30 ngày
@@ -671,7 +680,7 @@ function buildOffline10KHTML(word, entry) {
         </div>`;
 }
 
-async function enrichOfflineWordOnline(word, requestId, controller, resultBox) {
+async function enrichOfflineWordOnline(word, requestId, controller, resultBox, baseFormNotice = '') {
     // V14: cập nhật lớp dữ liệu online lên bản Offline hiện tại; không thay thế
     // toàn bộ kết quả bằng cache cũ trong quá trình này.
     try {
@@ -691,9 +700,13 @@ async function enrichOfflineWordOnline(word, requestId, controller, resultBox) {
         const slot = resultBox.querySelector('#dict-offline-online-slot');
         if (slot) {
             slot.innerHTML = `<div class="dict-v11-meta" style="margin-bottom:8px;">🌐 Đã bổ sung dữ liệu online.</div>${onlineHtml}${vi ? `<div style="padding:10px;background:#e8f5e9;border-radius:7px;margin-top:8px;"><b>🇻🇳 Nghĩa:</b> ${escapeHTML(vi)}</div>` : ''}${familyHtml}`;
+            // V27: Bổ sung online xong vẫn bảo toàn thông tin từ gốc ở đầu kết quả.
+            if (baseFormNotice && !resultBox.querySelector('.dict-base-form-note')) {
+                resultBox.insertAdjacentHTML('afterbegin', baseFormNotice);
+            }
         }
         // Chỉ lưu sau khi đã ghép dữ liệu online vào bản Offline.
-        await dictV11Save(word, resultBox.innerHTML);
+        await dictV11Save(word, dictV26GetResultHTMLForCache(resultBox));
         return true;
     } catch(e) {
         return false;
@@ -1119,7 +1132,7 @@ function dictV11SetTranslation(meaning, word) {
 }
 
 // ==========================================
-// V25 DICTIONARY BASE-FORM RESOLVER
+// V27 DICTIONARY BASE-FORM RESOLVER — GUARANTEED DISPLAY
 // Nhận diện cả:
 // 1) Động từ bất quy tắc: went -> go, gone -> go
 // 2) Động từ có quy tắc: closed -> close, studied -> study,
@@ -1132,33 +1145,57 @@ function dictSplitVerbForms(value) {
         .filter(Boolean);
 }
 
+// V26 FIX: Bảng ánh xạ V2/V3 -> V1 được tạo sẵn từ chính danh sách 219 động từ
+// bất quy tắc. Vì vậy việc nhận diện không còn phụ thuộc vào phạm vi/ thứ tự khai báo
+// của IRREGULAR_VERBS_DATA ở phần phía sau file.
+const DICT_IRREGULAR_BASE_MAP = {"abode":{"base":"abide","matchedType":"V3"},"abided":{"base":"abide","matchedType":"V3"},"arose":{"base":"arise","matchedType":"V2"},"arisen":{"base":"arise","matchedType":"V3"},"awoke":{"base":"awake","matchedType":"V2"},"awakened":{"base":"awake","matchedType":"V3"},"awoken":{"base":"awake","matchedType":"V3"},"was":{"base":"be","matchedType":"V2"},"were":{"base":"be","matchedType":"V2"},"been":{"base":"be","matchedType":"V3"},"bore":{"base":"bear","matchedType":"V2"},"born":{"base":"bear","matchedType":"V3"},"borne":{"base":"bear","matchedType":"V3"},"beaten":{"base":"beat","matchedType":"V3"},"became":{"base":"become","matchedType":"V2"},"befell":{"base":"befall","matchedType":"V2"},"befallen":{"base":"befall","matchedType":"V3"},"begot":{"base":"beget","matchedType":"V2"},"begat":{"base":"beget","matchedType":"V2"},"begotten":{"base":"beget","matchedType":"V3"},"began":{"base":"begin","matchedType":"V2"},"begun":{"base":"begin","matchedType":"V3"},"beheld":{"base":"behold","matchedType":"V3"},"bent":{"base":"bend","matchedType":"V3"},"bereft":{"base":"bereave","matchedType":"V3"},"bereaved":{"base":"bereave","matchedType":"V3"},"besought":{"base":"beseech","matchedType":"V3"},"beseeched":{"base":"beseech","matchedType":"V3"},"bespoke":{"base":"bespeak","matchedType":"V2"},"bespoken":{"base":"bespeak","matchedType":"V3"},"bestrode":{"base":"bestride","matchedType":"V2"},"bestridden":{"base":"bestride","matchedType":"V3"},"betook":{"base":"betake","matchedType":"V2"},"betaken":{"base":"betake","matchedType":"V3"},"bade":{"base":"bid","matchedType":"V2"},"bidden":{"base":"bid","matchedType":"V3"},"bound":{"base":"bind","matchedType":"V3"},"bit":{"base":"bite","matchedType":"V2"},"bitten":{"base":"bite","matchedType":"V3"},"bled":{"base":"bleed","matchedType":"V3"},"blew":{"base":"blow","matchedType":"V2"},"blown":{"base":"blow","matchedType":"V3"},"broke":{"base":"break","matchedType":"V2"},"broken":{"base":"break","matchedType":"V3"},"bred":{"base":"breed","matchedType":"V3"},"brought":{"base":"bring","matchedType":"V3"},"broadcasted":{"base":"broadcast","matchedType":"V3"},"built":{"base":"build","matchedType":"V3"},"burnt":{"base":"burn","matchedType":"V3"},"burned":{"base":"burn","matchedType":"V3"},"bought":{"base":"buy","matchedType":"V3"},"caught":{"base":"catch","matchedType":"V3"},"chose":{"base":"choose","matchedType":"V2"},"chosen":{"base":"choose","matchedType":"V3"},"clung":{"base":"cling","matchedType":"V3"},"clad":{"base":"clothe","matchedType":"V3"},"clothed":{"base":"clothe","matchedType":"V3"},"came":{"base":"come","matchedType":"V2"},"crept":{"base":"creep","matchedType":"V3"},"dealt":{"base":"deal","matchedType":"V3"},"dug":{"base":"dig","matchedType":"V3"},"dived":{"base":"dive","matchedType":"V3"},"dove":{"base":"dive","matchedType":"V2"},"did":{"base":"do","matchedType":"V2"},"done":{"base":"do","matchedType":"V3"},"drew":{"base":"draw","matchedType":"V2"},"drawn":{"base":"draw","matchedType":"V3"},"dreamt":{"base":"dream","matchedType":"V3"},"dreamed":{"base":"dream","matchedType":"V3"},"drank":{"base":"drink","matchedType":"V2"},"drunk":{"base":"drink","matchedType":"V3"},"drove":{"base":"drive","matchedType":"V2"},"driven":{"base":"drive","matchedType":"V3"},"dwelt":{"base":"dwell","matchedType":"V3"},"dwelled":{"base":"dwell","matchedType":"V3"},"ate":{"base":"eat","matchedType":"V2"},"eaten":{"base":"eat","matchedType":"V3"},"fell":{"base":"fall","matchedType":"V2"},"fallen":{"base":"fall","matchedType":"V3"},"fed":{"base":"feed","matchedType":"V3"},"felt":{"base":"feel","matchedType":"V3"},"fought":{"base":"fight","matchedType":"V3"},"found":{"base":"find","matchedType":"V3"},"fled":{"base":"flee","matchedType":"V3"},"flung":{"base":"fling","matchedType":"V3"},"flew":{"base":"fly","matchedType":"V2"},"flown":{"base":"fly","matchedType":"V3"},"forbade":{"base":"forbid","matchedType":"V2"},"forbad":{"base":"forbid","matchedType":"V2"},"forbidden":{"base":"forbid","matchedType":"V3"},"forecasted":{"base":"forecast","matchedType":"V3"},"foresaw":{"base":"foresee","matchedType":"V2"},"foreseen":{"base":"foresee","matchedType":"V3"},"foretold":{"base":"foretell","matchedType":"V3"},"forgot":{"base":"forget","matchedType":"V2"},"forgotten":{"base":"forget","matchedType":"V3"},"forgave":{"base":"forgive","matchedType":"V2"},"forgiven":{"base":"forgive","matchedType":"V3"},"forsook":{"base":"forsake","matchedType":"V2"},"forsaken":{"base":"forsake","matchedType":"V3"},"froze":{"base":"freeze","matchedType":"V2"},"frozen":{"base":"freeze","matchedType":"V3"},"got":{"base":"get","matchedType":"V3"},"gotten":{"base":"get","matchedType":"V3"},"gave":{"base":"give","matchedType":"V2"},"given":{"base":"give","matchedType":"V3"},"went":{"base":"go","matchedType":"V2"},"gone":{"base":"go","matchedType":"V3"},"ground":{"base":"grind","matchedType":"V3"},"grew":{"base":"grow","matchedType":"V2"},"grown":{"base":"grow","matchedType":"V3"},"hung":{"base":"hang","matchedType":"V3"},"hanged":{"base":"hang","matchedType":"V3"},"had":{"base":"have","matchedType":"V3"},"heard":{"base":"hear","matchedType":"V3"},"hid":{"base":"hide","matchedType":"V2"},"hidden":{"base":"hide","matchedType":"V3"},"held":{"base":"hold","matchedType":"V3"},"kept":{"base":"keep","matchedType":"V3"},"knelt":{"base":"kneel","matchedType":"V3"},"kneeled":{"base":"kneel","matchedType":"V3"},"knew":{"base":"know","matchedType":"V2"},"known":{"base":"know","matchedType":"V3"},"laid":{"base":"lay","matchedType":"V3"},"led":{"base":"lead","matchedType":"V3"},"leant":{"base":"lean","matchedType":"V3"},"leaned":{"base":"lean","matchedType":"V3"},"leapt":{"base":"leap","matchedType":"V3"},"leaped":{"base":"leap","matchedType":"V3"},"learnt":{"base":"learn","matchedType":"V3"},"learned":{"base":"learn","matchedType":"V3"},"left":{"base":"leave","matchedType":"V3"},"lent":{"base":"lend","matchedType":"V3"},"lay":{"base":"lie","matchedType":"V2"},"lain":{"base":"lie","matchedType":"V3"},"lit":{"base":"light","matchedType":"V3"},"lighted":{"base":"light","matchedType":"V3"},"lost":{"base":"lose","matchedType":"V3"},"made":{"base":"make","matchedType":"V3"},"meant":{"base":"mean","matchedType":"V3"},"met":{"base":"meet","matchedType":"V3"},"mowed":{"base":"mow","matchedType":"V3"},"mown":{"base":"mow","matchedType":"V3"},"overcame":{"base":"overcome","matchedType":"V2"},"overdid":{"base":"overdo","matchedType":"V2"},"overdone":{"base":"overdo","matchedType":"V3"},"overdrew":{"base":"overdraw","matchedType":"V2"},"overdrawn":{"base":"overdraw","matchedType":"V3"},"overate":{"base":"overeat","matchedType":"V2"},"overeaten":{"base":"overeat","matchedType":"V3"},"overheard":{"base":"overhear","matchedType":"V3"},"overlaid":{"base":"overlay","matchedType":"V3"},"overtook":{"base":"overtake","matchedType":"V2"},"overtaken":{"base":"overtake","matchedType":"V3"},"overthrew":{"base":"overthrow","matchedType":"V2"},"overthrown":{"base":"overthrow","matchedType":"V3"},"paid":{"base":"pay","matchedType":"V3"},"pleaded":{"base":"plead","matchedType":"V3"},"pled":{"base":"plead","matchedType":"V3"},"proved":{"base":"prove","matchedType":"V3"},"proven":{"base":"prove","matchedType":"V3"},"quitted":{"base":"quit","matchedType":"V3"},"ridded":{"base":"rid","matchedType":"V3"},"rode":{"base":"ride","matchedType":"V2"},"ridden":{"base":"ride","matchedType":"V3"},"rang":{"base":"ring","matchedType":"V2"},"rung":{"base":"ring","matchedType":"V3"},"rose":{"base":"rise","matchedType":"V2"},"risen":{"base":"rise","matchedType":"V3"},"ran":{"base":"run","matchedType":"V2"},"said":{"base":"say","matchedType":"V3"},"saw":{"base":"see","matchedType":"V2"},"seen":{"base":"see","matchedType":"V3"},"sought":{"base":"seek","matchedType":"V3"},"sold":{"base":"sell","matchedType":"V3"},"sent":{"base":"send","matchedType":"V3"},"sewed":{"base":"sew","matchedType":"V3"},"sewn":{"base":"sew","matchedType":"V3"},"shook":{"base":"shake","matchedType":"V2"},"shaken":{"base":"shake","matchedType":"V3"},"shaved":{"base":"shave","matchedType":"V3"},"shaven":{"base":"shave","matchedType":"V3"},"sheared":{"base":"shear","matchedType":"V3"},"shorn":{"base":"shear","matchedType":"V3"},"shone":{"base":"shine","matchedType":"V3"},"shined":{"base":"shine","matchedType":"V3"},"shot":{"base":"shoot","matchedType":"V3"},"showed":{"base":"show","matchedType":"V3"},"shown":{"base":"show","matchedType":"V3"},"shrank":{"base":"shrink","matchedType":"V2"},"shrunk":{"base":"shrink","matchedType":"V3"},"shrunken":{"base":"shrink","matchedType":"V3"},"sang":{"base":"sing","matchedType":"V2"},"sung":{"base":"sing","matchedType":"V3"},"sank":{"base":"sink","matchedType":"V2"},"sunk":{"base":"sink","matchedType":"V3"},"sunken":{"base":"sink","matchedType":"V3"},"sat":{"base":"sit","matchedType":"V3"},"slept":{"base":"sleep","matchedType":"V3"},"slid":{"base":"slide","matchedType":"V3"},"slung":{"base":"sling","matchedType":"V3"},"smelt":{"base":"smell","matchedType":"V3"},"smelled":{"base":"smell","matchedType":"V3"},"sowed":{"base":"sow","matchedType":"V3"},"sown":{"base":"sow","matchedType":"V3"},"spoke":{"base":"speak","matchedType":"V2"},"spoken":{"base":"speak","matchedType":"V3"},"sped":{"base":"speed","matchedType":"V3"},"speeded":{"base":"speed","matchedType":"V3"},"spelt":{"base":"spell","matchedType":"V3"},"spelled":{"base":"spell","matchedType":"V3"},"spent":{"base":"spend","matchedType":"V3"},"spilt":{"base":"spill","matchedType":"V3"},"spilled":{"base":"spill","matchedType":"V3"},"spun":{"base":"spin","matchedType":"V3"},"spat":{"base":"spit","matchedType":"V3"},"spoilt":{"base":"spoil","matchedType":"V3"},"spoiled":{"base":"spoil","matchedType":"V3"},"sprang":{"base":"spring","matchedType":"V2"},"sprung":{"base":"spring","matchedType":"V3"},"stood":{"base":"stand","matchedType":"V3"},"stole":{"base":"steal","matchedType":"V2"},"stolen":{"base":"steal","matchedType":"V3"},"stuck":{"base":"stick","matchedType":"V3"},"stung":{"base":"sting","matchedType":"V3"},"stank":{"base":"stink","matchedType":"V2"},"stunk":{"base":"stink","matchedType":"V3"},"strode":{"base":"stride","matchedType":"V2"},"stridden":{"base":"stride","matchedType":"V3"},"struck":{"base":"strike","matchedType":"V3"},"stricken":{"base":"strike","matchedType":"V3"},"strung":{"base":"string","matchedType":"V3"},"swore":{"base":"swear","matchedType":"V2"},"sworn":{"base":"swear","matchedType":"V3"},"swept":{"base":"sweep","matchedType":"V3"},"swelled":{"base":"swell","matchedType":"V3"},"swollen":{"base":"swell","matchedType":"V3"},"swam":{"base":"swim","matchedType":"V2"},"swum":{"base":"swim","matchedType":"V3"},"swung":{"base":"swing","matchedType":"V3"},"took":{"base":"take","matchedType":"V2"},"taken":{"base":"take","matchedType":"V3"},"taught":{"base":"teach","matchedType":"V3"},"tore":{"base":"tear","matchedType":"V2"},"torn":{"base":"tear","matchedType":"V3"},"told":{"base":"tell","matchedType":"V3"},"thought":{"base":"think","matchedType":"V3"},"threw":{"base":"throw","matchedType":"V2"},"thrown":{"base":"throw","matchedType":"V3"},"trod":{"base":"tread","matchedType":"V3"},"trodden":{"base":"tread","matchedType":"V3"},"understood":{"base":"understand","matchedType":"V3"},"undertook":{"base":"undertake","matchedType":"V2"},"undertaken":{"base":"undertake","matchedType":"V3"},"undid":{"base":"undo","matchedType":"V2"},"undone":{"base":"undo","matchedType":"V3"},"upheld":{"base":"uphold","matchedType":"V3"},"woke":{"base":"wake","matchedType":"V2"},"waked":{"base":"wake","matchedType":"V3"},"woken":{"base":"wake","matchedType":"V3"},"wore":{"base":"wear","matchedType":"V2"},"worn":{"base":"wear","matchedType":"V3"},"wept":{"base":"weep","matchedType":"V3"},"won":{"base":"win","matchedType":"V3"},"wound":{"base":"wind","matchedType":"V3"},"withdrew":{"base":"withdraw","matchedType":"V2"},"withdrawn":{"base":"withdraw","matchedType":"V3"},"withstood":{"base":"withstand","matchedType":"V3"},"wrung":{"base":"wring","matchedType":"V3"},"wrote":{"base":"write","matchedType":"V2"},"written":{"base":"write","matchedType":"V3"},"misdealt":{"base":"misdeal","matchedType":"V3"},"misdid":{"base":"misdo","matchedType":"V2"},"misdone":{"base":"misdo","matchedType":"V3"},"misheard":{"base":"mishear","matchedType":"V3"},"misled":{"base":"mislead","matchedType":"V3"},"misspelt":{"base":"misspell","matchedType":"V3"},"misspelled":{"base":"misspell","matchedType":"V3"},"misspent":{"base":"misspend","matchedType":"V3"},"mistook":{"base":"mistake","matchedType":"V2"},"mistaken":{"base":"mistake","matchedType":"V3"},"misunderstood":{"base":"misunderstand","matchedType":"V3"},"miswrote":{"base":"miswrite","matchedType":"V2"},"miswritten":{"base":"miswrite","matchedType":"V3"},"outdid":{"base":"outdo","matchedType":"V2"},"outdone":{"base":"outdo","matchedType":"V3"},"outdrew":{"base":"outdraw","matchedType":"V2"},"outdrawn":{"base":"outdraw","matchedType":"V3"},"outgrew":{"base":"outgrow","matchedType":"V2"},"outgrown":{"base":"outgrow","matchedType":"V3"},"outshone":{"base":"outshine","matchedType":"V3"},"outshot":{"base":"outshoot","matchedType":"V3"},"outsold":{"base":"outsell","matchedType":"V3"},"outspent":{"base":"outspend","matchedType":"V3"},"outswam":{"base":"outswim","matchedType":"V2"},"outswum":{"base":"outswim","matchedType":"V3"},"outthought":{"base":"outthink","matchedType":"V3"},"outwrote":{"base":"outwrite","matchedType":"V2"},"outwritten":{"base":"outwrite","matchedType":"V3"},"rebuilt":{"base":"rebuild","matchedType":"V3"},"redid":{"base":"redo","matchedType":"V2"},"redone":{"base":"redo","matchedType":"V3"},"repaid":{"base":"repay","matchedType":"V3"},"resold":{"base":"resell","matchedType":"V3"},"resent":{"base":"resend","matchedType":"V3"},"retook":{"base":"retake","matchedType":"V2"},"retaken":{"base":"retake","matchedType":"V3"},"retold":{"base":"retell","matchedType":"V3"},"rethought":{"base":"rethink","matchedType":"V3"},"rewrote":{"base":"rewrite","matchedType":"V2"},"rewritten":{"base":"rewrite","matchedType":"V3"},"withheld":{"base":"withhold","matchedType":"V3"}};
+
 function dictResolveIrregularVerbForm(value) {
     const query = dictV11NormalizeWord(value);
-    if (!query || typeof IRREGULAR_VERBS_DATA === 'undefined' || !Array.isArray(IRREGULAR_VERBS_DATA)) return null;
+    if (!query) return null;
 
-    for (const item of IRREGULAR_VERBS_DATA) {
-        const v1 = dictV11NormalizeWord(item.v1);
-        const v2Forms = dictSplitVerbForms(item.v2);
-        const v3Forms = dictSplitVerbForms(item.v3);
+    // Ưu tiên bảng ánh xạ độc lập đã có sẵn.
+    const direct = DICT_IRREGULAR_BASE_MAP[query];
+    if (direct && direct.base) {
+        return {
+            base: direct.base,
+            v1: direct.base,
+            matched: query,
+            matchedType: direct.matchedType || 'V2/V3',
+            resolverType: 'irregular'
+        };
+    }
 
-        if (v2Forms.includes(query)) {
-            return {
-                ...item,
-                base: v1,
-                matched: query,
-                matchedType: 'V2',
-                resolverType: 'irregular'
-            };
+    // Dự phòng: vẫn dò bảng gốc nếu bảng được bổ sung động từ mới ở phía sau.
+    try {
+        if (typeof IRREGULAR_VERBS_DATA !== 'undefined' && Array.isArray(IRREGULAR_VERBS_DATA)) {
+            for (const item of IRREGULAR_VERBS_DATA) {
+                const v1 = dictV11NormalizeWord(item.v1);
+                const v2Forms = dictSplitVerbForms(item.v2);
+                const v3Forms = dictSplitVerbForms(item.v3);
+
+                if (v2Forms.includes(query)) {
+                    return {
+                        ...item,
+                        base: v1,
+                        matched: query,
+                        matchedType: 'V2',
+                        resolverType: 'irregular'
+                    };
+                }
+                if (v3Forms.includes(query)) {
+                    return {
+                        ...item,
+                        base: v1,
+                        matched: query,
+                        matchedType: 'V3',
+                        resolverType: 'irregular'
+                    };
+                }
+            }
         }
-        if (v3Forms.includes(query)) {
-            return {
-                ...item,
-                base: v1,
-                matched: query,
-                matchedType: 'V3',
-                resolverType: 'irregular'
-            };
-        }
+    } catch (e) {
+        console.warn('Không thể dò bảng động từ bất quy tắc:', e);
     }
     return null;
 }
@@ -1206,8 +1243,11 @@ function dictResolveRegularVerbForm(value) {
         const stem = query.slice(0, -2);
         if (stem.endsWith('i') && stem.length > 2) add(stem.slice(0, -1) + 'y', '-ied → -y');
         if (dictLooksLikeDoubledFinalConsonant(stem)) add(stem.slice(0, -1), 'bỏ phụ âm kép + -ed');
-        // closed -> close phải được ưu tiên trước close-less candidate.
-        add(stem + 'e', '+e trước -ed');
+
+        // Các hậu tố thường giữ lại chữ e khi thêm -d: close -> closed, resolve -> resolved...
+        // Ưu tiên dạng +e để tránh closed -> clos. Sau đó vẫn giữ ứng viên bỏ -ed
+        // làm dự phòng cho worked -> work.
+        add(stem + 'e', '+e trước -d/-ed');
         add(stem, 'bỏ -ed');
     }
 
@@ -1253,22 +1293,304 @@ function dictResolveBaseForm(value) {
     return dictResolveIrregularVerbForm(value) || dictResolveRegularVerbForm(value);
 }
 
-function dictBuildBaseFormNotice(requestedWord, verbInfo) {
+// V30: Thông tin từ gốc là lớp bắt buộc, được render trực tiếp bởi engine duy nhất.
+// Vì vậy mọi kết quả tra một dạng biến đổi đều phải hiện rõ dạng đã nhập -> từ gốc.
+// V31: HIỂN THỊ SONG SONG PHÁT ÂM CỦA DẠNG ĐANG TRA VÀ TỪ GỐC.
+// Ví dụ: went -> /went/ và go -> /ɡəʊ/.
+const DICT_V31_PRON_CACHE = new Map();
+
+function dictV31GetIrregularParadigm(verbInfo) {
+    const base = dictV11NormalizeWord(verbInfo?.base || verbInfo?.v1 || '');
+    if (!base) return null;
+
+    try {
+        if (typeof IRREGULAR_VERBS_DATA !== 'undefined' && Array.isArray(IRREGULAR_VERBS_DATA)) {
+            const found = IRREGULAR_VERBS_DATA.find(item => dictV11NormalizeWord(item?.v1) === base);
+            if (found) {
+                return {
+                    v1: dictV11NormalizeWord(found.v1),
+                    v2: String(found.v2 || '').trim(),
+                    v3: String(found.v3 || '').trim()
+                };
+            }
+        }
+    } catch (e) {}
+
+    return {
+        v1: base,
+        v2: String(verbInfo?.v2 || '').trim(),
+        v3: String(verbInfo?.v3 || '').trim()
+    };
+}
+
+function dictV31ExtractPronunciation(entries, fallbackWord) {
+    const list = Array.isArray(entries) ? entries : [];
+    const phonetics = list.flatMap(e => Array.isArray(e?.phonetics) ? e.phonetics : []);
+    const ipa = list.map(e => e?.phonetic).find(Boolean)
+        || phonetics.map(p => p?.text).find(Boolean)
+        || '';
+    const audio = phonetics.map(p => p?.audio).find(Boolean) || '';
+    return { word: fallbackWord, ipa: String(ipa || '').trim(), audio: String(audio || '').trim() };
+}
+
+async function dictV31GetPronunciationMeta(word) {
+    const key = dictV11NormalizeWord(word);
+    if (!key) return { word:'', ipa:'', audio:'' };
+    if (DICT_V31_PRON_CACHE.has(key)) return DICT_V31_PRON_CACHE.get(key);
+
+    const promise = (async () => {
+        try {
+            const offline = await getOffline50KEntry(key);
+            if (offline?.ipa) {
+                return { word:key, ipa:String(offline.ipa).trim(), audio:String(offline.audio || '').trim() };
+            }
+        } catch (e) {}
+
+        try {
+            const url = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(key)}`;
+            const data = await dictV11FetchJSON(url, 3500);
+            const meta = dictV31ExtractPronunciationMeta(data, key);
+            return meta;
+        } catch (e) {
+            return { word:key, ipa:'', audio:'' };
+        }
+    })();
+
+    DICT_V31_PRON_CACHE.set(key, promise);
+    return promise;
+}
+
+function dictV31ExtractPronunciationMeta(entries, fallbackWord) {
+    return dictV31ExtractPronunciation(entries, fallbackWord);
+}
+
+function dictV32EnsureStyles() {
+    if (document.getElementById('dict-v32-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'dict-v32-styles';
+    style.textContent = `
+      .dict-v32-base-note{margin:0 0 12px;padding:0;background:linear-gradient(180deg,#fffdfa,#fff8e8);border:1px solid #e8c46f;border-radius:16px;overflow:hidden;box-shadow:0 8px 24px rgba(114,75,20,.10)}
+      .dict-v32-note-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;background:rgba(255,255,255,.65);border-bottom:1px solid rgba(232,196,111,.55)}
+      .dict-v32-note-title{font-weight:800;color:#6b3b00;font-size:1rem}.dict-v32-note-sub{color:#777;font-size:.9rem;text-align:right}
+      .dict-v32-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px}
+      .dict-v32-form-card{position:relative;border:1px solid #e5d8bd;border-radius:13px;padding:14px;background:#fff;min-width:0}
+      .dict-v32-form-card.requested{border-color:#e9b957;background:linear-gradient(180deg,#fffdf7,#fff7e4)}
+      .dict-v32-form-card.base{border-color:#9dc7a6;background:linear-gradient(180deg,#fbfffb,#eef8ef)}
+      .dict-v32-card-kicker{display:flex;align-items:center;gap:8px;font-size:.82rem;font-weight:800;letter-spacing:.02em;text-transform:uppercase;margin-bottom:8px}
+      .dict-v32-form-card.requested .dict-v32-card-kicker{color:#9a5a00}.dict-v32-form-card.base .dict-v32-card-kicker{color:#2f6b3b}
+      .dict-v32-word-row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.dict-v32-word{font-size:1.55rem;font-weight:900;line-height:1.15;color:#3f1c1c;word-break:break-word}
+      .dict-v32-tag{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;background:rgba(122,75,0,.10);color:#7a4b00;font-size:.78rem;font-weight:800}
+      .dict-v32-ipa-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px dashed rgba(0,0,0,.12)}
+      .dict-v32-ipa-label{font-size:.82rem;font-weight:800;color:#6b6b6b}.dict-v32-ipa{font-size:1.08rem;color:#164d73;font-weight:700}
+      .dict-v32-listen{border:0;border-radius:9px;padding:7px 10px;cursor:pointer;background:#f3efe5;color:#4b3b20;font-weight:800;font-size:.86rem}
+      .dict-v32-listen:hover{filter:brightness(.98);transform:translateY(-1px)}
+      .dict-v32-relation{margin:0 14px 12px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.7);color:#5b5b5b;font-size:.93rem}
+      .dict-v32-paradigm{margin:0 14px 14px;padding:11px 12px;border-radius:10px;background:#fff;border:1px solid #eadfc9;color:#5b5b5b;font-size:.92rem}
+      .dict-v32-paradigm b{color:#343434}
+      /* V33: tăng khả năng đọc và tránh nút nghe bị co quá nhỏ */
+      .dict-v32-form-card{min-height:142px}.dict-v32-listen{white-space:nowrap;min-width:88px}
+      .dict-v32-ipa{overflow-wrap:anywhere}.dict-v32-word-row{padding-bottom:2px}
+      @media(max-width:620px){.dict-v32-form-grid{grid-template-columns:1fr}.dict-v32-note-head{align-items:flex-start;flex-direction:column}.dict-v32-note-sub{text-align:left}.dict-v32-word{font-size:1.35rem}}
+    `;
+    document.head.appendChild(style);
+}
+
+function dictV32AudioButton(word, audio) {
+    const safeWord = escapeHTML(word);
+    return audio
+        ? `<button type="button" class="dict-v32-listen" onclick="window.playDictionaryAudio('${escapeHTML(audio)}')">🔊 Nghe</button>`
+        : `<button type="button" class="dict-v32-listen" onclick="speakWord('${safeWord}')">🔊 Nghe</button>`;
+}
+
+function dictV32PronunciationCard(id, variant, kicker, word, typeLabel, ipa, audio) {
+    const safeId = escapeHTML(id);
+    const safeWord = escapeHTML(word);
+    const safeIpa = escapeHTML(ipa || 'Đang lấy phiên âm…');
+    return `<section class="dict-v32-form-card ${variant}" id="${safeId}">
+        <div class="dict-v32-card-kicker">${kicker}</div>
+        <div class="dict-v32-word-row"><span class="dict-v32-word">${safeWord}</span>${typeLabel ? `<span class="dict-v32-tag">${escapeHTML(typeLabel)}</span>` : ''}</div>
+        <div class="dict-v32-ipa-row">
+            <span class="dict-v32-ipa-label">🔤 IPA</span>
+            <code class="dict-v32-ipa">${safeIpa}</code>
+            ${dictV32AudioButton(word, audio)}
+        </div>
+    </section>`;
+}
+
+function dictV31BuildBaseFormNotice(requestedWord, verbInfo) {
     if (!verbInfo) return '';
+    dictV32EnsureStyles();
 
-    if (verbInfo.resolverType === 'irregular') {
-        return `<div class="dict-base-form-note" style="margin:0 0 10px;padding:10px 12px;background:#fff7df;border:1px solid #f0c36d;border-radius:9px;line-height:1.55;">
-            <div>🔁 <b>Dạng từ bạn tra:</b> <span style="color:#7a4b00;">${escapeHTML(requestedWord)}</span> <span style="color:#777;">(${escapeHTML(verbInfo.matchedType)})</span></div>
-            <div style="margin-top:3px;"><b style="color:#2f5f2f;">Từ gốc (V1): ${escapeHTML(verbInfo.base || verbInfo.v1)}</b></div>
-            <div style="margin-top:3px;color:#555;font-size:.94em;">V1: <b>${escapeHTML(verbInfo.v1)}</b> &nbsp;•&nbsp; V2: <b>${escapeHTML(verbInfo.v2)}</b> &nbsp;•&nbsp; V3: <b>${escapeHTML(verbInfo.v3)}</b></div>
-        </div>`;
-    }
+    const requested = dictV11NormalizeWord(requestedWord);
+    const base = dictV11NormalizeWord(verbInfo.base || verbInfo.v1 || '');
+    const type = verbInfo.matchedType || 'dạng biến đổi';
+    const relation = verbInfo.resolverType === 'irregular'
+        ? `${escapeHTML(requested)} là dạng ${escapeHTML(type)} của động từ ${escapeHTML(base)}.`
+        : `${escapeHTML(requested)} là một dạng biến đổi của ${escapeHTML(base)}.`;
+    const paradigm = verbInfo.resolverType === 'irregular'
+        ? dictV31GetIrregularParadigm(verbInfo)
+        : null;
+    const paradigmHtml = paradigm
+        ? `<div class="dict-v32-paradigm">🔗 <b>Dạng động từ:</b> V1: <b>${escapeHTML(paradigm.v1 || base)}</b> &nbsp;•&nbsp; V2: <b>${escapeHTML(paradigm.v2 || '')}</b> &nbsp;•&nbsp; V3: <b>${escapeHTML(paradigm.v3 || '')}</b></div>`
+        : `<div class="dict-v32-paradigm">🔗 ${escapeHTML(verbInfo.ruleLabel || 'Đã nhận diện dạng biến đổi')}</div>`;
 
-    return `<div class="dict-base-form-note" style="margin:0 0 10px;padding:10px 12px;background:#fff7df;border:1px solid #f0c36d;border-radius:9px;line-height:1.55;">
-        <div>🔁 <b>Dạng từ bạn tra:</b> <span style="color:#7a4b00;">${escapeHTML(requestedWord)}</span></div>
-        <div style="margin-top:3px;"><b style="color:#2f5f2f;">Từ gốc (base form): ${escapeHTML(verbInfo.base)}</b></div>
-        <div style="margin-top:3px;color:#666;font-size:.92em;">${escapeHTML(verbInfo.ruleLabel || 'Đã nhận diện dạng biến đổi')}</div>
+    const requestedId = `dict-v32-requested-pron-${requested}`;
+    const baseId = `dict-v32-base-pron-${base}`;
+
+    return `<div class="dict-base-form-note dict-v32-base-note" data-requested-word="${escapeHTML(requested)}" data-base-word="${escapeHTML(base)}">
+        <div class="dict-v32-note-head">
+            <div class="dict-v32-note-title">🧭 Nhận diện dạng từ</div>
+            <div class="dict-v32-note-sub">Hiển thị riêng từ bạn tra và từ gốc để dễ học</div>
+        </div>
+        <div class="dict-v32-form-grid">
+            ${dictV32PronunciationCard(requestedId, 'requested', '🔎 Từ bạn đang tra', requested, type, 'Đang lấy phiên âm…', '')}
+            ${dictV32PronunciationCard(baseId, 'base', '📌 Từ gốc (V1)', base, 'Base form', 'Đang lấy phiên âm…', '')}
+        </div>
+        <div class="dict-v32-relation">${relation}</div>
+        ${paradigmHtml}
     </div>`;
+}
+
+function dictV31UpdatePronunciationRow(row, meta, word) {
+    if (!row) return;
+    const ipaEl = row.querySelector('.dict-v32-ipa');
+    if (ipaEl) ipaEl.textContent = meta?.ipa || 'Chưa có dữ liệu IPA';
+
+    const button = row.querySelector('.dict-v32-listen');
+    if (button) {
+        if (meta?.audio) {
+            button.setAttribute('onclick', `window.playDictionaryAudio('${escapeHTML(meta.audio)}')`);
+        } else {
+            button.setAttribute('onclick', `speakWord('${escapeHTML(word)}')`);
+        }
+    }
+}
+
+function dictV31EnhanceBaseFormPronunciations(resultBox, requestedWord, verbInfo, requestId = AppState.dictionaryRequestId) {
+    if (!resultBox || !verbInfo) return;
+    const requested = dictV11NormalizeWord(requestedWord);
+    const base = dictV11NormalizeWord(verbInfo.base || verbInfo.v1 || '');
+    if (!requested || !base) return;
+
+    const requestedSelector = `#dict-v32-requested-pron-${requested}`;
+    const baseSelector = `#dict-v32-base-pron-${base}`;
+
+    dictV31GetPronunciationMeta(requested).then(meta => {
+        if (!dictV11IsCurrent(requestId)) return;
+        const row = resultBox.querySelector(requestedSelector);
+        dictV31UpdatePronunciationRow(row, meta, requested);
+    }).catch(() => {});
+
+    dictV31GetPronunciationMeta(base).then(meta => {
+        if (!dictV11IsCurrent(requestId)) return;
+        const row = resultBox.querySelector(baseSelector);
+        dictV31UpdatePronunciationRow(row, meta, base);
+    }).catch(() => {});
+}
+
+// Giữ tên cũ để các đoạn V30 nội bộ không bị ảnh hưởng nếu còn gọi trực tiếp.
+function dictBuildBaseFormNotice(requestedWord, verbInfo) {
+    return dictV31BuildBaseFormNotice(requestedWord, verbInfo);
+}
+
+// V30: Luôn đặt thông tin từ gốc ở đầu kết quả, kể cả HTML lấy từ cache cũ hoặc được bổ sung bất đồng bộ.
+function dictV27ApplyBaseFormNotice(resultBox, baseFormNotice, html) {
+    if (!resultBox) return;
+    const body = String(html || '').replace(/<div class="dict-base-form-note"[\s\S]*?<\/div>\s*(?=<div|$)/g, '');
+    resultBox.innerHTML = (baseFormNotice || '') + body;
+}
+
+// V30: hàm dự phòng nội bộ; không dùng MutationObserver và không tự quan sát DOM.
+function dictV30ApplyBaseFormNoticeNow(resultBox, requestedWord) {
+    if (!resultBox) return;
+    const requested = dictV11NormalizeWord(requestedWord || '');
+    if (!requested) return;
+    const info = dictResolveBaseForm(requested);
+    const notice = dictBuildBaseFormNotice(requested, info);
+    resultBox.querySelectorAll('.dict-base-form-note').forEach(el => el.remove());
+    if (notice) resultBox.insertAdjacentHTML('afterbegin', notice);
+}
+
+function dictV26GetResultHTMLForCache(resultBox) {
+    if (!resultBox) return '';
+    const clone = resultBox.cloneNode(true);
+    clone.querySelectorAll('.dict-base-form-note').forEach(el => el.remove());
+    return clone.innerHTML;
+}
+
+
+// ============================================================
+// V33 HARDENING LAYER
+// - Không thêm engine thứ hai, không dùng wrapper/MutationObserver.
+// - Ưu tiên dữ liệu offline 50K, sau đó mới gọi API phát âm.
+// - Chống dữ liệu IPA/audio rỗng hoặc Promise cache bị lỗi.
+// - Giữ nguyên cấu trúc HTML/CSS hiện có để không ảnh hưởng chức năng làm bài.
+// ============================================================
+function dictV33NormalizePronunciationMeta(meta, fallbackWord) {
+    const word = dictV11NormalizeWord(meta?.word || fallbackWord || '');
+    return {
+        word,
+        ipa: String(meta?.ipa || '').trim(),
+        audio: String(meta?.audio || '').trim()
+    };
+}
+
+async function dictV33GetPronunciationMeta(word) {
+    const key = dictV11NormalizeWord(word);
+    if (!key) return { word:'', ipa:'', audio:'' };
+
+    // Reuse the V31/V32 cache, but remove a failed/empty cached request so a later
+    // lookup can retry instead of permanently showing an empty pronunciation.
+    try {
+        const meta = dictV33NormalizePronunciationMeta(
+            await dictV31GetPronunciationMeta(key), key
+        );
+        if (meta.ipa || meta.audio) return meta;
+        DICT_V31_PRON_CACHE.delete(key);
+        return meta;
+    } catch (e) {
+        DICT_V31_PRON_CACHE.delete(key);
+        return { word:key, ipa:'', audio:'' };
+    }
+}
+
+function dictV33UpdatePronunciationCard(row, meta, word) {
+    if (!row) return;
+    const safeMeta = dictV33NormalizePronunciationMeta(meta, word);
+    dictV31UpdatePronunciationRow(row, safeMeta, word);
+
+    const ipaEl = row.querySelector('.dict-v32-ipa');
+    if (ipaEl && !safeMeta.ipa) {
+        ipaEl.textContent = 'Chưa có IPA — vẫn có thể nghe phát âm';
+    }
+}
+
+function dictV31EnhanceBaseFormPronunciations(resultBox, requestedWord, verbInfo, requestId = AppState.dictionaryRequestId) {
+    if (!resultBox || !verbInfo) return;
+    const requested = dictV11NormalizeWord(requestedWord);
+    const base = dictV11NormalizeWord(verbInfo.base || verbInfo.v1 || '');
+    if (!requested || !base) return;
+
+    const requestedSelector = `#dict-v32-requested-pron-${requested}`;
+    const baseSelector = `#dict-v32-base-pron-${base}`;
+
+    // V33: tải song song nhưng cập nhật từng thẻ độc lập; một thẻ lỗi không làm mất thẻ kia.
+    Promise.allSettled([
+        dictV33GetPronunciationMeta(requested),
+        dictV33GetPronunciationMeta(base)
+    ]).then(([requestedResult, baseResult]) => {
+        if (!dictV11IsCurrent(requestId)) return;
+
+        const requestedRow = resultBox.querySelector(requestedSelector);
+        const baseRow = resultBox.querySelector(baseSelector);
+
+        if (requestedResult.status === 'fulfilled') {
+            dictV33UpdatePronunciationCard(requestedRow, requestedResult.value, requested);
+        }
+        if (baseResult.status === 'fulfilled') {
+            dictV33UpdatePronunciationCard(baseRow, baseResult.value, base);
+        }
+    }).catch(() => {});
 }
 
 window.lookupWord = async function(requestedWord = '') {
@@ -1288,15 +1610,17 @@ window.lookupWord = async function(requestedWord = '') {
     // nhưng vẫn giữ nguyên dạng học sinh vừa nhập ở ô tìm kiếm.
     const verbInfo = dictResolveBaseForm(requested);
     const word = verbInfo ? dictV11NormalizeWord(verbInfo.base || verbInfo.v1) : requested;
-    const baseFormNotice = dictBuildBaseFormNotice(requested, verbInfo);
-    const showResult = (html) => {
-        resultBox.innerHTML = baseFormNotice + String(html || '');
-    };
+    const baseFormNotice = dictV31BuildBaseFormNotice(requested, verbInfo);
 
     input.value = requested;
     dictV11RememberRecent(requested);
 
     const requestId = ++AppState.dictionaryRequestId;
+    const showResult = (html) => {
+        dictV27ApplyBaseFormNotice(resultBox, baseFormNotice, html);
+        // V33: sau khi render, cập nhật riêng IPA/audio của từ đang tra và từ gốc theo luồng ổn định hơn.
+        if (verbInfo) dictV31EnhanceBaseFormPronunciations(resultBox, requested, verbInfo, requestId);
+    };
     if (AppState.dictionaryAbortController) {
         try { AppState.dictionaryAbortController.abort(); } catch(e) {}
     }
@@ -1328,7 +1652,7 @@ window.lookupWord = async function(requestedWord = '') {
             }
         } catch (e) {}
 
-        enrichOfflineWordOnline(word, requestId, controller, resultBox).catch(() => {});
+        enrichOfflineWordOnline(word, requestId, controller, resultBox, baseFormNotice).catch(() => {});
         return;
     }
 
@@ -1374,7 +1698,7 @@ window.lookupWord = async function(requestedWord = '') {
                 ${vietnameseMeaning ? `<div style="padding:12px;background:#e8f5e9;border-radius:7px;"><b>🇻🇳 Nghĩa tiếng Việt:</b> ${escapeHTML(vietnameseMeaning)}</div>` : '<div style="color:#b00020;">Không lấy được nghĩa tiếng Việt.</div>'}
                 ${familyHtml}
                 <div class="dict-v11-meta">⚠️ Dictionary API không phản hồi; đang dùng nguồn dự phòng.</div>`);
-            await dictV11Save(word, resultBox.innerHTML);
+            await dictV11Save(word, dictV26GetResultHTMLForCache(resultBox));
             return;
         } catch (fallbackError) {
             if (!dictV11IsCurrent(requestId)) return;
@@ -1392,7 +1716,7 @@ window.lookupWord = async function(requestedWord = '') {
     const entries = data;
     showResult(buildDictionaryBaseHTML(entries, word));
 
-    await dictV11Save(word, resultBox.innerHTML);
+    await dictV11Save(word, dictV26GetResultHTMLForCache(resultBox));
 
     const transPromise = (async () => {
         try {
@@ -1410,7 +1734,7 @@ window.lookupWord = async function(requestedWord = '') {
     const familySlot = document.getElementById('dict-family-slot');
     if (familySlot) familySlot.innerHTML = familyHtml || '<div style="color:#777;">🌿 Chưa tìm thấy họ từ mở rộng.</div>';
 
-    await dictV11Save(word, resultBox.innerHTML);
+    await dictV11Save(word, dictV26GetResultHTMLForCache(resultBox));
 };
 
 function speechButtonHTML(text) {
