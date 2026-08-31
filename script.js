@@ -757,34 +757,89 @@ function buildOffline10KHTML(word, entry) {
         </div>`;
 }
 
-async function enrichOfflineWordOnline(word, requestId, controller, resultBox, baseFormNotice = '') {
-    // V14: cập nhật lớp dữ liệu online lên bản Offline hiện tại; không thay thế
-    // toàn bộ kết quả bằng cache cũ trong quá trình này.
+async function dictV36GetVietnameseMeaning(word, controller = null) {
+    const key = dictV11NormalizeWord(word);
+    if (!key) return '';
+
+    // Ưu tiên nghĩa đã học/lưu cục bộ.
     try {
-        const url = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`;
-        const data = await dictV11FetchJSON(url, 4500, controller.signal);
-        if (!dictV11IsCurrent(requestId) || !Array.isArray(data) || !data.length) return false;
-        const entries = data;
-        const onlineHtml = buildDictionaryBaseHTML(entries, word);
-        const transUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|vi`;
+        const learned = await dictV34LearnedGet(key);
+        const cachedMeaning = String(learned?.payload?.translation || '').trim();
+        if (cachedMeaning && cachedMeaning.toLowerCase() !== key.toLowerCase()) return cachedMeaning;
+    } catch (e) {}
+
+    // Luôn hỏi backend theo kind=translation khi chưa có nghĩa.
+    // Backend V36.1 sẽ tự bổ sung bản dịch nếu bản ghi cũ chưa có translation.
+    try {
+        const payload = await dictV34BackendLookup(key, 'translation', 4000, controller?.signal || null);
+        const vi = String(payload?.translation || '').trim();
+        if (vi && vi.toLowerCase() !== key.toLowerCase()) {
+            dictV34LearnedSet(key, { ...(payload || {}), translation: vi }).catch(() => {});
+            return vi;
+        }
+    } catch (e) {}
+
+    return '';
+}
+
+function dictV36HasVietnameseMeaning(resultBox) {
+    if (!resultBox) return false;
+    const text = String(resultBox.innerText || resultBox.textContent || '');
+    return /🇻🇳\s*(Nghĩa|Nghĩa nổi bật)\s*:/i.test(text) &&
+        text.replace(/[^\p{L}\p{N}\s]/gu, ' ').trim().length > 0;
+}
+
+async function dictV36EnsureVietnameseMeaning(word, requestId, controller, resultBox) {
+    try {
+        const vi = await dictV36GetVietnameseMeaning(word, controller);
+        if (!vi || !dictV11IsCurrent(requestId)) return false;
+
+        const translationSlot = resultBox?.querySelector('#dict-translation-slot');
+        if (translationSlot) {
+            dictV11SetTranslation(vi, word);
+        } else {
+            const offlineSlot = resultBox?.querySelector('#dict-offline-online-slot');
+            if (offlineSlot && !offlineSlot.querySelector('.dict-v36-vi-meaning')) {
+                offlineSlot.insertAdjacentHTML('afterbegin', `<div class="dict-v36-vi-meaning" style="padding:10px;background:#e8f5e9;border:1px solid #c8e6c9;border-radius:7px;margin-bottom:8px;"><b style="color:#2e7d32;">🇻🇳 Nghĩa tiếng Việt:</b> <span style="font-weight:700;color:#1b5e20;">${escapeHTML(vi)}</span></div>`);
+            }
+        }
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+async function enrichOfflineWordOnline(word, requestId, controller, resultBox, baseFormNotice = '') {
+    // V36.2: dictionary và nghĩa tiếng Việt được tải độc lập.
+    // Vì vậy nếu API từ điển tạm lỗi, nghĩa tiếng Việt vẫn có thể xuất hiện.
+    try {
+        let data = null;
+        try { data = await dictV11FetchJSON(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`, 4500, controller.signal); } catch (e) {}
+        if (!dictV11IsCurrent(requestId)) return false;
+
         let vi = '';
-        try {
-            const td = await dictV11FetchJSON(transUrl, 2500, controller.signal);
-            vi = td?.responseData?.translatedText || '';
-        } catch(e) {}
+        try { vi = await dictV36GetVietnameseMeaning(word, controller); } catch (e) {}
+        if (!dictV11IsCurrent(requestId)) return false;
+
         const familyHtml = await renderWordFamily(word).catch(() => '');
         if (!dictV11IsCurrent(requestId)) return false;
+
         const slot = resultBox.querySelector('#dict-offline-online-slot');
-        if (slot) {
-            slot.innerHTML = `<div class="dict-v11-meta" style="margin-bottom:8px;">🌐 Đã bổ sung dữ liệu online.</div>${onlineHtml}${vi ? `<div style="padding:10px;background:#e8f5e9;border-radius:7px;margin-top:8px;"><b>🇻🇳 Nghĩa:</b> ${escapeHTML(vi)}</div>` : ''}${familyHtml}`;
-            // V27: Bổ sung online xong vẫn bảo toàn thông tin từ gốc ở đầu kết quả.
+        if (slot && Array.isArray(data) && data.length) {
+            const onlineHtml = buildDictionaryBaseHTML(data, word);
+            slot.innerHTML = `<div class="dict-v11-meta" style="margin-bottom:8px;">🌐 Đã bổ sung dữ liệu online.</div>${onlineHtml}${vi ? `<div class="dict-v36-vi-meaning" style="padding:10px;background:#e8f5e9;border:1px solid #c8e6c9;border-radius:7px;margin-top:8px;"><b style="color:#2e7d32;">🇻🇳 Nghĩa tiếng Việt:</b> <span style="font-weight:700;color:#1b5e20;">${escapeHTML(vi)}</span></div>` : ''}${familyHtml}`;
             if (baseFormNotice && !resultBox.querySelector('.dict-base-form-note')) {
                 resultBox.insertAdjacentHTML('afterbegin', baseFormNotice);
             }
+        } else if (vi) {
+            const offlineSlot = resultBox.querySelector('#dict-offline-online-slot');
+            if (offlineSlot) {
+                offlineSlot.innerHTML = `<div class="dict-v36-vi-meaning" style="padding:10px;background:#e8f5e9;border:1px solid #c8e6c9;border-radius:7px;"><b style="color:#2e7d32;">🇻🇳 Nghĩa tiếng Việt:</b> <span style="font-weight:700;color:#1b5e20;">${escapeHTML(vi)}</span></div>`;
+            }
         }
-        // Chỉ lưu sau khi đã ghép dữ liệu online vào bản Offline.
+
         await dictV11Save(word, dictV26GetResultHTMLForCache(resultBox));
-        return true;
+        return Boolean(data?.length || vi);
     } catch(e) {
         return false;
     }
@@ -1185,9 +1240,8 @@ async function enrichFamilyItem(item) {
     if (cached && cached.__familyMeta) return cached.__familyMeta;
 
     try {
-        const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(item.word)}`);
-        if (res.ok) {
-            const data = await res.json();
+        const data = await dictV11FetchJSON(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(item.word)}`, 4500);
+        {
             const entries = Array.isArray(data) ? data : [];
             const meanings = entries.flatMap(e => Array.isArray(e.meanings) ? e.meanings : []);
             const first = meanings.find(m => m && m.definitions && m.definitions.length);
@@ -1548,8 +1602,7 @@ async function dictV31GetPronunciationMeta(word) {
         } catch (e) {}
 
         try {
-            const url = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(key)}`;
-            const data = await dictV11FetchJSON(url, 3500);
+            const data = await dictV11FetchJSON(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(key)}`, 3500);
             const meta = dictV31ExtractPronunciationMeta(data, key);
             return meta;
         } catch (e) {
@@ -1772,6 +1825,11 @@ window.lookupWord = async function(requestedWord = '') {
                 meta.className = 'dict-v11-meta';
                 meta.innerHTML = `<span class="cache">⚡ Offline 200K + Cache ${cachedRich.source === 'indexeddb' ? 'IndexedDB' : 'trình duyệt'}</span>`;
                 resultBox.prepend(meta);
+                // Cache cũ có thể chỉ lưu IPA/định nghĩa mà chưa có nghĩa Việt.
+                // Không bỏ qua bước dịch nữa.
+                if (!dictV36HasVietnameseMeaning(resultBox)) {
+                    dictV36EnsureVietnameseMeaning(word, requestId, controller, resultBox).catch(() => {});
+                }
             }
         } catch (e) {}
 
@@ -1805,10 +1863,9 @@ window.lookupWord = async function(requestedWord = '') {
 
     showResult(`<div class="dict-v11-loading"><b>🔎 Đang tra ${escapeHTML(word)}${verbInfo ? ` (từ gốc của ${escapeHTML(requested)})` : ''}...</b><div class="dict-v11-skeleton"><span></span><span></span><span></span></div></div>`);
 
-    const dictUrl = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`;
     let data = null;
     try {
-        data = await dictV11FetchJSON(dictUrl, 5000, controller.signal);
+        data = await dictV11FetchJSON(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`, 5000, controller.signal);
     } catch (e) {
         if (!dictV11IsCurrent(requestId)) return;
         try {
@@ -1841,13 +1898,7 @@ window.lookupWord = async function(requestedWord = '') {
 
     await dictV11Save(word, dictV26GetResultHTMLForCache(resultBox));
 
-    const transPromise = (async () => {
-        try {
-            const transUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|vi`;
-            const transData = await dictV11FetchJSON(transUrl, 3000, controller.signal);
-            return transData?.responseData?.translatedText || '';
-        } catch(e) { return ''; }
-    })();
+    const transPromise = dictV36GetVietnameseMeaning(word, controller);
 
     const familyPromise = renderWordFamily(word).catch(() => '');
     const [vietnameseMeaning, familyHtml] = await Promise.all([transPromise, familyPromise]);
@@ -3865,15 +3916,9 @@ window.lookupIrregularVerbDetail = async function(verb, targetId) {
     }
     target.innerHTML = '<span style="color:#007bff;">🔎 Đang tra...</span>';
     try {
-        const [dictResponse, transResponse] = await Promise.all([
-            fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(verb)}`).catch(() => null),
-            fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(verb)}&langpair=en|vi`).catch(() => null)
-        ]);
-        let vi = '';
-        if (transResponse?.ok) {
-            const t = await transResponse.json();
-            vi = t?.responseData?.translatedText || '';
-        }
+        const payload = await dictV34BackendLookup(verb, 'full', 5000);
+        const dictResponse = payload?.entries ? { ok: true, json: async () => payload.entries } : null;
+        const vi = payload?.translation || '';
         let html = `<b style="color:#2e7d32;">${escapeHTML(vi || 'Đang cập nhật nghĩa')}</b>`;
         if (dictResponse?.ok) {
             const data = await dictResponse.json();
@@ -4403,5 +4448,4 @@ window.DictionaryV36 = {
     sources: V36_DICT_SOURCES.map(item => ({ ...item })),
     lookupOrder: ['dictionary-50k', 'dictionary-200k/core']
 };
-
 
