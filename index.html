@@ -258,6 +258,10 @@ body.dark-mode .dict-v11-recent button { background:#2d2d2d; color:#eee; border-
             <select id="made-select" onchange="window.handleMadeChange()" style="width: 100%; padding: 14px; margin: 5px 0; font-size: 1.1em; border: 1px solid #540606; border-radius: 8px;">
                 <option value="">-- Chọn mã đề --</option>
             </select>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 8px 0;">
+                    <button type="button" onclick="window.updateMadeList()" style="padding:10px 14px;background:#6f42c1;color:#fff;border:0;border-radius:8px;font-weight:bold;cursor:pointer;">🔄 Atualizar danh sách mã đề</button>
+                    <button type="button" id="btn-edit-v41-exam" onclick="window.openV42EditExam()" style="display:none;padding:10px 14px;background:#fd7e14;color:#fff;border:0;border-radius:8px;font-weight:bold;cursor:pointer;">✏️ Chỉnh sửa mã đề</button>
+                </div>
             <div id="made-passage-preview"></div>
         </div>
     </div>
@@ -268,10 +272,24 @@ body.dark-mode .dict-v11-recent button { background:#2d2d2d; color:#eee; border-
     </div>
     <div id="topic-container">Chưa tải dữ liệu...</div>
 
-    <!-- NÚT TẠO ĐỀ TỔNG HỢP MÔN TOÁN -->
-    <button type="button" id="btn-tao-de-toan" style="width: 100%; padding: 12px; background-color: #ffc107; color: #000; border: none; border-radius: 8px; font-weight: bold; font-size: 1em; margin-top: 10px; margin-bottom: 10px; cursor: pointer;">
-        🎯 Tạo đề tổng hợp (30 phút - 21 câu)
-    </button>
+    <!-- V40: XEM NGÂN HÀNG CÂU HỎI, độc lập với BT/Questions -->
+    <button type="button" onclick="window.toggleQuestionBank()" style="width:100%;padding:11px;background:#198754;color:#fff;border:none;border-radius:8px;font-weight:bold;font-size:1em;margin-top:10px;cursor:pointer;">📚 Xem ngân hàng câu hỏi</button>
+    <div id="question-bank-panel" style="display:none;margin-top:10px;background:#fff;padding:14px;border:1px solid #198754;border-radius:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+            <b style="color:#198754;">Ngân hàng câu hỏi V40</b>
+            <span id="question-bank-count" style="color:#666;">Chưa tải</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin:10px 0;">
+            <select id="bank-topic-select" onchange="window.renderQuestionBank()" style="padding:9px;border:1px solid #ccc;border-radius:6px;"><option value="">-- Tất cả chủ đề --</option></select>
+            <select id="bank-level-select" onchange="window.renderQuestionBank()" style="padding:9px;border:1px solid #ccc;border-radius:6px;"><option value="">-- Tất cả độ khó --</option></select>
+            <select id="bank-skill-select" onchange="window.renderQuestionBank()" style="padding:9px;border:1px solid #ccc;border-radius:6px;"><option value="">-- Tất cả kỹ năng --</option></select>
+            <input id="bank-search-input" oninput="window.renderQuestionBank()" placeholder="🔎 Tìm mã câu / nội dung..." style="padding:9px;border:1px solid #ccc;border-radius:6px;">
+        </div>
+        <div id="question-bank-list" style="max-height:420px;overflow:auto;border:1px solid #eee;border-radius:6px;">Chưa tải dữ liệu...</div>
+    </div>
+
+    <!-- V41: TẠO ĐỀ TỰ ĐỘNG TỪ NGÂN HÀNG -->
+    <button type="button" id="btn-tao-de-v41" onclick="window.openV41ExamGenerator()" style="width:100%;padding:12px;background:#6f42c1;color:#fff;border:none;border-radius:8px;font-weight:bold;font-size:1em;margin-top:10px;cursor:pointer;">🎯 Tạo đề tự động từ ngân hàng V41</button>
 
     <button type="button" id="start-btn" onclick="window.startQuizWithToolCheck()" style="width: 100%; padding: 16px; background: #007bff; color: white; border: none; cursor: pointer; margin-top: 5px; border-radius: 8px; font-weight: bold; font-size: 1.2em;">Bắt Đầu Làm Bài</button>
 
@@ -280,6 +298,27 @@ body.dark-mode .dict-v11-recent button { background:#2d2d2d; color:#eee; border-
         <div id="ranking-list"><p style="color: #666; font-size: 1.05em;">Chưa có dữ liệu xếp hạng.</p></div>
     </div>
 </div>
+
+
+<div id="v41-exam-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;padding:15px;box-sizing:border-box;">
+<div style="width:min(720px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:14px;padding:20px;box-sizing:border-box;">
+<div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0;color:#6f42c1">🎯 Tạo đề tự động V41</h2><button type="button" onclick="window.closeV41ExamGenerator()">✕</button></div>
+<p>Chọn điều kiện để tạo đề ngẫu nhiên và lưu mã đề vào <b>DE_THI</b> + <b>CHI_TIET_DE</b>.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+<label>Môn<select id="v41-subject" style="width:100%;padding:10px"><option>Tiếng Anh</option><option>Toán</option></select></label>
+<label>Chủ đề<select id="v41-topic" style="width:100%;padding:10px"><option value="">-- Tất cả --</option></select></label>
+<label>Độ khó<select id="v41-level" style="width:100%;padding:10px"><option value="">-- Tất cả --</option></select></label>
+<label id="v41-skill-wrap">Kỹ năng<select id="v41-skill" style="width:100%;padding:10px"><option value="">-- Tất cả --</option></select></label>
+<label id="v41-count-wrap">Số câu<input id="v41-count" type="number" min="1" max="100" value="10" style="width:100%;padding:10px;box-sizing:border-box"></label>
+<label id="v41-reading-wrap" style="display:none">Số bài Reading<select id="v41-reading-count" style="width:100%;padding:10px"><option value="1">1 bài (5 câu)</option><option value="2">2 bài (10 câu)</option><option value="3">3 bài (15 câu)</option></select></label>
+<label>Thời gian (phút)<input id="v41-minutes" type="number" min="1" max="180" value="20" style="width:100%;padding:10px;box-sizing:border-box"></label>
+<label>Số mã đề<input id="v41-variants" type="number" min="1" max="20" value="1" style="width:100%;padding:10px;box-sizing:border-box"></label>
+</div>
+<input id="v41-name" placeholder="Tên đề (tùy chọn)" style="width:100%;padding:10px;margin-top:10px;box-sizing:border-box">
+<div id="v41-generator-status" style="margin-top:10px;padding:10px;background:#f5f5f5;border-radius:8px">Sẵn sàng tạo đề.</div>
+<button type="button" id="v41-generate-btn" onclick="window.generateV41Exam()" style="width:100%;padding:13px;margin-top:10px;background:#6f42c1;color:#fff;border:0;border-radius:8px;font-weight:bold">🚀 Tạo đề</button>
+<div id="v41-result" style="margin-top:10px"></div>
+</div></div>
 
 <div class="container" id="quiz-screen" style="display:none;">
     
