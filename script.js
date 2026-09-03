@@ -36,7 +36,11 @@ let AppState = {
     dataLoadedAt: 0,
     submitInProgress: false,
     v42ExamActive: false,
-    v42ExamMeta: null
+    v42ExamMeta: null,
+    loadedSubjects: {},
+    subjectLoading: {},
+    questionBankLoaded: {},
+    questionBankLoading: {}
 };
 
 // ============================================================
@@ -2275,6 +2279,156 @@ window.toggleDarkMode = function() {
     if (btn) btn.innerHTML = isDark ? '☀️ Sáng' : '🌙 Tối';
 };
 
+
+// ============================================================
+// V42.5 SPEED LAYER — bootstrap nhỏ + tải Questions/Bank theo nhu cầu
+// ============================================================
+const V425_BOOT_CACHE_KEY = 'QUIZ_V425_BOOTSTRAP_V1';
+const V425_SUBJECT_CACHE_PREFIX = 'QUIZ_V425_SUBJECT_V1_';
+const V425_BANK_CACHE_PREFIX = 'QUIZ_V425_BANK_V1_';
+
+function v425ApiCall(action, params, timeoutMs = 20000) {
+    return new Promise(function(resolve, reject) {
+        const cb = 'v425_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+        const script = document.createElement('script');
+        let done = false;
+        const cleanup = function() {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            try { delete window[cb]; } catch (e) { window[cb] = null; }
+            if (script.parentNode) script.parentNode.removeChild(script);
+        };
+        const timer = setTimeout(function() { cleanup(); reject(new Error('Hết thời gian kết nối Apps Script.')); }, timeoutMs);
+        window[cb] = function(data) { cleanup(); resolve(data); };
+        script.onerror = function() { cleanup(); reject(new Error('Không kết nối được Apps Script.')); };
+        let qs = '?action=' + encodeURIComponent(action);
+        Object.keys(params || {}).forEach(function(k) {
+            qs += '&' + encodeURIComponent(k) + '=' + encodeURIComponent(params[k] == null ? '' : params[k]);
+        });
+        qs += '&callback=' + encodeURIComponent(cb) + '&v=42.5';
+        script.src = API_URL + qs;
+        document.body.appendChild(script);
+    });
+}
+
+function v425ReadLocal(key, maxAgeMs = 21600000) {
+    try {
+        const x = localStorage.getItem(key); if (!x) return null;
+        const obj = JSON.parse(x);
+        if (obj && obj.savedAt && (Date.now() - Number(obj.savedAt) > maxAgeMs)) { localStorage.removeItem(key); return null; }
+        return obj;
+    } catch (e) { return null; }
+}
+function v425WriteLocal(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+}
+function v425SubjectCacheKey(subject) { return V425_SUBJECT_CACHE_PREFIX + cleanKey(subject); }
+function v425BankCacheKey(subject) { return V425_BANK_CACHE_PREFIX + cleanKey(subject); }
+
+window.ensureSubjectData = function(subject, forceRefresh = false) {
+    const mon = String(subject || '').trim();
+    if (!mon) return Promise.resolve(false);
+    const key = cleanKey(mon);
+    if (!forceRefresh && AppState.loadedSubjects[key] && AppState.loadedSubjects[key].length) return Promise.resolve(true);
+    if (AppState.subjectLoading[key]) return AppState.subjectLoading[key];
+
+    if (!forceRefresh) {
+        const local = v425ReadLocal(v425SubjectCacheKey(mon));
+        if (local && Array.isArray(local.questions) && local.questions.length) {
+            window.applyV425SubjectQuestions(local.questions, true, mon);
+            return Promise.resolve(true);
+        }
+    }
+
+    AppState.subjectLoading[key] = v425ApiCall('getquestions', { subject: mon }).then(function(data) {
+        if (!data || !data.ok || !Array.isArray(data.questions)) throw new Error((data && data.message) || 'Không tải được câu hỏi môn ' + mon + '.');
+        window.applyV425SubjectQuestions(data.questions, false, mon);
+        return true;
+    }).finally(function() { delete AppState.subjectLoading[key]; });
+    return AppState.subjectLoading[key];
+};
+
+window.applyV425SubjectQuestions = function(rawQuestions, fromCache, subject) {
+    const key = cleanKey(subject);
+    const normalized = (rawQuestions || []).map(function(rawItem) {
+        let item = normalizeItem(rawItem);
+        if (!item) return null;
+        return item;
+    }).filter(function(item) { return item && item.question !== ''; });
+
+    AppState.allQuizData = AppState.allQuizData.filter(function(i) { return cleanKey(i.mon || '') !== key; }).concat(normalized);
+    AppState.loadedSubjects[key] = normalized;
+    rebuildQuestionIndex();
+    if (!fromCache) v425WriteLocal(v425SubjectCacheKey(subject), { savedAt: Date.now(), questions: rawQuestions });
+
+    const currentSubject = document.getElementById('subject-select')?.value || '';
+    if (cleanKey(currentSubject) === key) {
+        try { window.updateTopicList(); } catch(e) {}
+        try { window.updateMadeList(); } catch(e) {}
+        try { window.renderLeaderboard(currentSubject); } catch(e) {}
+    }
+};
+
+window.ensureQuestionBankForSubject = function(subject, forceRefresh = false) {
+    const mon = String(subject || '').trim();
+    if (!mon) return Promise.resolve([]);
+    const key = cleanKey(mon);
+    const target = key === cleanKey('Toán') ? 'mathQuestionBank' : 'englishQuestionBank';
+    if (!forceRefresh && AppState.questionBankLoaded[key]) return Promise.resolve(AppState[target] || []);
+    if (AppState.questionBankLoading[key]) return AppState.questionBankLoading[key];
+
+    if (!forceRefresh) {
+        const local = v425ReadLocal(v425BankCacheKey(mon));
+        if (local && Array.isArray(local.bank)) {
+            AppState[target] = local.bank;
+            AppState.questionBankLoaded[key] = true;
+            return Promise.resolve(local.bank);
+        }
+    }
+
+    AppState.questionBankLoading[key] = v425ApiCall('getbank', { subject: mon }).then(function(data) {
+        if (!data || !data.ok || !Array.isArray(data.bank)) throw new Error((data && data.message) || 'Không tải được ngân hàng câu hỏi.');
+        AppState[target] = data.bank.slice();
+        AppState.questionBankLoaded[key] = true;
+        v425WriteLocal(v425BankCacheKey(mon), { savedAt: Date.now(), bank: data.bank });
+        try { window.renderQuestionBank(); } catch(e) {}
+        return AppState[target];
+    }).finally(function() { delete AppState.questionBankLoading[key]; });
+    return AppState.questionBankLoading[key];
+};
+
+window.ensureV425Bootstrap = function(forceRefresh = false) {
+    if (!forceRefresh && AppState.userPermissions.length + AppState.madePermissions.length > 0) return Promise.resolve(true);
+    if (!forceRefresh) {
+        const local = v425ReadLocal(V425_BOOT_CACHE_KEY);
+        if (local && local.permissions && local.madePermissions) {
+            window.handleV425Bootstrap(local, true);
+            return Promise.resolve(true);
+        }
+    }
+    return v425ApiCall('fastbootstrap', {}).then(function(data) {
+        if (!data || !data.ok) throw new Error((data && data.message) || 'Không tải được dữ liệu khởi động.');
+        v425WriteLocal(V425_BOOT_CACHE_KEY, data);
+        window.handleV425Bootstrap(data, false);
+        return true;
+    });
+};
+
+window.handleV425Bootstrap = function(data, fromCache) {
+    AppState.userPermissions = (data.permissions || []).map(function(p) {
+        return { maHS: String(p.maHS || p[0] || '').trim(), mon: standardizeSubject(String(p.mon || p[1] || '').trim()), chuDe: String(p.chuDe || p[2] || '').trim() };
+    }).filter(function(p) { return p.maHS && p.mon && p.chuDe; });
+    AppState.madePermissions = (data.madePermissions || []).map(function(p) {
+        return { maHS: String(p.maHS || p[0] || '').trim(), mon: standardizeSubject(String(p.mon || p[1] || '').trim()), made: String(p.made || p.maDe || p.MADE || p[2] || '').trim() };
+    }).filter(function(p) { return p.maHS && p.mon && p.made; });
+    AppState.rankings = Array.isArray(data.rankings) ? data.rankings : [];
+    AppState.dataLoaded = true;
+    AppState.dataSource = fromCache ? 'localStorage-bootstrap' : 'network-bootstrap';
+    AppState.dataLoadedAt = Date.now();
+    try { window.initInterface(); } catch(e) { console.warn('V42.5 init:', e); }
+};
+
 window.handleSubjectChange = function() {
     // SỬ DỤNG cleanKey ĐỂ XÓA DẤU TRƯỚC KHI SO SÁNH
     const monRaw = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
@@ -2303,10 +2457,23 @@ window.handleSubjectChange = function() {
         if (btnVerbs) btnVerbs.style.display = 'none';
     }
 
-    window.updateTopicList();
-    window.updateMadeList();
-    window.renderLeaderboard(monRaw);
     window.saveUserSelections();
+    if (!monRaw) {
+        window.updateTopicList();
+        window.updateMadeList();
+        window.renderLeaderboard('');
+        return;
+    }
+    // V42.5: chỉ tải Questions của môn đang chọn; không tải toàn bộ ngay lúc mở trang.
+    window.ensureSubjectData(monRaw).then(function(){
+        window.updateTopicList();
+        window.updateMadeList();
+        window.renderLeaderboard(monRaw);
+        window.saveUserSelections();
+    }).catch(function(err){
+        const c = document.getElementById('topic-container');
+        if (c) c.innerHTML = '<span style="color:#b00020">❌ ' + escapeHTML(err.message || 'Không tải được dữ liệu môn học.') + '</span>';
+    });
 };
 
 // ============================================================
@@ -2778,50 +2945,29 @@ window.loadData = function(forceRefresh = false) {
     if (AppState.dataLoading) return;
     const studentSelect = document.getElementById('student-code');
     const maHS = studentSelect ? studentSelect.value.trim() : '';
-
     const oldMa = localStorage.getItem('saved_maHS') || '';
     if (maHS) {
-        if (oldMa && normalizePermissionValue(oldMa) !== normalizePermissionValue(maHS)) {
-            localStorage.removeItem('saved_mon');
-        }
+        if (oldMa && normalizePermissionValue(oldMa) !== normalizePermissionValue(maHS)) localStorage.removeItem('saved_mon');
         localStorage.setItem('saved_maHS', maHS);
     }
     clearLegacyPermissionCaches();
 
-    // V36.9: dữ liệu Questions + toàn bộ bảng phân quyền được tải một lần.
-    // Vì danh sách thí sinh cũng lấy từ sheet phân quyền nên lần đầu có thể tải
-    // mà chưa cần chọn học sinh. Khi đã có dữ liệu RAM, đổi học sinh không tải lại.
-    if (!forceRefresh && AppState.dataLoaded && AppState.allQuizData.length > 0) {
-        console.log('⚡ Load Once: sử dụng dữ liệu đang có trong RAM.');
-        if (window.updateStudentList) window.updateStudentList(maHS || oldMa);
-        window.initInterface();
-        window.restoreUserSelections();
-        return;
-    }
-
-    // 2) Nếu có cache trong sessionStorage -> hiển thị ngay, không chờ mạng.
-    if (!forceRefresh) {
-        const cachedData = getQuizSessionCache(maHS);
-        if (cachedData && cachedData.questions && cachedData.questions.length > 0) {
-            console.log('⚡ Load Once: sử dụng dữ liệu cache của phiên.');
-            window.handleQuizData(cachedData, true);
-            return;
-        }
-    }
-
-    const container = document.getElementById('topic-container');
-    if (container) container.innerHTML = "Đang tải dữ liệu lần đầu...";
-
     AppState.dataLoading = true;
-    const script = document.createElement('script');
-    script.src = API_URL + '?ma=' + encodeURIComponent(maHS) + '&callback=handleQuizData';
-    script.onerror = () => {
+    const container = document.getElementById('topic-container');
+    if (container) container.innerHTML = '⚡ Đang tải dữ liệu khởi động...';
+
+    // V42.5: bootstrap chỉ gồm quyền + xếp hạng. Questions và 2 ngân hàng được lazy-load.
+    window.ensureV425Bootstrap(forceRefresh).then(function(){
         AppState.dataLoading = false;
-        script.remove();
-        if (container) container.innerHTML = "Lỗi kết nối mạng khi tải dữ liệu.";
-    };
-    document.body.appendChild(script);
-    script.onload = () => { AppState.dataLoading = false; script.remove(); };
+        const selected = window.updateStudentList ? window.updateStudentList(maHS || oldMa) : (maHS || oldMa);
+        if (selected && selected !== maHS) localStorage.setItem('saved_maHS', selected);
+        const subject = document.getElementById('subject-select')?.value || '';
+        if (subject) return window.ensureSubjectData(subject, forceRefresh);
+    }).catch(function(err){
+        AppState.dataLoading = false;
+        if (container) container.innerHTML = '<span style="color:#b00020">❌ ' + escapeHTML(err.message || 'Lỗi kết nối mạng khi tải dữ liệu.') + '</span>';
+        console.error('V42.5 loadData:', err);
+    });
 };
 
 window.handleQuizData = function(data, fromSessionCache = false) {
@@ -3140,6 +3286,19 @@ window.startQuiz = function() {
     const subjectSelect = document.getElementById('subject-select');
     const selectedSubjectRaw = subjectSelect ? subjectSelect.value : '';
     const selectedSubject = cleanKey(selectedSubjectRaw);
+
+    // V42.5: nếu Questions của môn chưa có trong RAM, tải đúng môn rồi chạy lại.
+    if (selectedSubjectRaw && !(AppState.loadedSubjects[selectedSubject] && AppState.loadedSubjects[selectedSubject].length)) {
+        const startBtn = document.getElementById('start-btn');
+        if (startBtn) { startBtn.disabled = true; startBtn.textContent = '⏳ Đang tải câu hỏi...'; }
+        return window.ensureSubjectData(selectedSubjectRaw).then(function(){
+            if (startBtn) { startBtn.disabled = false; startBtn.textContent = 'Bắt Đầu Làm Bài'; }
+            return window.startQuiz();
+        }).catch(function(err){
+            if (startBtn) { startBtn.disabled = false; startBtn.textContent = 'Bắt Đầu Làm Bài'; }
+            alert('Không tải được câu hỏi: ' + (err.message || err));
+        });
+    }
 
     const btnCalc = document.getElementById('btn-calc');
     const btnDict = document.getElementById('btn-dict');
@@ -4324,7 +4483,12 @@ window.toggleQuestionBank = function() {
     const panel = document.getElementById('question-bank-panel');
     if (!panel) return;
     panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-    if (panel.style.display === 'block') window.renderQuestionBank();
+    if (panel.style.display === 'block') {
+        const subject = document.getElementById('subject-select')?.value || 'Tiếng Anh';
+        const list = document.getElementById('question-bank-list');
+        if (list) list.innerHTML = '<div style="padding:12px;color:#666">⏳ Đang tải ngân hàng câu hỏi...</div>';
+        window.ensureQuestionBankForSubject(subject).then(function(){ window.renderQuestionBank(); }).catch(function(e){ if(list) list.innerHTML='<div style="padding:12px;color:#b00020">❌ '+escapeHTML(e.message||e)+'</div>'; });
+    }
 };
 
 window.downloadPDF = function() {
@@ -4572,7 +4736,8 @@ window.startQuiz = function() {
     if(!isV42GeneratedExamCode(code)){alert('Vui lòng chọn một mã đề V41 trước.');return;}
     var modal=ensureEditModal(); modal.style.display='flex';
     var body=document.getElementById('v42-edit-body'); if(body)body.innerHTML='<p>⏳ Đang tải cấu hình mã đề <b>'+escapeHTML(code)+'</b>...</p>';
-    v42EditCall('getexam',{maDe:code}).then(function(data){
+    var subjectNow=document.getElementById('subject-select')?.value||'Tiếng Anh';
+    Promise.resolve().then(function(){ return window.ensureQuestionBankForSubject(subjectNow); }).then(function(){ return v42EditCall('getexam',{maDe:code}); }).then(function(data){
       if(!data||!data.ok)throw new Error((data&&data.message)||'Không đọc được mã đề.');
       var meta=data.meta||{}, bank=v42EditBankForSubject(meta.subject||''), qs=Array.isArray(data.questions)?data.questions:[];
       var topic=v42EditVal(meta,['topic']), level=v42EditVal(meta,['level']), skill=v42EditVal(meta,['skill']);
@@ -4682,7 +4847,9 @@ function v424PrepareReadingItem(item){ var p=v424ReadingPassage(item), x=Object.
     var modal=document.getElementById('v41-exam-modal');
     if(!modal){ alert('Không tìm thấy cửa sổ tạo đề V41.'); return; }
     modal.style.display='flex';
-    refreshV41Filters();
+    var subject=document.getElementById('subject-select')?.value||'Tiếng Anh';
+    var status=document.getElementById('v41-generator-status'); if(status) status.textContent='⏳ Đang tải ngân hàng '+subject+'...';
+    window.ensureQuestionBankForSubject(subject).then(function(){ refreshV41Filters(); }).catch(function(e){ setStatus('❌ '+(e.message||e),false); });
   };
   window.closeV41ExamGenerator=function(){
     var modal=document.getElementById('v41-exam-modal'); if(modal) modal.style.display='none';
