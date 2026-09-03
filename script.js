@@ -1,4 +1,5 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbyVe4lxouXJ6mUc2dMOBdCbMDFr_OFffFMfNE7hWeg7QkwM12BU37PZTiX7vqPWFret/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbxByXvzJFoK6N0jToFqXj1pEMBnGkMyoa7J5r7vEScJTr-ZSOfSw8Wdv8pPg5EyBg/exec";
+
 // ============================================================
 // V32 — SINGLE DICTIONARY ENGINE + PROFESSIONAL DUAL-PRONUNCIATION UI
 // - Chỉ script.js sở hữu window.lookupWord
@@ -2452,6 +2453,97 @@ window.updateBaoAdminToolsVisibility = function() {
 };
 
 
+window.isBaoAdmin = function() {
+    const studentSelect = document.getElementById('student-code');
+    const maHS = studentSelect ? String(studentSelect.value || '').trim() : String(localStorage.getItem('saved_maHS') || '').trim();
+    return cleanKey(maHS) === 'bao';
+};
+
+window.v42UpdateAnswerCall = function(params) {
+    return new Promise(function(resolve, reject) {
+        const cb = 'v42AnswerFix_' + Date.now() + '_' + Math.floor(Math.random()*100000);
+        const script = document.createElement('script');
+        let done = false;
+        const cleanup = function(){
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            try { delete window[cb]; } catch(e) { window[cb] = null; }
+            if (script.parentNode) script.parentNode.removeChild(script);
+        };
+        const timer = setTimeout(function(){ cleanup(); reject(new Error('Hết thời gian kết nối Apps Script.')); }, 20000);
+        window[cb] = function(data){ cleanup(); resolve(data); };
+        script.onerror = function(){ cleanup(); reject(new Error('Không kết nối được Apps Script.')); };
+        let qs = '?action=updateanswer';
+        Object.keys(params || {}).forEach(function(k){ qs += '&' + encodeURIComponent(k) + '=' + encodeURIComponent(params[k] == null ? '' : params[k]); });
+        qs += '&callback=' + encodeURIComponent(cb) + '&v=42.4';
+        script.src = API_URL + qs;
+        document.body.appendChild(script);
+    });
+};
+
+window.openAnswerFixModal = function(index) {
+    if (!window.isBaoAdmin()) { alert('Chức năng sửa đáp án chỉ dành cho Bảo/Bao.'); return; }
+    const item = AppState.currentQuizData[index];
+    if (!item) return;
+    const maCau = String(item.MaCau || item['Mã câu'] || item.maCau || item.ID || '').trim();
+    if (!maCau) return alert('Câu này chưa có MaCau nên không thể cập nhật an toàn.');
+    let modal = document.getElementById('v42-answer-fix-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'v42-answer-fix-modal';
+        modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:100000;display:none;align-items:center;justify-content:center;padding:15px;box-sizing:border-box;';
+        modal.innerHTML = '<div style="background:#fff;width:min(620px,100%);max-height:92vh;overflow:auto;border-radius:14px;padding:20px;box-sizing:border-box;box-shadow:0 10px 40px rgba(0,0,0,.25)">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h2 style="margin:0;color:#540606">🛠️ Sửa đáp án câu hỏi</h2><button type="button" onclick="window.closeAnswerFixModal()" style="font-size:22px;border:0;background:#eee;border-radius:8px;padding:5px 12px;cursor:pointer">✕</button></div>' +
+            '<div id="v42-answer-fix-body" style="margin-top:14px"></div></div>';
+        document.body.appendChild(modal);
+    }
+    modal.style.display = 'flex';
+    const body = document.getElementById('v42-answer-fix-body');
+    const opts = ['a','b','c','d'].filter(function(k){ return String(item[k] || '').trim() !== ''; });
+    const currentKeys = item._correctKeys || getCorrectKeys(item);
+    const current = currentKeys.map(function(k){return k.toUpperCase();}).join(',') || String(item.correct || '').toUpperCase();
+    const multi = currentKeys.length > 1;
+    let html = '<div style="background:#f6f8fa;padding:10px;border-radius:8px;margin-bottom:12px"><b>MaCau:</b> ' + escapeHTML(maCau) + '<br><b>Đáp án hiện tại:</b> <span style="color:#b00020;font-weight:bold">' + escapeHTML(current || 'Chưa xác định') + '</span></div>';
+    html += '<div style="margin-bottom:10px;font-weight:bold">' + (multi ? 'Chọn các đáp án đúng:' : 'Chọn đáp án đúng:') + '</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px">';
+    opts.forEach(function(k){
+        const letter = k.toUpperCase();
+        const checked = currentKeys.indexOf(k) >= 0;
+        html += '<label style="display:block;border:1px solid #ddd;border-radius:8px;padding:10px;cursor:pointer;background:#fafafa"><input type="' + (multi ? 'checkbox' : 'radio') + '" name="v42-fix-answer" value="' + k + '" ' + (checked ? 'checked' : '') + ' style="margin-right:7px"> <b>' + letter + '.</b> ' + escapeHTML(cleanOptionText(item[k])) + '</label>';
+    });
+    html += '</div>';
+    html += '<label style="display:block;margin-top:14px;font-weight:bold">Lý do sửa (không bắt buộc)<textarea id="v42-fix-reason" rows="3" style="width:100%;box-sizing:border-box;margin-top:6px;padding:9px;border:1px solid #ccc;border-radius:8px" placeholder="Ví dụ: Đáp án C mới là đáp án đúng."></textarea></label>';
+    html += '<div id="v42-fix-status" style="margin-top:10px"></div>';
+    html += '<div style="display:flex;gap:8px;margin-top:14px"><button type="button" onclick="window.closeAnswerFixModal()" style="flex:1;padding:11px;border:0;border-radius:8px;background:#6c757d;color:#fff;font-weight:bold;cursor:pointer">Hủy</button><button type="button" id="v42-fix-save" style="flex:1;padding:11px;border:0;border-radius:8px;background:#198754;color:#fff;font-weight:bold;cursor:pointer">💾 Cập nhật ngân hàng</button></div>';
+    if (body) body.innerHTML = html;
+    const saveBtn = document.getElementById('v42-fix-save');
+    if (saveBtn) saveBtn.onclick = function(){
+        let selected = Array.from(document.querySelectorAll('input[name="v42-fix-answer"]:checked')).map(function(x){return x.value.toUpperCase();});
+        if (!selected.length) return alert('Vui lòng chọn ít nhất một đáp án.');
+        if (!multi && selected.length > 1) selected = [selected[0]];
+        const status = document.getElementById('v42-fix-status');
+        saveBtn.disabled = true; saveBtn.style.opacity = '.65';
+        if (status) status.innerHTML = '<span style="color:#6c757d">⏳ Đang cập nhật vào ngân hàng câu hỏi...</span>';
+        const maHS = document.getElementById('student-code') ? String(document.getElementById('student-code').value || '').trim() : String(localStorage.getItem('saved_maHS') || '').trim();
+        const subject = String(item.mon || item.Mon || document.getElementById('subject-select')?.value || 'Tiếng Anh').trim();
+        const maDe = String(item.made || (AppState.v42ExamMeta && AppState.v42ExamMeta.maDe) || '').trim();
+        const reason = String(document.getElementById('v42-fix-reason')?.value || '').trim();
+        window.v42UpdateAnswerCall({maHS:maHS,subject:subject,maCau:maCau,newAnswer:selected.join(','),reason:reason,maDe:maDe}).then(function(r){
+            if (!r || !r.ok) throw new Error((r && r.message) || 'Không cập nhật được.');
+            item.correct = r.newAnswer || selected.join(','); item.DapAnDung = item.correct; item._correctKeys = getCorrectKeys(item);
+            if (status) status.innerHTML = '<div style="padding:10px;background:#eaf7ee;border:1px solid #b7e1c1;border-radius:8px;color:#146c2e"><b>✅ Đã cập nhật thành công.</b><br>' + escapeHTML(r.oldAnswer || current || '') + ' → <b>' + escapeHTML(r.newAnswer || selected.join(',')) + '</b><br><small>MaCau: ' + escapeHTML(maCau) + '</small></div>';
+            saveBtn.textContent = '✅ Đã cập nhật';
+            setTimeout(function(){ window.closeAnswerFixModal(); }, 1400);
+        }).catch(function(err){
+            if (status) status.innerHTML = '<div style="padding:10px;background:#fdecec;border:1px solid #f5c2c7;border-radius:8px;color:#b00020">❌ ' + escapeHTML(err.message) + '</div>';
+            saveBtn.disabled = false; saveBtn.style.opacity = '1';
+        });
+    };
+};
+
+window.closeAnswerFixModal = function(){ const modal = document.getElementById('v42-answer-fix-modal'); if (modal) modal.style.display = 'none'; };
+
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function(){ window.updateBaoAdminToolsVisibility(); });
 } else {
@@ -3383,6 +3475,7 @@ window.renderQuiz = function() {
         const isMathOrVietnamese = cleanMon.includes('toan') || cleanMon.includes('math') || cleanMon.includes('tiengviet') || cleanMon.includes('tv');
         let speechBtnHtml = isMathOrVietnamese ? '' : '<button type="button" class="speech-btn" onclick="window.speakQuestion(' + index + ')">🔊 Nghe</button>';
 
+        const adminFixHtml = window.isBaoAdmin() ? '<div style="margin-top:12px;padding-top:10px;border-top:1px dashed #ccc;display:flex;justify-content:flex-end;"><button type="button" onclick="window.openAnswerFixModal(' + index + ')" style="padding:9px 13px;border:1px solid #fd7e14;border-radius:8px;background:#fff7ed;color:#b45309;font-weight:bold;cursor:pointer;">🛠️ Sửa đáp án đúng</button></div>' : '';
         html += '<div class="quiz-card" id="question-card-' + index + '"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;"><div style="font-weight: bold; color: #540606; font-size: 1.1em;">Câu ' + (index + 1) + ':</div>' + speechBtnHtml + '</div><div style="margin-bottom: 15px; font-weight: 600; white-space: pre-line; line-height: 1.6; font-size: 1.1em;">' + escapeHTML(item.question) + '</div>' + bodyHtml + '<div class="explanation-box" id="explanation-' + index + '"><b>💡 Giải thích:</b> ' + escapeHTML(item.explanation || 'Không có giải thích.') + '</div></div>';
     });
 
