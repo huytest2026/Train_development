@@ -5758,7 +5758,7 @@ window.addEventListener('load', () => { try { v16BackgroundPreload(); } catch (e
     let m=document.getElementById('v427-ebook-ai-modal');
     if(m)return m;
     m=document.createElement('div');m.id='v427-ebook-ai-modal';
-    m.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:10120;align-items:center;justify-content:center;padding:10px;box-sizing:border-box;';
+    m.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:13050;align-items:center;justify-content:center;padding:10px;box-sizing:border-box;';
     m.innerHTML='<div style="width:min(1000px,100%);max-height:95vh;overflow:auto;background:#fff;border-radius:16px;padding:16px;box-sizing:border-box;color:#17212b">'+
       '<div style="display:flex;align-items:center;gap:8px;justify-content:space-between"><h2 style="margin:0;color:#0d6efd">🤖 Tạo trắc nghiệm từ sách</h2><button type="button" onclick="window.closeEbookAIQuiz()" style="padding:8px 12px;border:0;border-radius:8px;background:#6c757d;color:#fff;font-weight:700">✕ Đóng</button></div>'+ 
       '<div id="v427-ebook-ai-book" style="margin-top:8px;padding:9px;background:#eef6ff;border-radius:9px;font-size:.92em"></div>'+ 
