@@ -5619,4 +5619,3 @@ window.addEventListener('load', () => { try { v16BackgroundPreload(); } catch (e
   let touchX=0;document.addEventListener('touchstart',e=>{if(e.touches?.length===1)touchX=e.touches[0].clientX;},{passive:true});document.addEventListener('touchend',e=>{const m=document.getElementById('ebook-reader-modal');if(!m||m.style.display==='none')return;if(!touchX||!e.changedTouches?.length)return;const dx=e.changedTouches[0].clientX-touchX;touchX=0;if(Math.abs(dx)>60){if(dx<0)window.ebookNext();else window.ebookPrev();}},{passive:true});
 })();
 
-
