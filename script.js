@@ -5503,9 +5503,13 @@ window.addEventListener('load', () => { try { v16BackgroundPreload(); } catch (e
     return dbTx('readonly',st=>st.index('remoteId').get(String(remoteId))).catch(()=>null);
   }
   async function saveRemoteCache(meta,blob){
-    const old=await getRemoteCached(meta.id);
-    const obj={id:old?.id,name:meta.name,file:blob,size:blob.size,type:'application/pdf',remoteId:String(meta.id),createdAt:meta.createdAt||Date.now(),updatedAt:meta.updatedAt||Date.now(),source:'drive'};
-    if(old){obj.id=old.id;return dbTx('readwrite',st=>st.put(obj));}
+    const remoteId=String(meta?.id||'').trim();
+    if(!remoteId)throw new Error('Sách không có mã Drive hợp lệ.');
+    const old=await getRemoteCached(remoteId);
+    const obj={name:String(meta.name||'Sách'),file:blob,size:blob.size,type:'application/pdf',remoteId,createdAt:meta.createdAt||Date.now(),updatedAt:meta.updatedAt||Date.now(),source:'drive'};
+    // Store có keyPath='id' + autoIncrement. Khi thêm bản ghi mới tuyệt đối không
+    // truyền id: undefined, vì IndexedDB sẽ báo Invalid key.
+    if(old&&old.id!=null){obj.id=old.id;return dbTx('readwrite',st=>st.put(obj));}
     return dbTx('readwrite',st=>st.add(obj));
   }
   async function delCachedRemote(id){const b=await getRemoteCached(id);if(b)return dbTx('readwrite',st=>st.delete(b.id));}
@@ -5618,4 +5622,3 @@ window.addEventListener('load', () => { try { v16BackgroundPreload(); } catch (e
   document.addEventListener('keydown',e=>{const m=document.getElementById('ebook-reader-modal');if(!m||m.style.display==='none')return;if(e.key==='ArrowRight'){e.preventDefault();window.ebookNext();}else if(e.key==='ArrowLeft'){e.preventDefault();window.ebookPrev();}else if(e.key==='+'||e.key==='='){e.preventDefault();window.ebookZoom(1);}else if(e.key==='-'){e.preventDefault();window.ebookZoom(-1);}else if(e.key==='Escape'){window.closeEbookReader();}});
   let touchX=0;document.addEventListener('touchstart',e=>{if(e.touches?.length===1)touchX=e.touches[0].clientX;},{passive:true});document.addEventListener('touchend',e=>{const m=document.getElementById('ebook-reader-modal');if(!m||m.style.display==='none')return;if(!touchX||!e.changedTouches?.length)return;const dx=e.changedTouches[0].clientX-touchX;touchX=0;if(Math.abs(dx)>60){if(dx<0)window.ebookNext();else window.ebookPrev();}},{passive:true});
 })();
-
