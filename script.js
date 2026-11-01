@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbwh8JBTsw3S5o_8mtmK_qiJrZy3plc_-bCQevifKTS1mH0dhk_MkGl1wm75q48zgUt1/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbxTXBiEIWlQHGHKNh-pCOo6Cx6F4bAOlJFdkmj9Q3lOUGJNbL-ri_uZypg1waFgVK0G/exec";
 // ============================================================
 // V32 — SINGLE DICTIONARY ENGINE + PROFESSIONAL DUAL-PRONUNCIATION UI
 // - Chỉ script.js sở hữu window.lookupWord
@@ -2344,9 +2344,10 @@ function v425CurrentStudentCode() {
     return String((el && el.value) || localStorage.getItem('saved_maHS') || '').trim();
 }
 function v425CurrentTopicPermissionKey(subject, maHS) {
-    const topics = getAllowedPermissionValues(maHS || v425CurrentStudentCode(), subject)
-        .map(x => cleanKey(x)).sort();
-    return cleanKey(maHS || v425CurrentStudentCode()) + '_' + topics.join('_');
+    const student = maHS || v425CurrentStudentCode();
+    const topics = getAllowedPermissionValues(student, subject).map(x => cleanKey(x)).sort();
+    const mades = getAllowedMadeValues(student, subject).map(x => cleanKey(x)).sort();
+    return cleanKey(student) + '_T_' + topics.join('_') + '_M_' + mades.join('_');
 }
 function v425SubjectCacheKey(subject, maHS) {
     return V425_SUBJECT_CACHE_PREFIX + cleanKey(subject) + '_' + v425CurrentTopicPermissionKey(subject, maHS);
@@ -2362,7 +2363,7 @@ window.ensureSubjectData = function(subject, forceRefresh = false) {
     const maHS = v425CurrentStudentCode();
     // Xác thực quyền trước cả RAM cache và localStorage cache.
     if (!maHS || !getAllowedSubjectsForStudent(maHS).some(x => cleanKey(x) === key)) {
-        return Promise.reject(new Error('Bạn chưa được phân quyền Chủ đề cho môn ' + mon + '.'));
+        return Promise.reject(new Error('Bạn chưa được phân quyền Chủ đề hoặc Mã đề cho môn ' + mon + '.'));
     }
     if (!forceRefresh && AppState.loadedSubjects[key] && AppState.loadedSubjects[key].length) return Promise.resolve(true);
     if (AppState.subjectLoading[key]) return AppState.subjectLoading[key];
@@ -2528,6 +2529,16 @@ window.handleSubjectChange = function() {
         window.renderLeaderboard('');
         return;
     }
+    // Nếu học sinh chỉ được cấp MADE (không có quyền Chủ đề), không gọi API tải Questions.
+    // Danh sách MADE được lấy riêng từ MadePermissions/DE_THI.
+    const currentStudent = v425CurrentStudentCode();
+    if (!getAllowedPermissionValues(currentStudent, monRaw).length) {
+        window.updateTopicList();
+        window.updateMadeList();
+        window.renderLeaderboard(monRaw);
+        window.saveUserSelections();
+        return;
+    }
     // V42.5: chỉ tải Questions của môn đang chọn; không tải toàn bộ ngay lúc mở trang.
     window.ensureSubjectData(monRaw).then(function(){
         window.updateTopicList();
@@ -2614,9 +2625,12 @@ function getAllowedSubjectsForStudent(maHS) {
     const topicSubjects = (Array.isArray(AppState.userPermissions) ? AppState.userPermissions : [])
         .filter(p => isStudentAllowed(p.maHS, maHS) && String(p.chuDe || '').trim())
         .map(p => String(p.mon == null ? '' : p.mon).trim());
+    const madeSubjects = (Array.isArray(AppState.madePermissions) ? AppState.madePermissions : [])
+        .filter(p => isStudentAllowed(p.maHS, maHS) && String(p.made || '').trim())
+        .map(p => String(p.mon == null ? '' : p.mon).trim());
 
     const unique = [];
-    topicSubjects.forEach(subject => {
+    topicSubjects.concat(madeSubjects).forEach(subject => {
         if (!subject || cleanKey(subject) === 'id') return;
         if (!unique.some(x => cleanKey(x) === cleanKey(subject))) unique.push(subject);
     });
@@ -2643,9 +2657,9 @@ function getPermissionStudentList() {
             });
     };
 
-    // Danh sách học sinh chính thức lấy từ UserPermissions.
-    // Học sinh chỉ có MadePermissions chưa được cấp quyền học môn nên không được chọn.
+    // Học sinh có quyền theo Chủ đề hoặc theo MADE đều được phép chọn.
     (Array.isArray(AppState.userPermissions) ? AppState.userPermissions : []).forEach(p => addStudents(p.maHS));
+    (Array.isArray(AppState.madePermissions) ? AppState.madePermissions : []).forEach(p => addStudents(p.maHS));
 
     return students;
 }
@@ -2904,12 +2918,7 @@ window.updateMadeList = function() {
     const allowedMadeValues = getAllowedMadeValues(maHS, monSelect);
     const legacyMades = allowedMadeValues.filter((made, index, arr) => {
         const madeKey = cleanKey(made);
-        const existsInQuizData = AppState.allQuizData.some(i =>
-            cleanKey(i.mon || '') === cleanMonSelect &&
-            cleanKey(i.made || '') === madeKey &&
-            String(i.question || '').trim() !== ''
-        );
-        return madeKey && arr.findIndex(x => cleanKey(x) === madeKey) === index && existsInQuizData;
+        return madeKey && arr.findIndex(x => cleanKey(x) === madeKey) === index;
     });
 
     madeSelect.innerHTML = '<option value="">-- Chọn mã đề --</option>' +
@@ -3060,32 +3069,58 @@ window.initInterface = function() {
 };
 
 window.loadData = function(forceRefresh = false) {
-    if (AppState.dataLoading) return;
+    // Mỗi lần bấm/đổi học sinh tạo một lượt tải mới; kết quả lượt cũ không được ghi đè.
+    window.__v425LoadRequestId = (window.__v425LoadRequestId || 0) + 1;
+    const requestId = window.__v425LoadRequestId;
     const studentSelect = document.getElementById('student-code');
     const maHS = studentSelect ? studentSelect.value.trim() : '';
     const oldMa = localStorage.getItem('saved_maHS') || '';
-    if (maHS) {
-        if (oldMa && normalizePermissionValue(oldMa) !== normalizePermissionValue(maHS)) localStorage.removeItem('saved_mon');
-        localStorage.setItem('saved_maHS', maHS);
+    if (!maHS) {
+        AppState.dataLoading = false;
+        const c = document.getElementById('topic-container');
+        if (c) c.innerHTML = '<i>Vui lòng chọn Mã học sinh.</i>';
+        return;
     }
+    if (oldMa && normalizePermissionValue(oldMa) !== normalizePermissionValue(maHS)) {
+        localStorage.removeItem('saved_mon');
+        AppState.allQuizData = []; AppState.loadedSubjects = {}; AppState.subjectLoading = {};
+        AppState.mathQuestionBank = []; AppState.englishQuestionBank = [];
+        AppState.questionBankLoaded = {}; AppState.questionBankLoading = {};
+        try { rebuildQuestionIndex(); } catch(e) {}
+    }
+    localStorage.setItem('saved_maHS', maHS);
     clearLegacyPermissionCaches();
-
     AppState.dataLoading = true;
     const container = document.getElementById('topic-container');
-    if (container) container.innerHTML = '⚡ Đang tải dữ liệu khởi động...';
+    if (container) container.innerHTML = '⚡ Đang làm mới quyền và tải dữ liệu...';
 
-    // V42.5: bootstrap chỉ gồm quyền + xếp hạng. Questions và 2 ngân hàng được lazy-load.
-    window.ensureV425Bootstrap(forceRefresh).then(function(){
+    // Luôn yêu cầu máy chủ đọc snapshot mới từ Sheets, không dùng quyền cũ trong cache.
+    window.ensureV425Bootstrap(true).then(function(){
+        if (requestId !== window.__v425LoadRequestId || v425CurrentStudentCode() !== maHS) return;
         AppState.dataLoading = false;
-        const selected = window.updateStudentList ? window.updateStudentList(maHS || oldMa) : (maHS || oldMa);
-        if (selected && selected !== maHS) localStorage.setItem('saved_maHS', selected);
-        const subject = document.getElementById('subject-select')?.value || '';
-        if (subject) return window.ensureSubjectData(subject, forceRefresh);
+        const selected = window.updateStudentList ? window.updateStudentList(maHS) : maHS;
+        if (!selected || normalizePermissionValue(selected) !== normalizePermissionValue(maHS)) {
+            throw new Error('Mã học sinh này chưa được cấp quyền trong UserPermissions hoặc MadePermissions.');
+        }
+        const allowedSubjects = getAllowedSubjectsForStudent(maHS);
+        const subjectSelect = document.getElementById('subject-select');
+        const current = subjectSelect ? subjectSelect.value : '';
+        const chosen = allowedSubjects.find(x => cleanKey(x) === cleanKey(current)) || getDefaultSubjectForStudent(allowedSubjects);
+        if (subjectSelect) subjectSelect.value = chosen || '';
+        window.updateBaoAdminToolsVisibility();
+        if (chosen && getAllowedPermissionValues(maHS, chosen).length) return window.ensureSubjectData(chosen, true);
+        if (chosen) {
+            window.updateTopicList(); window.updateMadeList(); window.renderLeaderboard(chosen);
+            return;
+        }
+        window.updateTopicList(); window.updateMadeList();
+        if (container) container.innerHTML = '<i>Học sinh chưa được cấp quyền môn học hoặc mã đề.</i>';
     }).catch(function(err){
+        if (requestId !== window.__v425LoadRequestId) return;
         AppState.dataLoading = false;
         if (container) container.innerHTML = '<span style="color:#b00020">❌ ' + escapeHTML(err.message || 'Lỗi kết nối mạng khi tải dữ liệu.') + '</span>';
         console.error('V42.5 loadData:', err);
-    });
+    }).finally(function(){ if (requestId === window.__v425LoadRequestId) AppState.dataLoading = false; });
 };
 
 window.handleQuizData = function(data, fromSessionCache = false) {
@@ -6015,45 +6050,3 @@ window.addEventListener('load', () => { try { v16BackgroundPreload(); } catch (e
     (async function(){try{let total=0;for(let i=0;i<chunks.length;i++){if(st)st.textContent='⏳ Đang lưu '+(i+1)+'/'+chunks.length+'...';const r=await window.v426AICall('ebookaisave',{maHS:maHS,subject:subject,mode:mode,bookName:String(b.name||''),pageStart:document.getElementById('v427-ai-page-start')?.value||'',pageEnd:document.getElementById('v427-ai-page-end')?.value||'',model:'gemini-3.6-flash',items:JSON.stringify(chunks[i])},60000);if(!r||!r.ok)throw new Error((r&&r.message)||'Không lưu được.');total+=Number(r.count||0);}if(st)st.textContent='✅ Đã lưu '+total+' câu vào sheet riêng '+(subject==='Toán'?'NGAN_HANG_EBOOK_TOAN':'NGAN_HANG_EBOOK_TIENG_ANH')+'.';try{if(typeof window.updateQuestionBank==='function')window.updateQuestionBank(true);}catch(e){}try{if(typeof window.updateMadeList==='function')window.updateMadeList();}catch(e){}}catch(e){if(st)st.textContent='❌ '+(e.message||e);}})();
   };
 })();
-// ============================================================
-// V43.0.2 PATCH – BẢN VÁ LỖI VÀ TỐI ƯU HỆ THỐNG
-// ============================================================
-
-// 1. Vá lỗi an toàn IndexedDB cho E-Book Library Store
-(function fixIndexedDBInit() {
-    try {
-        const req = indexedDB.open('V4263_EBOOK_LIBRARY', 4);
-        req.onupgradeneeded = function(e) {
-            const db = e.target.result;
-            if (db.objectStoreNames.contains('books')) {
-                db.deleteObjectStore('books');
-            }
-            const st = db.createObjectStore('books', { keyPath: 'id', autoIncrement: true });
-            st.createIndex('name', 'name', { unique: false });
-            st.createIndex('remoteId', 'remoteId', { unique: true });
-        };
-    } catch (err) {
-        console.warn('⚠️ Không thể tối ưu hóa IndexedDB tự động:', err);
-    }
-})();
-
-// 2. Tối ưu bộ đếm lịch sử máy tính không làm ảnh hưởng luồng fetch khác
-(function safeFetchLogger() {
-    const originalFetch = window.fetch;
-    window.fetch = function(...args) {
-        const [url, options] = args;
-        if (options && options.method === 'POST' && options.body && typeof url === 'string' && url.includes(API_URL)) {
-            try {
-                let data = JSON.parse(options.body);
-                data.calcOpenCount = window.calcLogs?.openCount || 0;
-                data.calcHistory = window.calcLogs?.history?.join('\n') || 'Không sử dụng máy tính';
-                options.body = JSON.stringify(data);
-            } catch (e) {
-                // Bỏ qua nếu body không phải JSON hợp lệ
-            }
-        }
-        return originalFetch.apply(this, args);
-    };
-})();
-
-console.log('✅ Đã nạp bản vá V43.0.2 thành công. Hệ thống sẵn sàng vận hành!');
