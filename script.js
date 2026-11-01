@@ -2339,25 +2339,45 @@ function v425ReadLocal(key, maxAgeMs = 21600000) {
 function v425WriteLocal(key, value) {
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
 }
-function v425SubjectCacheKey(subject) { return V425_SUBJECT_CACHE_PREFIX + cleanKey(subject); }
-function v425BankCacheKey(subject) { return V425_BANK_CACHE_PREFIX + cleanKey(subject); }
+function v425CurrentStudentCode() {
+    const el = document.getElementById('student-code');
+    return String((el && el.value) || localStorage.getItem('saved_maHS') || '').trim();
+}
+function v425CurrentTopicPermissionKey(subject, maHS) {
+    const topics = getAllowedPermissionValues(maHS || v425CurrentStudentCode(), subject)
+        .map(x => cleanKey(x)).sort();
+    return cleanKey(maHS || v425CurrentStudentCode()) + '_' + topics.join('_');
+}
+function v425SubjectCacheKey(subject, maHS) {
+    return V425_SUBJECT_CACHE_PREFIX + cleanKey(subject) + '_' + v425CurrentTopicPermissionKey(subject, maHS);
+}
+function v425BankCacheKey(subject, maHS) {
+    return V425_BANK_CACHE_PREFIX + cleanKey(subject) + '_' + cleanKey(maHS || v425CurrentStudentCode());
+}
 
 window.ensureSubjectData = function(subject, forceRefresh = false) {
     const mon = String(subject || '').trim();
     if (!mon) return Promise.resolve(false);
     const key = cleanKey(mon);
+    const maHS = v425CurrentStudentCode();
+    // Xác thực quyền trước cả RAM cache và localStorage cache.
+    if (!maHS || !getAllowedSubjectsForStudent(maHS).some(x => cleanKey(x) === key)) {
+        return Promise.reject(new Error('Bạn chưa được phân quyền Chủ đề cho môn ' + mon + '.'));
+    }
     if (!forceRefresh && AppState.loadedSubjects[key] && AppState.loadedSubjects[key].length) return Promise.resolve(true);
     if (AppState.subjectLoading[key]) return AppState.subjectLoading[key];
 
     if (!forceRefresh) {
-        const local = v425ReadLocal(v425SubjectCacheKey(mon));
+        const local = v425ReadLocal(v425SubjectCacheKey(mon, maHS));
         if (local && Array.isArray(local.questions) && local.questions.length) {
+            if (v425CurrentStudentCode() !== maHS) return Promise.reject(new Error('Mã học sinh đã thay đổi.'));
             window.applyV425SubjectQuestions(local.questions, true, mon);
             return Promise.resolve(true);
         }
     }
 
-    AppState.subjectLoading[key] = v425ApiCall('getquestions', { subject: mon }).then(function(data) {
+    AppState.subjectLoading[key] = v425ApiCall('getquestions', { subject: mon, maHS: maHS }).then(function(data) {
+        if (v425CurrentStudentCode() !== maHS) throw new Error('Mã học sinh đã thay đổi trong lúc tải dữ liệu.');
         if (!data || !data.ok || !Array.isArray(data.questions)) throw new Error((data && data.message) || 'Không tải được câu hỏi môn ' + mon + '.');
         window.applyV425SubjectQuestions(data.questions, false, mon);
         return true;
@@ -2386,7 +2406,7 @@ window.applyV425SubjectQuestions = function(rawQuestions, fromCache, subject) {
     AppState.allQuizData = AppState.allQuizData.filter(function(i) { return cleanKey(i.mon || '') !== key; }).concat(normalized);
     AppState.loadedSubjects[key] = normalized;
     rebuildQuestionIndex();
-    if (!fromCache) v425WriteLocal(v425SubjectCacheKey(subject), { savedAt: Date.now(), questions: rawQuestions });
+    if (!fromCache) v425WriteLocal(v425SubjectCacheKey(subject, v425CurrentStudentCode()), { savedAt: Date.now(), questions: rawQuestions });
 
     const currentSubject = document.getElementById('subject-select')?.value || '';
     if (cleanKey(currentSubject) === key) {
@@ -2405,7 +2425,8 @@ window.ensureQuestionBankForSubject = function(subject, forceRefresh = false) {
     if (AppState.questionBankLoading[key]) return AppState.questionBankLoading[key];
 
     if (!forceRefresh) {
-        const local = v425ReadLocal(v425BankCacheKey(mon));
+        const maHS = v425CurrentStudentCode();
+        const local = v425ReadLocal(v425BankCacheKey(mon, maHS));
         if (local && Array.isArray(local.bank)) {
             AppState[target] = local.bank;
             AppState.questionBankLoaded[key] = true;
@@ -2413,11 +2434,12 @@ window.ensureQuestionBankForSubject = function(subject, forceRefresh = false) {
         }
     }
 
-    AppState.questionBankLoading[key] = v425ApiCall('getbank', { subject: mon }).then(function(data) {
+    const maHS = v425CurrentStudentCode();
+    AppState.questionBankLoading[key] = v425ApiCall('getbank', { subject: mon, maHS: maHS }).then(function(data) {
         if (!data || !data.ok || !Array.isArray(data.bank)) throw new Error((data && data.message) || 'Không tải được ngân hàng câu hỏi.');
         AppState[target] = data.bank.slice();
         AppState.questionBankLoaded[key] = true;
-        v425WriteLocal(v425BankCacheKey(mon), { savedAt: Date.now(), bank: data.bank });
+        v425WriteLocal(v425BankCacheKey(mon, maHS), { savedAt: Date.now(), bank: data.bank });
         try { window.renderQuestionBank(); } catch(e) {}
         return AppState[target];
     }).finally(function() { delete AppState.questionBankLoading[key]; });
@@ -2425,15 +2447,16 @@ window.ensureQuestionBankForSubject = function(subject, forceRefresh = false) {
 };
 
 window.ensureV425Bootstrap = function(forceRefresh = false) {
-    if (!forceRefresh && AppState.userPermissions.length + AppState.madePermissions.length > 0) return Promise.resolve(true);
+    if (!forceRefresh && AppState.userPermissions.length + AppState.madePermissions.length > 0 &&
+        AppState.dataLoadedAt && (Date.now() - AppState.dataLoadedAt) < 30000) return Promise.resolve(true);
     if (!forceRefresh) {
-        const local = v425ReadLocal(V425_BOOT_CACHE_KEY);
+        const local = v425ReadLocal(V425_BOOT_CACHE_KEY, 30000);
         if (local && local.permissions && local.madePermissions) {
             window.handleV425Bootstrap(local, true);
             return Promise.resolve(true);
         }
     }
-    return v425ApiCall('fastbootstrap', {}).then(function(data) {
+    return v425ApiCall('fastbootstrap', { fresh: forceRefresh ? '1' : '' }).then(function(data) {
         if (!data || !data.ok) throw new Error((data && data.message) || 'Không tải được dữ liệu khởi động.');
         v425WriteLocal(V425_BOOT_CACHE_KEY, data);
         window.handleV425Bootstrap(data, false);
@@ -2442,12 +2465,27 @@ window.ensureV425Bootstrap = function(forceRefresh = false) {
 };
 
 window.handleV425Bootstrap = function(data, fromCache) {
-    AppState.userPermissions = (data.permissions || []).map(function(p) {
+    const nextUserPermissions = (data.permissions || []).map(function(p) {
         return { maHS: String(p.maHS || p[0] || '').trim(), mon: standardizeSubject(String(p.mon || p[1] || '').trim()), chuDe: String(p.chuDe || p[2] || '').trim() };
     }).filter(function(p) { return p.maHS && p.mon && p.chuDe; });
-    AppState.madePermissions = (data.madePermissions || []).map(function(p) {
+    const nextMadePermissions = (data.madePermissions || []).map(function(p) {
         return { maHS: String(p.maHS || p[0] || '').trim(), mon: standardizeSubject(String(p.mon || p[1] || '').trim()), made: String(p.made || p.maDe || p.MADE || p[2] || '').trim() };
     }).filter(function(p) { return p.maHS && p.mon && p.made; });
+    const permissionChanged = JSON.stringify(AppState.userPermissions || []) !== JSON.stringify(nextUserPermissions) ||
+        JSON.stringify(AppState.madePermissions || []) !== JSON.stringify(nextMadePermissions);
+    if (AppState.dataLoaded && permissionChanged) {
+        // Khi quyền thay đổi, loại bỏ câu hỏi cũ trong RAM trước khi dựng lại giao diện.
+        AppState.allQuizData = [];
+        AppState.loadedSubjects = {};
+        AppState.subjectLoading = {};
+        AppState.mathQuestionBank = [];
+        AppState.englishQuestionBank = [];
+        AppState.questionBankLoaded = {};
+        AppState.questionBankLoading = {};
+        try { rebuildQuestionIndex(); } catch(e) {}
+    }
+    AppState.userPermissions = nextUserPermissions;
+    AppState.madePermissions = nextMadePermissions;
     AppState.rankings = Array.isArray(data.rankings) ? data.rankings : [];
     AppState.dataLoaded = true;
     AppState.dataSource = fromCache ? 'localStorage-bootstrap' : 'network-bootstrap';
@@ -2511,9 +2549,9 @@ window.handleSubjectChange = function() {
 // NHÁNH 2: HỌC THEO MÃ ĐỀ
 //   MadePermissions: Mã học sinh | Môn | Mã đề
 //
-// Hai quyền hoàn toàn độc lập. Một học sinh chỉ được xem những môn
-// mà em đó có quyền Chủ đề hoặc quyền Mã đề. Sau khi chọn chế độ,
-// từng nhánh sẽ kiểm tra đúng bảng quyền của chính nó.
+// Hai bảng quyền độc lập:
+// UserPermissions quyết định môn học được hiển thị và các Chủ đề được học.
+// MadePermissions chỉ cấp mã đề bên trong môn đã được cấp quyền Chủ đề.
 // ============================================================
 function normalizePermissionValue(value) {
     return String(value == null ? '' : value)
@@ -2571,16 +2609,14 @@ function getAllowedMadeValues(maHS, mon) {
 }
 
 function getAllowedSubjectsForStudent(maHS) {
+    // Chỉ UserPermissions được quyết định môn nào xuất hiện trên giao diện.
+    // MadePermissions không tự cấp quyền hiển thị môn.
     const topicSubjects = (Array.isArray(AppState.userPermissions) ? AppState.userPermissions : [])
-        .filter(p => isStudentAllowed(p.maHS, maHS))
-        .map(p => String(p.mon == null ? '' : p.mon).trim());
-
-    const madeSubjects = (Array.isArray(AppState.madePermissions) ? AppState.madePermissions : [])
-        .filter(p => isStudentAllowed(p.maHS, maHS))
+        .filter(p => isStudentAllowed(p.maHS, maHS) && String(p.chuDe || '').trim())
         .map(p => String(p.mon == null ? '' : p.mon).trim());
 
     const unique = [];
-    [...topicSubjects, ...madeSubjects].forEach(subject => {
+    topicSubjects.forEach(subject => {
         if (!subject || cleanKey(subject) === 'id') return;
         if (!unique.some(x => cleanKey(x) === cleanKey(subject))) unique.push(subject);
     });
@@ -2607,8 +2643,9 @@ function getPermissionStudentList() {
             });
     };
 
+    // Danh sách học sinh chính thức lấy từ UserPermissions.
+    // Học sinh chỉ có MadePermissions chưa được cấp quyền học môn nên không được chọn.
     (Array.isArray(AppState.userPermissions) ? AppState.userPermissions : []).forEach(p => addStudents(p.maHS));
-    (Array.isArray(AppState.madePermissions) ? AppState.madePermissions : []).forEach(p => addStudents(p.maHS));
 
     return students;
 }
@@ -2783,16 +2820,24 @@ window.handleStudentChange = function() {
     localStorage.setItem('saved_maHS', maHS);
     if (oldMa && normalizePermissionValue(oldMa) !== normalizePermissionValue(maHS)) {
         localStorage.removeItem('saved_mon');
+        // Không tái sử dụng câu hỏi/ngân hàng đã tải cho học sinh trước.
+        AppState.allQuizData = [];
+        AppState.loadedSubjects = {};
+        AppState.subjectLoading = {};
+        AppState.mathQuestionBank = [];
+        AppState.englishQuestionBank = [];
+        AppState.questionBankLoaded = {};
+        AppState.questionBankLoading = {};
+        try { rebuildQuestionIndex(); } catch(e) {}
     }
 
-    // Dữ liệu Questions + UserPermissions + MadePermissions đã tải một lần
-    // nên đổi học sinh chỉ cần dựng lại giao diện, không tải lại toàn bộ dữ liệu.
-    if (AppState.dataLoaded && AppState.allQuizData.length > 0) {
+    // Đổi học sinh: tải lại snapshot quyền từ Sheets và chỉ tải câu hỏi
+    // thuộc quyền của học sinh mới, không dùng lại dữ liệu RAM của học sinh trước.
+    if (AppState.dataLoaded) {
         try {
-            window.initInterface();
-            window.restoreUserSelections();
+            window.loadData(true);
         } catch (e) {
-            console.warn('Không thể đổi học sinh từ dữ liệu RAM:', e);
+            console.warn('Không thể làm mới quyền khi đổi học sinh:', e);
         }
     }
     window.updateBaoAdminToolsVisibility();
@@ -3440,9 +3485,15 @@ window.startQuiz = function() {
     const toggleMade = document.getElementById('toggle-made');
     const selectedMade = (toggleMade && toggleMade.checked && document.getElementById('made-select')) ? document.getElementById('made-select').value.trim() : '';
 
-    // MADE là chế độ riêng: không kiểm tra phân quyền Chủ đề và không yêu cầu
-    // checkbox Chủ đề, kể cả khi học sinh đang chọn Level 2/3.
+    // MADE là chế độ riêng về cách chọn câu, nhưng học sinh vẫn phải có
+    // ít nhất một quyền Chủ đề ở môn đang chọn để được truy cập môn đó.
     const isMadeMode = !!selectedMade;
+    if (!getAllowedSubjectsForStudent(maHS).some(s => cleanKey(s) === cleanKey(mon))) {
+        return alert('Bạn chưa được phân quyền Chủ đề cho môn ' + mon + '.');
+    }
+    if (isMadeMode && !getAllowedMadeValues(maHS, mon).some(x => cleanKey(x) === cleanKey(selectedMade))) {
+        return alert('Bạn chưa được phân quyền Mã đề ' + selectedMade + ' cho môn ' + mon + '.');
+    }
     
     if (selectedMade) {
         const tenPointTimeKey = 'made_10_time_' + maHS + '_' + mon + '_' + selectedMade;
@@ -3460,6 +3511,11 @@ window.startQuiz = function() {
     const levelSelect = document.getElementById('level-select');
     const selectedLevel = levelSelect ? levelSelect.value : '';
     const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
+    if (!isMadeMode) {
+        const permittedTopics = getAllowedPermissionValues(maHS, mon).map(cleanKey);
+        const unauthorizedTopic = selectedTopics.find(topic => permittedTopics.indexOf(cleanKey(topic)) < 0);
+        if (unauthorizedTopic) return alert('Chủ đề ' + unauthorizedTopic + ' chưa được cấp quyền cho học sinh này.');
+    }
 
     if (!isMadeMode && (selectedLevel === 'Level 2' || selectedLevel === 'Level 3' || selectedLevel === '2' || selectedLevel === '3' || selectedLevel.includes('2') || selectedLevel.includes('3'))) {
         if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
@@ -4963,7 +5019,7 @@ window.startV42Exam = function(maDe) {
         }
     };
     const script = document.createElement('script');
-    script.src = API_URL + '?action=getexam&maDe=' + encodeURIComponent(code) + '&callback=' + encodeURIComponent(cb) + '&v=42';
+    script.src = API_URL + '?action=getexam&maDe=' + encodeURIComponent(code) + '&maHS=' + encodeURIComponent(maHS) + '&callback=' + encodeURIComponent(cb) + '&v=42';
     script.onerror = function(){ try { delete window[cb]; } catch(e) {} alert('Không kết nối được máy chủ để tải Mã đề.'); };
     document.body.appendChild(script);
 };
@@ -5959,4 +6015,3 @@ window.addEventListener('load', () => { try { v16BackgroundPreload(); } catch (e
     (async function(){try{let total=0;for(let i=0;i<chunks.length;i++){if(st)st.textContent='⏳ Đang lưu '+(i+1)+'/'+chunks.length+'...';const r=await window.v426AICall('ebookaisave',{maHS:maHS,subject:subject,mode:mode,bookName:String(b.name||''),pageStart:document.getElementById('v427-ai-page-start')?.value||'',pageEnd:document.getElementById('v427-ai-page-end')?.value||'',model:'gemini-3.6-flash',items:JSON.stringify(chunks[i])},60000);if(!r||!r.ok)throw new Error((r&&r.message)||'Không lưu được.');total+=Number(r.count||0);}if(st)st.textContent='✅ Đã lưu '+total+' câu vào sheet riêng '+(subject==='Toán'?'NGAN_HANG_EBOOK_TOAN':'NGAN_HANG_EBOOK_TIENG_ANH')+'.';try{if(typeof window.updateQuestionBank==='function')window.updateQuestionBank(true);}catch(e){}try{if(typeof window.updateMadeList==='function')window.updateMadeList();}catch(e){}}catch(e){if(st)st.textContent='❌ '+(e.message||e);}})();
   };
 })();
-
