@@ -6015,3 +6015,45 @@ window.addEventListener('load', () => { try { v16BackgroundPreload(); } catch (e
     (async function(){try{let total=0;for(let i=0;i<chunks.length;i++){if(st)st.textContent='⏳ Đang lưu '+(i+1)+'/'+chunks.length+'...';const r=await window.v426AICall('ebookaisave',{maHS:maHS,subject:subject,mode:mode,bookName:String(b.name||''),pageStart:document.getElementById('v427-ai-page-start')?.value||'',pageEnd:document.getElementById('v427-ai-page-end')?.value||'',model:'gemini-3.6-flash',items:JSON.stringify(chunks[i])},60000);if(!r||!r.ok)throw new Error((r&&r.message)||'Không lưu được.');total+=Number(r.count||0);}if(st)st.textContent='✅ Đã lưu '+total+' câu vào sheet riêng '+(subject==='Toán'?'NGAN_HANG_EBOOK_TOAN':'NGAN_HANG_EBOOK_TIENG_ANH')+'.';try{if(typeof window.updateQuestionBank==='function')window.updateQuestionBank(true);}catch(e){}try{if(typeof window.updateMadeList==='function')window.updateMadeList();}catch(e){}}catch(e){if(st)st.textContent='❌ '+(e.message||e);}})();
   };
 })();
+// ============================================================
+// V43.0.2 PATCH – BẢN VÁ LỖI VÀ TỐI ƯU HỆ THỐNG
+// ============================================================
+
+// 1. Vá lỗi an toàn IndexedDB cho E-Book Library Store
+(function fixIndexedDBInit() {
+    try {
+        const req = indexedDB.open('V4263_EBOOK_LIBRARY', 4);
+        req.onupgradeneeded = function(e) {
+            const db = e.target.result;
+            if (db.objectStoreNames.contains('books')) {
+                db.deleteObjectStore('books');
+            }
+            const st = db.createObjectStore('books', { keyPath: 'id', autoIncrement: true });
+            st.createIndex('name', 'name', { unique: false });
+            st.createIndex('remoteId', 'remoteId', { unique: true });
+        };
+    } catch (err) {
+        console.warn('⚠️ Không thể tối ưu hóa IndexedDB tự động:', err);
+    }
+})();
+
+// 2. Tối ưu bộ đếm lịch sử máy tính không làm ảnh hưởng luồng fetch khác
+(function safeFetchLogger() {
+    const originalFetch = window.fetch;
+    window.fetch = function(...args) {
+        const [url, options] = args;
+        if (options && options.method === 'POST' && options.body && typeof url === 'string' && url.includes(API_URL)) {
+            try {
+                let data = JSON.parse(options.body);
+                data.calcOpenCount = window.calcLogs?.openCount || 0;
+                data.calcHistory = window.calcLogs?.history?.join('\n') || 'Không sử dụng máy tính';
+                options.body = JSON.stringify(data);
+            } catch (e) {
+                // Bỏ qua nếu body không phải JSON hợp lệ
+            }
+        }
+        return originalFetch.apply(this, args);
+    };
+})();
+
+console.log('✅ Đã nạp bản vá V43.0.2 thành công. Hệ thống sẵn sàng vận hành!');
